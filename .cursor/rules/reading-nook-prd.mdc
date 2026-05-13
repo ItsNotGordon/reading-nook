@@ -1,0 +1,23 @@
+---
+description: Reading Nook — consult PRD before product, UX, tabs, or data model changes
+globs: app/**/*
+alwaysApply: false
+---
+
+# The Reading Nook and the PRD
+
+When editing files under `app/` for **The Reading Nook**, treat the product spec as source of truth:
+
+1. **Read first:** Open [`docs/PRD.md`](docs/PRD.md) and follow it to [`docs/Reading_Nook_PRD.md`](docs/Reading_Nook_PRD.md) (full spec) before you implement or materially change:
+   - tab names, routes, or shell layout  
+   - shelves, library, add flow, leaderboard/ranking, recs, profile  
+   - `AppState` / types / persistence / localStorage keys  
+   - sentiment buckets, progress modes, scoring, or recommendation scope  
+
+2. **If the PRD is silent or ambiguous:** Say what is missing; do **not** invent MVP requirements, tab sets, or data fields.
+
+3. **If code and PRD disagree:** Call out the conflict. Prefer the PRD unless the user explicitly says to diverge.
+
+4. **Out of scope:** Do not expand into items the PRD lists as out-of-scope (e.g. auth, cloud DB, social) unless the user explicitly asks.
+
+5. **Repo layout:** The Next.js app lives in `app/`. Root `notebook.ipynb`, Python, and `requirements.txt` stay unchanged unless the user asks otherwise.

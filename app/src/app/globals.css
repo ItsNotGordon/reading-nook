@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/*
+  Aligned with Stitch DESIGN.md (The Reading Nook) + reference mocks:
+  sage primary, warm paper background, honey secondary accents.
+*/
+:root {
+  --background: #fbf9f9;
+  --foreground: #1b1c1c;
+  --foreground-muted: #424841;
+  --border: #c2c8bf;
+  --accent: #426447;
+  --accent-soft: #abd0ad;
+  --secondary-delight: #efe0a7;
+  --on-secondary-delight: #6d6235;
+  --progress-exact: #426447;
+  --progress-exact-track: #e9e8e7;
+  /* Yellow band for estimated / uncertain stretch of the bar */
+  --progress-estimated-band: #e8cf6a;
+  --progress-estimated: #695e31;
+  --progress-estimated-track: #efe0a7;
+  --progress-estimated-range: #f2e2aa;
+  /* Unread tail of the bar (inside the gray outline) */
+  --progress-unread: #ffffff;
+  --card-surface: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-secondary-delight: var(--secondary-delight);
+  --color-on-secondary-delight: var(--on-secondary-delight);
+  --color-progress-exact: var(--progress-exact);
+  --color-progress-exact-track: var(--progress-exact-track);
+  --color-progress-estimated: var(--progress-estimated);
+  --color-progress-estimated-track: var(--progress-estimated-track);
+  --color-progress-estimated-range: var(--progress-estimated-range);
+  --color-progress-estimated-band: var(--progress-estimated-band);
+  --color-progress-unread: var(--progress-unread);
+  --color-card-surface: var(--card-surface);
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-literata), ui-serif, Georgia, serif;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
