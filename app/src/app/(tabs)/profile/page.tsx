@@ -1,7 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import { useMemo } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { CoverThumb } from "@/components/CoverThumb";
+import { EditProfileSheet } from "@/components/EditProfileSheet";
 import { PageShell } from "@/components/PageShell";
 import { useReadingNook } from "@/lib/app-state";
 import { getUserTopGenreRows, topCounts } from "@/lib/userTopGenres";
@@ -34,8 +36,24 @@ function LeafAccent({ className }: { className: string }) {
   );
 }
 
+/** Two-letter avatar from display name; fallback "RN". */
+function profileAvatarInitials(displayName: string): string {
+  const t = displayName.trim();
+  if (!t) return "RN";
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0][0];
+    const b = parts[1][0];
+    if (a && b) return (a + b).toUpperCase();
+  }
+  const w = parts[0] ?? t;
+  return w.slice(0, 2).toUpperCase();
+}
+
 export default function ProfilePage() {
-  const { state } = useReadingNook();
+  const { state, actions } = useReadingNook();
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const initials = profileAvatarInitials(state.profile.displayName);
 
   const userEntries = useMemo<BookWithMeta[]>(() => {
     const out: BookWithMeta[] = [];
@@ -74,7 +92,6 @@ export default function ProfilePage() {
     3,
   );
 
-  const profileName = "Reading Nook Reader";
   const favoriteBookId =
     state.bucketRankings.liked[0] ??
     state.bucketRankings.okay[0] ??
@@ -85,6 +102,9 @@ export default function ProfilePage() {
 
   return (
     <PageShell>
+      {editProfileOpen ? (
+        <EditProfileSheet profile={state.profile} onClose={() => setEditProfileOpen(false)} />
+      ) : null}
       <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-gradient-to-b from-[#f7f1e7]/80 via-transparent to-transparent px-1 py-1">
         <LeafAccent className="pointer-events-none absolute -left-8 top-3 h-24 w-24 -rotate-[18deg] text-[#7fa483]/35" />
         <LeafAccent className="pointer-events-none absolute -right-10 top-36 h-32 w-32 rotate-[20deg] text-[#9bb391]/30" />
@@ -95,44 +115,66 @@ export default function ProfilePage() {
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border bg-background font-serif text-xl font-semibold text-foreground">
-              RN
+              {initials}
             </div>
             <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
-              {profileName}
+              {state.profile.displayName}
             </h1>
-            <p className="mt-1 text-sm italic text-foreground-muted">
-              Curating stories, one cozy shelf at a time.
-            </p>
+            <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditProfileOpen(true)}
+                className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+              >
+                Edit profile
+              </button>
+              <button
+                type="button"
+                disabled
+                title="Not in this preview"
+                className="min-h-9 cursor-not-allowed rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted opacity-70"
+              >
+                Share library
+              </button>
+            </div>
           </section>
           <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
             <p className="font-medium text-foreground">Your nook is empty</p>
             <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
               Add a few books to start tracking your reading and taste.
             </p>
+            <Link
+              href="/add"
+              className="mt-4 inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+            >
+              Go to Add
+            </Link>
           </div>
         </>
       ) : (
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border bg-[radial-gradient(circle_at_50%_30%,#f7f2e8_0%,#ece3d3_85%)] font-serif text-xl font-semibold text-foreground">
-              RN
+              {initials}
             </div>
             <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
-              {profileName}
+              {state.profile.displayName}
             </h1>
-            <p className="mt-1 text-sm italic text-foreground-muted">
-              Curating words, one chapter at a time.
-            </p>
+            <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
             <div className="mt-4 flex justify-center gap-2">
               <button
                 type="button"
-                className="rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm"
+                onClick={() => setEditProfileOpen(true)}
+                className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
               >
                 Edit profile
               </button>
               <button
                 type="button"
-                className="rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted"
+                disabled
+                title="Not in this preview"
+                className="min-h-9 cursor-not-allowed rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted opacity-70"
               >
                 Share library
               </button>
@@ -166,9 +208,13 @@ export default function ProfilePage() {
             <p className="text-sm font-semibold text-foreground">Favorite book</p>
             {favoriteBook && favoriteUserBook ? (
               <div className="mt-3 flex items-center gap-3 rounded-xl border border-border/80 bg-background p-3">
-                <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-border">
-                  <Image src={favoriteBook.coverUrl} alt="" fill sizes="56px" className="object-cover" />
-                </div>
+                <CoverThumb
+                  src={favoriteBook.coverUrl}
+                  alt=""
+                  sizes="56px"
+                  fallbackLetter={favoriteBook.title}
+                  className="relative h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-border"
+                />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-foreground">{favoriteBook.title}</p>
                   <p className="truncate text-xs text-foreground-muted">{favoriteBook.author}</p>
@@ -253,6 +299,28 @@ export default function ProfilePage() {
           </section>
         </>
           )}
+          <section className="rounded-2xl border border-dashed border-amber-900/25 bg-card-surface/90 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-900/70">
+              Danger zone
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
+              Remove every book from your shelves, clear progress and ratings, and drop cached book
+              metadata stored in this browser. This only affects this device; nothing is sent to a
+              server. You cannot undo this.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const ok = window.confirm(
+                  "Clear all library data from this device? This removes shelves, progress, ratings, rankings, and cached books. This only affects local storage on this device and cannot be undone.",
+                );
+                if (ok) actions.resetLibrary();
+              }}
+              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-900/35 bg-background px-4 text-sm font-semibold text-amber-950 shadow-sm active:bg-amber-100/60"
+            >
+              Clear all library data
+            </button>
+          </section>
         </div>
       </div>
     </PageShell>

@@ -14,6 +14,7 @@ Future stage:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,9 @@ APP_PUBLIC_DATA_DIR = REPO_ROOT / "app" / "public" / "data"
 OUTPUT_PATH = APP_PUBLIC_DATA_DIR / "recommendations.json"
 CATALOG_PATH = APP_PUBLIC_DATA_DIR / "books.json"
 USER_PREFS_PATH = APP_PUBLIC_DATA_DIR / "user-preferences.json"
+
+# Large ranked pool for the app to slice (shows up to 30 not-yet-shelved at a time). Override with READING_NOOK_RECS_POOL.
+DEFAULT_RECS_POOL_SIZE = 2000
 
 
 def _safe_str(value: Any) -> str:
@@ -141,7 +145,7 @@ def build_placeholder_recommendations(
     genre_lookup: dict[str, list[str]],
     catalog_lookup: dict[str, dict[str, Any]],
     user_prefs: dict[str, Any],
-    limit: int = 30,
+    limit: int = DEFAULT_RECS_POOL_SIZE,
 ) -> list[dict[str, Any]]:
     # TODO: Replace with notebook-extracted hybrid Apriori + KNN pipeline.
     # For scaffold: rank by ratings_count and average_rating.
@@ -212,12 +216,16 @@ def main() -> None:
     catalog_lookup = load_catalog_by_id()
     user_prefs = load_optional_user_preferences()
     genre_lookup = build_genre_lookup(frames["books"], frames["book_tags"], frames["tags"])
+    pool_limit = int(os.environ.get("READING_NOOK_RECS_POOL", str(DEFAULT_RECS_POOL_SIZE)))
+    if pool_limit < 1:
+        pool_limit = DEFAULT_RECS_POOL_SIZE
     recs = build_placeholder_recommendations(
         books_df=frames["books"],
         ratings_df=frames["ratings"],
         genre_lookup=genre_lookup,
         catalog_lookup=catalog_lookup,
         user_prefs=user_prefs,
+        limit=pool_limit,
     )
     OUTPUT_PATH.write_text(json.dumps(recs, indent=2), encoding="utf-8")
     print(f"Wrote {len(recs)} recommendations to {OUTPUT_PATH}")

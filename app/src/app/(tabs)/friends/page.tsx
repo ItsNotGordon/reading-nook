@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageShell } from "@/components/PageShell";
 
 export default function FriendsPage() {
@@ -7,8 +8,15 @@ export default function FriendsPage() {
         <p className="text-sm font-medium text-foreground">Friends&apos; libraries aren&apos;t here yet</p>
         <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
           Browsing shared shelves will need sign-in and a backend, so this tab is a placeholder until further
-          notice. For now, use <span className="font-medium text-foreground/90">Library</span> and{" "}
-          <span className="font-medium text-foreground/90">Add</span> for your own nook.
+          notice. For now, use{" "}
+          <Link href="/library" className="font-medium text-accent underline-offset-2 hover:underline">
+            Library
+          </Link>{" "}
+          and{" "}
+          <Link href="/add" className="font-medium text-accent underline-offset-2 hover:underline">
+            Add
+          </Link>{" "}
+          for your own nook.
         </p>
       </div>
     </PageShell>

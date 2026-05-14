@@ -44,6 +44,8 @@ export type UserBook = {
   derivedScore: number | null;
   /** ISO timestamp when the user added this book. */
   addedAt: string;
+  /** Free-form notes (e.g. after finishing). */
+  notes: string;
 };
 
 /** Ordered `bookId`s per sentiment bucket for leaderboard-style ordering (no pairwise logic yet). */
@@ -57,10 +59,17 @@ export const SENTIMENT_BUCKETS: SentimentBucket[] = [
 
 export const SHELVES: Shelf[] = ["want_to_read", "reading", "finished"];
 
+/** Local display name + tagline; persisted with AppState. */
+export type UserProfile = {
+  displayName: string;
+  tagline: string;
+};
+
 export type AppState = {
   version: 1;
   catalog: Record<BookId, Book>;
   /** One row per catalog book the user has shelved. */
   userBooks: Partial<Record<BookId, UserBook>>;
   bucketRankings: BucketRankings;
+  profile: UserProfile;
 };

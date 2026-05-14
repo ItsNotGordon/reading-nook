@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import {
   catalogJsonToBook,
@@ -104,12 +104,14 @@ async function fetchCatalog(): Promise<CatalogJsonBook[]> {
 }
 
 export type AddBookScreenProps = {
-  /** When set with `onQueryChange`, search field is controlled (e.g. Add tab parent for segment UX). */
+  /** When set with `onQueryChange`, search field is controlled (e.g. Add tab parent). */
   query?: string;
   onQueryChange?: (value: string) => void;
+  /** Rendered directly under the catalog search field (e.g. recommendation genre filters). */
+  afterSearch?: ReactNode;
 };
 
-export function AddBookScreen({ query: queryProp, onQueryChange }: AddBookScreenProps = {}) {
+export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: AddBookScreenProps = {}) {
   const { state, actions } = useReadingNook();
   const [internalQuery, setInternalQuery] = useState("");
   const controlled = onQueryChange !== undefined;
@@ -207,18 +209,24 @@ export function AddBookScreen({ query: queryProp, onQueryChange }: AddBookScreen
   return (
     <div className="flex flex-col gap-4">
       <label className="sr-only" htmlFor="add-book-search">
-        Search books
+        Search by title, author, or genre
       </label>
       <input
         id="add-book-search"
         type="search"
         autoComplete="off"
-        placeholder="Search books..."
+        placeholder="Search by title, author, or genre…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         disabled={catalogStatus === "loading"}
-        className="w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-sm text-foreground shadow-inner outline-none ring-0 transition-shadow placeholder:text-foreground-muted/80 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)] disabled:cursor-wait disabled:opacity-70"
+        className="min-h-11 w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-sm text-foreground shadow-inner outline-none ring-0 transition-shadow placeholder:text-foreground-muted/80 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)] disabled:cursor-wait disabled:opacity-70"
       />
+
+      {afterSearch ? <div className="min-w-0">{afterSearch}</div> : null}
+
+      {!queryReady && normalizedQuery.length === 0 ? (
+        <p className="text-xs text-foreground-muted/90">Matches title, author, or any genre tag in the catalog.</p>
+      ) : null}
 
       {catalogStatus === "error" && loadError ? (
         <div className="space-y-3 rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-5">
@@ -230,7 +238,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange }: AddBookScreen
               setLoadError(null);
               setFetchKey((k) => k + 1);
             }}
-            className="w-full rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+            className="w-full min-h-11 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
           >
             Retry
           </button>
@@ -255,7 +263,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange }: AddBookScreen
       <div className="flex flex-col gap-2">
         {catalogStatus === "ready" && !queryReady ? (
           <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
-            Search by title or author
+            Type at least {MIN_QUERY_LENGTH} letters to search the catalog.
           </p>
         ) : null}
         {catalogStatus === "ready" && queryReady && results.length === 0 ? (

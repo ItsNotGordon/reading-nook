@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function RecsPage() {
-  redirect("/add?tab=recs");
+  redirect("/add");
 }

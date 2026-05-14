@@ -7,10 +7,12 @@ import type {
   SentimentBucket,
   Shelf,
   UserBook,
+  UserProfile,
 } from "./types";
 import { SENTIMENT_BUCKETS, SHELVES } from "./types";
 import { fractionToEstimatedRange, matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
+import { normalizeGenreList } from "./genreNormalize";
 export const STORAGE_KEY = "reading-nook-v1";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -55,7 +57,7 @@ function parseBook(value: unknown): Book | null {
     typeof totalPages === "number" && Number.isFinite(totalPages) && totalPages >= 0
       ? Math.floor(totalPages)
       : 0;
-  const g = Array.isArray(genres) && genres.every((x) => typeof x === "string") ? genres : [];
+  const g = Array.isArray(genres) && genres.every((x) => typeof x === "string") ? normalizeGenreList(genres) : [];
   const desc = typeof description === "string" ? description : "";
   const cover =
     typeof coverUrl === "string" && coverUrl.trim() !== ""
@@ -104,6 +106,7 @@ function parseUserBook(value: unknown): UserBook | null {
     sentimentBucket,
     derivedScore,
     addedAt,
+    notes: notesField,
   } = value;
   if (typeof bookId !== "string" || !isShelf(shelf) || !isProgressMode(progressMode)) {
     return null;
@@ -140,6 +143,8 @@ function parseUserBook(value: unknown): UserBook | null {
   }
   const normalizedBucket = normalizeStoredSentiment(sentimentBucket);
   if (typeof addedAt !== "string") return null;
+  const notes =
+    typeof notesField === "string" ? notesField.slice(0, 8000) : "";
   if (
     derivedScore !== undefined &&
     derivedScore !== null &&
@@ -161,6 +166,7 @@ function parseUserBook(value: unknown): UserBook | null {
     sentimentBucket: normalizedBucket,
     derivedScore: typeof derivedScore === "number" && Number.isFinite(derivedScore) ? derivedScore : null,
     addedAt,
+    notes,
   };
 }
 
@@ -227,6 +233,31 @@ export function emptyRankings(): BucketRankings {
   };
 }
 
+const DEFAULT_DISPLAY_NAME = "Reading Nook Reader";
+const DEFAULT_TAGLINE = "Curating stories, one cozy shelf at a time.";
+
+export function defaultUserProfile(): UserProfile {
+  return {
+    displayName: DEFAULT_DISPLAY_NAME,
+    tagline: DEFAULT_TAGLINE,
+  };
+}
+
+const PROFILE_DISPLAY_MAX = 80;
+const PROFILE_TAGLINE_MAX = 200;
+
+function parseProfile(value: unknown): UserProfile {
+  const d = defaultUserProfile();
+  if (!isRecord(value)) return d;
+  const nameRaw = typeof value.displayName === "string" ? value.displayName.trim() : "";
+  const tagRaw = typeof value.tagline === "string" ? value.tagline.trim() : "";
+  const displayName = nameRaw
+    ? nameRaw.slice(0, PROFILE_DISPLAY_MAX)
+    : d.displayName;
+  const tagline = tagRaw ? tagRaw.slice(0, PROFILE_TAGLINE_MAX) : d.tagline;
+  return { displayName, tagline };
+}
+
 /** Default empty catalog and library; books are loaded from `public/data/books.json` in the Add flow. */
 export function getInitialState(): AppState {
   return {
@@ -234,6 +265,7 @@ export function getInitialState(): AppState {
     catalog: {},
     userBooks: {},
     bucketRankings: emptyRankings(),
+    profile: defaultUserProfile(),
   };
 }
 
@@ -305,11 +337,14 @@ export function parseStoredState(raw: string): AppState | null {
     }
   }
 
+  const profile = parseProfile(parsed.profile);
+
   return {
     version: 1,
     catalog,
     userBooks: nextUserBooks,
     bucketRankings: rankings,
+    profile,
   };
 }
 

@@ -1,4 +1,5 @@
 import type { Book } from "./types";
+import { normalizeGenreList } from "./genreNormalize";
 
 /** Row shape in `public/data/books.json` (from `scripts/build-book-catalog.js`). */
 export type CatalogJsonBook = {
@@ -33,10 +34,11 @@ function normalizeCoverUrl(raw?: string): string {
 
 function normalizeGenres(genres: unknown): string[] {
   if (!Array.isArray(genres)) return [];
-  return genres
+  const raw = genres
     .filter((g): g is string => typeof g === "string")
     .map((g) => g.trim())
     .filter(Boolean);
+  return normalizeGenreList(raw);
 }
 
 /** Normalize catalog JSON into the in-app `Book` shape for store and UI. */

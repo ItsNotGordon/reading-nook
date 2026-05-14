@@ -13,7 +13,7 @@ export function PageShell({ children, title }: PageShellProps) {
             {title}
           </h1>
         ) : null}
-        <div className={title ? "mt-4 flex flex-1 flex-col gap-3" : "flex flex-1 flex-col gap-3"}>
+        <div className={title ? "mt-4 flex min-w-0 flex-1 flex-col gap-3" : "flex min-w-0 flex-1 flex-col gap-3"}>
           {children}
         </div>
       </main>

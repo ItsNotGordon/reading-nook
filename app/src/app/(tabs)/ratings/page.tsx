@@ -1,7 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import { useMemo } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { CoverThumb } from "@/components/CoverThumb";
+import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
 import { PageShell } from "@/components/PageShell";
 import { useReadingNook } from "@/lib/app-state";
 import type { BookId, SentimentBucket } from "@/lib/types";
@@ -16,6 +18,13 @@ function scoreColor(bucket: SentimentBucket): string {
 
 export default function RatingsPage() {
   const { state } = useReadingNook();
+  const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
+
+  const openDetailBookId = useMemo(() => {
+    if (!detailBookId) return null;
+    if (!state.catalog[detailBookId] || !state.userBooks[detailBookId]) return null;
+    return detailBookId;
+  }, [detailBookId, state.catalog, state.userBooks]);
 
   const mergedRows = useMemo(() => {
     type Row = {
@@ -56,10 +65,21 @@ export default function RatingsPage() {
 
   return (
     <PageShell title="Ratings">
+      {openDetailBookId ? (
+        <RatedBookDetailSheet bookId={openDetailBookId} onClose={() => setDetailBookId(null)} />
+      ) : null}
       {mergedRows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
-          No rated books yet. Finish a book and pick how you felt about it to build your list.
-        </p>
+        <div className="space-y-4 rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center">
+          <p className="text-sm leading-relaxed text-foreground-muted">
+            No rated books yet. Finish a book and pick how you felt about it to build your list.
+          </p>
+          <Link
+            href="/add"
+            className="inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+          >
+            Go to Add
+          </Link>
+        </div>
       ) : (
         <div className="space-y-3">
           <div className="flex items-end justify-between px-0.5">
@@ -70,20 +90,20 @@ export default function RatingsPage() {
           <div className="overflow-hidden rounded-2xl border border-border bg-card-surface shadow-sm ring-1 ring-black/[0.03]">
             <ol>
               {mergedRows.map((vm, idx) => (
-                <li
-                  key={vm.id}
-                  className="flex items-center justify-between gap-3 border-b border-border px-3 py-3 last:border-b-0"
-                >
+                <li key={vm.id} className="border-b border-border last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => setDetailBookId(vm.id)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/35"
+                  >
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border">
-                      <Image
-                        src={vm.coverUrl}
-                        alt=""
-                        fill
-                        sizes="36px"
-                        className="object-cover"
-                      />
-                    </div>
+                    <CoverThumb
+                      src={vm.coverUrl}
+                      alt=""
+                      sizes="36px"
+                      fallbackLetter={vm.title}
+                      className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
+                    />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-foreground-muted">#{idx + 1}</p>
                       <p className="truncate text-sm font-semibold text-foreground">{vm.title}</p>
@@ -98,6 +118,7 @@ export default function RatingsPage() {
                   >
                     {vm.score != null ? vm.score.toFixed(1) : "—"}
                   </div>
+                  </button>
                 </li>
               ))}
             </ol>

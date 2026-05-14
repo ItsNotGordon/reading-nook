@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
-import type { AppState, Book, BookId, SentimentBucket, Shelf } from "./types";
+import type { AppState, Book, BookId, SentimentBucket, Shelf, UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 
 export type ReadingNookActions = {
@@ -24,6 +24,10 @@ export type ReadingNookActions = {
   setSentimentBucket: (bookId: BookId, sentimentBucket: SentimentBucket | null) => void;
   insertBookIntoBucketAtIndex: (bookId: BookId, bucket: SentimentBucket, index: number) => void;
   updateBucketRankings: (bucket: SentimentBucket, orderedBookIds: BookId[]) => void;
+  /** Wipe shelves, rankings, and cached catalog copies (localStorage only). */
+  resetLibrary: () => void;
+  updateUserBookNotes: (bookId: BookId, notes: string) => void;
+  updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline">>) => void;
 };
 
 type ReadingNookContextValue = {
@@ -72,6 +76,10 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX", bookId, bucket, index }),
       updateBucketRankings: (bucket, orderedBookIds) =>
         dispatch({ type: "UPDATE_BUCKET_RANKINGS", bucket, orderedBookIds }),
+      resetLibrary: () => dispatch({ type: "RESET_LIBRARY" }),
+      updateUserBookNotes: (bookId, notes) =>
+        dispatch({ type: "UPDATE_USER_BOOK_NOTES", bookId, notes }),
+      updateProfile: (patch) => dispatch({ type: "UPDATE_PROFILE", ...patch }),
     }),
     [],
   );

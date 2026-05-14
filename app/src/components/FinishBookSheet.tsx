@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
+import { CoverThumb } from "@/components/CoverThumb";
 import type { ReadingNookActions } from "@/lib/app-state";
 import type { Book, BookId, SentimentBucket, UserBook } from "@/lib/types";
 import { useReadingNook } from "@/lib/app-state";
@@ -113,9 +113,13 @@ export function FinishBookSheet({
         <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
           <div className="border-b border-border px-4 pb-3 pt-3">
             <div className="flex items-start gap-3">
-              <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-border">
-                <Image src={book.coverUrl} alt="" fill className="object-cover" sizes="40px" />
-              </div>
+              <CoverThumb
+                src={book.coverUrl}
+                alt=""
+                sizes="40px"
+                fallbackLetter={book.title}
+                className="relative h-14 w-10 shrink-0 overflow-hidden rounded-lg bg-border"
+              />
               <div className="min-w-0 flex-1">
                 <p id={headingId} className="font-serif text-lg font-semibold text-foreground">
                   How did you feel about this book?
@@ -186,15 +190,23 @@ export function FinishBookSheet({
 
             <div className="border-t border-dashed border-border/70 pt-4">
               <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                Extras
+                Notes
               </p>
-              <button
-                type="button"
-                className="mt-2 inline-flex w-full items-center justify-between rounded-xl border border-border bg-card-surface px-3 py-2.5 text-left text-sm font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-foreground"
-              >
-                <span>Add notes</span>
-                <span className="text-xs text-foreground-muted">Coming soon</span>
-              </button>
+              <label htmlFor={`finish-notes-${bookId}`} className="sr-only">
+                Notes for this book
+              </label>
+              <textarea
+                id={`finish-notes-${bookId}`}
+                value={userBook.notes ?? ""}
+                onChange={(e) => actions.updateUserBookNotes(bookId, e.target.value)}
+                maxLength={8000}
+                rows={4}
+                placeholder="Thoughts, quotes, or anything you want to remember…"
+                className="mt-2 w-full resize-y rounded-xl border border-border bg-card-surface px-3 py-2 text-sm text-foreground shadow-inner outline-none placeholder:text-foreground-muted/70 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
+              />
+              <p className="mt-1 text-right text-[10px] text-foreground-muted tabular-nums">
+                {(userBook.notes ?? "").length} / 8000
+              </p>
             </div>
           </div>
 

@@ -1,6 +1,13 @@
-import type { AppState, Book, UserBook } from "./types";
+import type { AppState, Book, SentimentBucket, UserBook } from "./types";
 
 type BookWithMeta = { book: Book; userBook: UserBook };
+
+/** Per-book genre weight when ranking taste from finished books. */
+const WEIGHT_LIKED = 2;
+const WEIGHT_OKAY = 1;
+const WEIGHT_DISLIKED = 0;
+/** When there are no finished books yet, all shelved books count equally. */
+const WEIGHT_NEUTRAL_SHELF = 1;
 
 export function topCounts(items: string[], limit: number): Array<{ label: string; count: number }> {
   const counts = new Map<string, number>();
@@ -26,14 +33,64 @@ function buildUserEntries(state: AppState): BookWithMeta[] {
   return out;
 }
 
-/** Same source rule as Profile: finished books' genres if any finished, else all shelved books. */
+function weightForFinishedSentiment(bucket: SentimentBucket | null): number {
+  if (bucket === "liked") return WEIGHT_LIKED;
+  if (bucket === "okay") return WEIGHT_OKAY;
+  if (bucket === "disliked") return WEIGHT_DISLIKED;
+  return WEIGHT_OKAY;
+}
+
+/**
+ * Sum genre labels with per-book weights. When `useSentimentWeights` is false, every book uses
+ * {@link WEIGHT_NEUTRAL_SHELF} (no-finished-yet / all-shelved case).
+ */
+function topWeightedGenreRowsFromEntries(
+  entries: BookWithMeta[],
+  useSentimentWeights: boolean,
+  limit: number,
+): Array<{ label: string; count: number }> {
+  const sums = new Map<string, number>();
+  for (const e of entries) {
+    const w = useSentimentWeights
+      ? weightForFinishedSentiment(e.userBook.sentimentBucket)
+      : WEIGHT_NEUTRAL_SHELF;
+    if (w === 0) continue;
+    for (const raw of e.book.genres ?? []) {
+      const label = raw.trim();
+      if (!label) continue;
+      sums.set(label, (sums.get(label) ?? 0) + w);
+    }
+  }
+  if (sums.size === 0) return [];
+  return [...sums.entries()]
+    .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0].localeCompare(b[0])))
+    .slice(0, limit)
+    .map(([label, count]) => ({ label, count }));
+}
+
+/**
+ * Same source rule as Profile: finished books' genres if any finished, else all shelved books.
+ * When using finished books, each genre is weighted by sentiment (liked > okay; disliked skips).
+ * If every finished book is disliked (no weighted signal), falls back to raw finished genre counts.
+ */
 export function getUserTopGenreRows(
   state: AppState,
   limit = 5,
 ): Array<{ label: string; count: number }> {
   const userEntries = buildUserEntries(state);
   const finishedEntries = userEntries.filter((e) => e.userBook.shelf === "finished");
-  const genreSource = finishedEntries.length > 0 ? finishedEntries : userEntries;
+  const hasFinished = finishedEntries.length > 0;
+  const genreSource = hasFinished ? finishedEntries : userEntries;
+
+  const weighted = topWeightedGenreRowsFromEntries(genreSource, hasFinished, limit);
+  if (weighted.length > 0) return weighted;
+
+  if (hasFinished) {
+    return topCounts(
+      finishedEntries.flatMap((e) => e.book.genres ?? []),
+      limit,
+    );
+  }
   return topCounts(
     genreSource.flatMap((e) => e.book.genres ?? []),
     limit,

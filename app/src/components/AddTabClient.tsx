@@ -1,78 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { AddBookScreen, MIN_QUERY_LENGTH } from "@/components/AddBookScreen";
-import { RecsScreen } from "@/components/RecsScreen";
-
-type Segment = "search" | "recs";
+import { AddBookScreen } from "@/components/AddBookScreen";
+import { RecsGenreFilterBar } from "@/components/RecsGenreFilterBar";
+import { RecsListPanel } from "@/components/RecsListPanel";
+import { useRecommendationsPool } from "@/lib/useRecommendationsPool";
 
 export function AddTabClient() {
-  const searchParams = useSearchParams();
-  const tabIsRecs = searchParams.get("tab") === "recs";
-  /** User segment choice; null means follow URL `tab=recs` when present, else Search. */
-  const [segmentOverride, setSegmentOverride] = useState<Segment | null>(null);
-
   const [searchQuery, setSearchQuery] = useState("");
+  const recs = useRecommendationsPool();
 
-  const normalizedQuery = searchQuery.trim();
-  const queryReady = normalizedQuery.length >= MIN_QUERY_LENGTH;
-
-  const effectiveSegment: Segment = (() => {
-    if (queryReady) return "search";
-    if (segmentOverride !== null) return segmentOverride;
-    if (tabIsRecs) return "recs";
-    return "search";
-  })();
-
-  const showSegmentToggle = !queryReady;
-  const showSearchPanel = queryReady || effectiveSegment === "search";
-  const showRecsPanel = !queryReady && effectiveSegment === "recs";
-
-  const segBtn =
-    "flex-1 rounded-lg py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+  const genreBar =
+    recs.status === "ready" && recs.sortedFilterGenres.length > 0 ? (
+      <RecsGenreFilterBar
+        sortedFilterGenres={recs.sortedFilterGenres}
+        genresForChipRow={recs.genresForChipRow}
+        genreSearch={recs.genreSearch}
+        setGenreSearch={recs.setGenreSearch}
+        genreSearchNorm={recs.genreSearchNorm}
+        filterActive={recs.filterActive}
+        activeFilterLowerKeys={recs.activeFilterLowerKeys}
+        userTopGenreLower={recs.userTopGenreLower}
+        toggleGenreFilter={recs.toggleGenreFilter}
+        clearGenreFilters={recs.clearGenreFilters}
+      />
+    ) : null;
 
   return (
-    <div className="flex flex-col gap-3">
-      {showSegmentToggle ? (
-        <div
-          className="flex rounded-xl border border-border bg-card-surface p-0.5 shadow-inner"
-          role="tablist"
-          aria-label="Add books"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={effectiveSegment === "search"}
-            onClick={() => setSegmentOverride("search")}
-            className={`${segBtn} ${
-              effectiveSegment === "search"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-foreground-muted hover:text-foreground"
-            }`}
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={effectiveSegment === "recs"}
-            onClick={() => setSegmentOverride("recs")}
-            className={`${segBtn} ${
-              effectiveSegment === "recs"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-foreground-muted hover:text-foreground"
-            }`}
-          >
-            Recs
-          </button>
-        </div>
-      ) : null}
-
-      {showSearchPanel ? (
-        <AddBookScreen query={searchQuery} onQueryChange={setSearchQuery} />
-      ) : null}
-      {showRecsPanel ? <RecsScreen /> : null}
+    <div className="flex min-w-0 flex-col gap-3">
+      <AddBookScreen query={searchQuery} onQueryChange={setSearchQuery} afterSearch={genreBar} />
+      <RecsListPanel model={recs} />
     </div>
   );
 }

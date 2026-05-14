@@ -4,6 +4,12 @@ This folder begins the offline recommendation pipeline for Reading Nook.
 
 Goal: generate `app/public/data/recommendations.json` from the original STAT 280 data sources, without running ML in the browser.
 
+## Pool size vs. in-app display
+
+By default, `generate_recommendations.py` writes a **large ranked pool** (see `DEFAULT_RECS_POOL_SIZE` in the script). The Reading Nook app shows **up to 30 books at a time** that are not already on your shelves, in rank order, so adding books surfaces the next candidates from the pool without refetching a new file.
+
+Re-run from the **`app`** directory: `npm run build:recs`. To change how many rows are written, set environment variable **`READING_NOOK_RECS_POOL`** (integer) before running Python, or edit **`DEFAULT_RECS_POOL_SIZE`** in `generate_recommendations.py`.
+
 ## Files
 
 - `generate_recommendations.py`

@@ -70,8 +70,24 @@ export function LibraryShelves() {
     [state.userBooks, state.catalog],
   );
 
+  const libraryEmpty = reading.length === 0 && finished.length === 0 && want.length === 0;
+
   return (
     <div className="flex flex-col gap-10">
+      {libraryEmpty ? (
+        <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center shadow-inner">
+          <p className="font-medium text-foreground">Your library is empty</p>
+          <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
+            Search the catalog or open recommendations to shelve your first book.
+          </p>
+          <Link
+            href="/add"
+            className="mt-4 inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+          >
+            Go to Add
+          </Link>
+        </div>
+      ) : null}
       <ShelfSection
         title="Currently Reading"
         variant="reading"

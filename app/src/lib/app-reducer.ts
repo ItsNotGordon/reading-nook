@@ -10,9 +10,11 @@ import type {
 import { SENTIMENT_BUCKETS } from "./types";
 import { matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
+import { getInitialState, defaultUserProfile } from "./storage";
 
 export type AppAction =
   | { type: "HYDRATE"; payload: AppState }
+  | { type: "RESET_LIBRARY" }
   | { type: "ADD_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf; catalogBook?: Book }
   | { type: "MOVE_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf }
   | { type: "UPDATE_EXACT_PROGRESS"; bookId: BookId; currentPage: number }
@@ -26,7 +28,9 @@ export type AppAction =
       type: "UPDATE_BUCKET_RANKINGS";
       bucket: SentimentBucket;
       orderedBookIds: BookId[];
-    };
+    }
+  | { type: "UPDATE_USER_BOOK_NOTES"; bookId: BookId; notes: string }
+  | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string };
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -45,6 +49,7 @@ function defaultUserBook(bookId: BookId, shelf: Shelf, totalPages: number): User
       sentimentBucket: null,
       derivedScore: null,
       addedAt: new Date().toISOString(),
+      notes: "",
     };
   }
   return {
@@ -58,6 +63,7 @@ function defaultUserBook(bookId: BookId, shelf: Shelf, totalPages: number): User
     sentimentBucket: null,
     derivedScore: null,
     addedAt: new Date().toISOString(),
+    notes: "",
   };
 }
 
@@ -123,7 +129,32 @@ function applyDerivedScoresToUserBooks(
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "HYDRATE":
-      return action.payload;
+      return {
+        ...action.payload,
+        profile: action.payload.profile ?? defaultUserProfile(),
+      };
+
+    case "RESET_LIBRARY":
+      // Clear shelves and cached catalog only; keep presenter profile for class demos.
+      return { ...getInitialState(), profile: state.profile };
+
+    case "UPDATE_PROFILE": {
+      const d = defaultUserProfile();
+      let displayName = state.profile.displayName;
+      let tagline = state.profile.tagline;
+      if (action.displayName !== undefined) {
+        const t = action.displayName.trim().slice(0, 80);
+        displayName = t || d.displayName;
+      }
+      if (action.tagline !== undefined) {
+        const t = action.tagline.trim().slice(0, 200);
+        tagline = t || d.tagline;
+      }
+      return {
+        ...state,
+        profile: { displayName, tagline },
+      };
+    }
 
     case "ADD_BOOK_TO_SHELF": {
       let catalog = state.catalog;
@@ -400,6 +431,20 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         bucketRankings: {
           ...state.bucketRankings,
           [bucket]: filtered,
+        },
+      };
+    }
+
+    case "UPDATE_USER_BOOK_NOTES": {
+      const ub = state.userBooks[action.bookId];
+      if (!ub) return state;
+      const nextNotes =
+        action.notes.length > 8000 ? action.notes.slice(0, 8000) : action.notes;
+      return {
+        ...state,
+        userBooks: {
+          ...state.userBooks,
+          [action.bookId]: { ...ub, notes: nextNotes },
         },
       };
     }

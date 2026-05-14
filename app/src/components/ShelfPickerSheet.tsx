@@ -76,7 +76,7 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
               key={shelf}
               type="button"
               onClick={() => onChooseShelf(shelf)}
-              className="flex w-full flex-col rounded-xl border border-border bg-card-surface px-3 py-3 text-left transition-colors active:bg-accent-soft/35"
+              className="flex min-h-[48px] w-full flex-col justify-center rounded-xl border border-border bg-card-surface px-3 py-3 text-left transition-colors active:bg-accent-soft/35"
             >
               <span className="text-sm font-semibold text-foreground">{title}</span>
               <span className="text-xs text-foreground-muted">{subtitle}</span>
@@ -85,7 +85,7 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
           <button
             type="button"
             onClick={onClose}
-            className="mt-1 rounded-xl py-2.5 text-center text-sm font-medium text-foreground-muted"
+            className="mt-1 min-h-11 rounded-xl py-2.5 text-center text-sm font-medium text-foreground-muted"
           >
             Cancel
           </button>

@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { CoverThumb } from "@/components/CoverThumb";
 import { useReadingNook } from "@/lib/app-state";
 import type { BookId, SentimentBucket } from "@/lib/types";
 
@@ -11,9 +11,13 @@ function MiniBook({ bookId }: { bookId: BookId }) {
   if (!book) return null;
   return (
     <div className="flex items-start gap-3">
-      <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border">
-        <Image src={book.coverUrl} alt="" fill className="object-cover" sizes="36px" />
-      </div>
+      <CoverThumb
+        src={book.coverUrl}
+        alt=""
+        sizes="36px"
+        fallbackLetter={book.title}
+        className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
+      />
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-foreground">{book.title}</p>
         <p className="truncate text-xs text-foreground-muted">{book.author}</p>
