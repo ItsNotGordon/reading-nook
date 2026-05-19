@@ -11,10 +11,11 @@ export type Book = {
   totalPages: number;
   genres: string[];
   description: string;
-  /** Optional fields from Goodreads-derived catalog JSON. */
   publishedYear?: number;
   averageRating?: number;
   ratingsCount?: number;
+  /** Open Library reading-log count when known. */
+  readinglogCount?: number;
 };
 
 /** Which shelf a copy lives on in the user library. */

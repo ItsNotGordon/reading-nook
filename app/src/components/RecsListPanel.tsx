@@ -121,9 +121,6 @@ type RecsListPanelProps = {
 export function RecsListPanel({ model }: RecsListPanelProps) {
   const { state, actions } = useReadingNook();
   const {
-    status,
-    loadError,
-    retryLoad,
     rows,
     displayRecs,
     filterActive,
@@ -133,6 +130,8 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
     clearGenreFilters,
     userTopGenreLower,
     personalizationActive,
+    appNativeEmptyReason,
+    discoverLoading,
   } = model;
 
   const [pickerBook, setPickerBook] = useState<Book | null>(null);
@@ -194,31 +193,18 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
         </div>
       ) : null}
 
-      {status === "loading" ? (
+      {discoverLoading ? (
         <div className="space-y-2">
           <p className="rounded-2xl border border-border bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
-            Loading recommendations…
+            Finding popular Open Library picks in your genres…
           </p>
         </div>
       ) : null}
 
-      {status === "error" && loadError ? (
-        <div className="space-y-3 rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-5">
-          <p className="text-center text-sm leading-relaxed text-foreground-muted">{loadError}</p>
-          <button
-            type="button"
-            onClick={() => retryLoad()}
-            className="w-full min-h-11 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
-          >
-            Retry
-          </button>
-        </div>
-      ) : null}
-
-      {status === "ready" ? (
-        rows.length === 0 ? (
+      {rows.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
-            No recommendations yet. Run `npm run build:recs` to generate your offline recommendation file.
+            {appNativeEmptyReason ??
+              "Finish and rate a book, then search Open Library on Add to build recommendations from your catalog."}
           </p>
         ) : poolExhausted && !filterActive ? (
           <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
@@ -258,8 +244,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
               ))}
             </ul>
           </div>
-        )
-      ) : null}
+        )}
 
       <ShelfPickerSheet book={pickerBook} onClose={closePicker} onChooseShelf={chooseShelf} />
 

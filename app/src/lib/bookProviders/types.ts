@@ -14,6 +14,7 @@ export type SearchBookResult = {
   publishedYear?: number;
   averageRating?: number;
   ratingsCount?: number;
+  readinglogCount?: number;
 };
 
 export type BookSearchResponse = {
@@ -35,5 +36,6 @@ export function toAppBook(result: SearchBookResult): Book {
   if (result.publishedYear != null) book.publishedYear = result.publishedYear;
   if (result.averageRating != null) book.averageRating = result.averageRating;
   if (result.ratingsCount != null) book.ratingsCount = result.ratingsCount;
+  if (result.readinglogCount != null) book.readinglogCount = result.readinglogCount;
   return book;
 }

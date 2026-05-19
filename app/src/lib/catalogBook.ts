@@ -13,6 +13,7 @@ export type CatalogJsonBook = {
   publishedYear?: number;
   averageRating?: number;
   ratingsCount?: number;
+  readinglogCount?: number;
 };
 
 const PLACEHOLDER_COVER =
@@ -68,6 +69,9 @@ export function catalogJsonToBook(row: CatalogJsonBook): Book {
       : {}),
     ...(row.ratingsCount != null && Number.isFinite(row.ratingsCount)
       ? { ratingsCount: Math.floor(row.ratingsCount) }
+      : {}),
+    ...(row.readinglogCount != null && Number.isFinite(row.readinglogCount)
+      ? { readinglogCount: Math.floor(row.readinglogCount) }
       : {}),
   };
 }

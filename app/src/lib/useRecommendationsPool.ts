@@ -2,9 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useReadingNook } from "@/lib/app-state";
-import { buildTasteSignals, sortRecommendationsPersonal } from "@/lib/recPersonalization";
+import {
+  buildAppNativeRecommendations,
+  CATALOG_UNSHELVED_DISCOVER_THRESHOLD,
+  countUnshelvedCatalog,
+  discoverResultsToCandidates,
+} from "@/lib/appNativeRecommendations";
+import { buildTasteSignals } from "@/lib/recPersonalization";
+import { getWeightedTopGenres } from "@/lib/recommender";
 import { getUserTopGenreLabels, sortRecGenresForFilter } from "@/lib/userTopGenres";
 import { normalizeGenreList } from "@/lib/genreNormalize";
+import type { SearchBookResult } from "@/lib/bookProviders/types";
 
 /** How many recommendation rows the UI shows at once (pool can be much larger). */
 export const RECS_VISIBLE_COUNT = 30;
@@ -20,58 +28,12 @@ export type Recommendation = {
   rawKind?: string;
   reason: string;
   source: string;
+  readinglogCount?: number;
+  ratingsCount?: number;
 };
 
-type LoadState = "loading" | "ready" | "error";
-
-function isRecommendation(value: unknown): value is Recommendation {
-  if (!value || typeof value !== "object") return false;
-  const row = value as Record<string, unknown>;
-  if (
-    typeof row.bookId !== "string" ||
-    typeof row.title !== "string" ||
-    typeof row.author !== "string" ||
-    typeof row.coverUrl !== "string" ||
-    !Array.isArray(row.genres) ||
-    !row.genres.every((g) => typeof g === "string") ||
-    typeof row.score !== "number" ||
-    !Number.isFinite(row.score) ||
-    typeof row.reason !== "string" ||
-    typeof row.source !== "string"
-  ) {
-    return false;
-  }
-  if ("rawScore" in row && row.rawScore !== undefined) {
-    if (typeof row.rawScore !== "number" || !Number.isFinite(row.rawScore)) return false;
-  }
-  if ("rawKind" in row && row.rawKind !== undefined && typeof row.rawKind !== "string") {
-    return false;
-  }
-  return true;
-}
-
-async function fetchRecommendations(): Promise<Recommendation[]> {
-  const res = await fetch("/data/recommendations.json", { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data: unknown = await res.json();
-  if (!Array.isArray(data)) throw new Error("Recommendations file is not an array.");
-  const rows = data.filter(isRecommendation);
-  rows.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.bookId.localeCompare(b.bookId);
-  });
-  const deduped: Recommendation[] = [];
-  const seenIds = new Set<string>();
-  for (const r of rows) {
-    if (seenIds.has(r.bookId)) continue;
-    seenIds.add(r.bookId);
-    deduped.push({ ...r, genres: normalizeGenreList(r.genres) });
-  }
-  return deduped;
-}
-
 export type RecommendationsPoolModel = {
-  status: LoadState;
+  status: "ready";
   loadError: string | null;
   retryLoad: () => void;
   rows: Recommendation[];
@@ -90,55 +52,102 @@ export type RecommendationsPoolModel = {
   queueAfterFilter: number;
   hasFilterNoMatches: boolean;
   poolExhausted: boolean;
-  /** True when re-ranking uses finished-book sentiment (see recPersonalization). */
   personalizationActive: boolean;
+  appNativeEmptyReason: string | null;
+  discoverLoading: boolean;
 };
+
+function isSearchBook(value: unknown): value is SearchBookResult {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return (
+    typeof row.id === "string" &&
+    typeof row.title === "string" &&
+    typeof row.author === "string" &&
+    typeof row.coverUrl === "string" &&
+    Array.isArray(row.genres)
+  );
+}
+
+async function fetchDiscoverBooks(genres: string[]): Promise<SearchBookResult[]> {
+  if (genres.length === 0) return [];
+  const params = new URLSearchParams({ genres: genres.join(",") });
+  const res = await fetch(`/api/books/discover?${params.toString()}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data: unknown = await res.json();
+  if (!data || typeof data !== "object") return [];
+  const books = (data as { books?: unknown }).books;
+  if (!Array.isArray(books)) return [];
+  return books.filter(isSearchBook);
+}
 
 export function useRecommendationsPool(): RecommendationsPoolModel {
   const { state } = useReadingNook();
-  const [status, setStatus] = useState<LoadState>("loading");
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [rows, setRows] = useState<Recommendation[]>([]);
-  const [fetchKey, setFetchKey] = useState(0);
+  const [discoverCache, setDiscoverCache] = useState<{
+    genreKey: string;
+    books: SearchBookResult[];
+  }>({ genreKey: "", books: [] });
 
   const [genreSearch, setGenreSearch] = useState("");
   const [selectedGenreLowerKeys, setSelectedGenreLowerKeys] = useState<string[]>([]);
 
+  const tasteActive = useMemo(() => buildTasteSignals(state).active, [state]);
+  const unshelvedCatalogCount = useMemo(() => countUnshelvedCatalog(state), [state]);
+  const topGenresForDiscover = useMemo(
+    () => getWeightedTopGenres(state, 2),
+    [state],
+  );
+
+  const discoverGenreKey = topGenresForDiscover.join("|");
+
+  const shouldFetchDiscover =
+    tasteActive && unshelvedCatalogCount < CATALOG_UNSHELVED_DISCOVER_THRESHOLD;
+
+  const discoverLoading =
+    shouldFetchDiscover &&
+    Boolean(discoverGenreKey) &&
+    discoverCache.genreKey !== discoverGenreKey;
+
   useEffect(() => {
+    if (!shouldFetchDiscover || !discoverGenreKey) return;
+    if (discoverCache.genreKey === discoverGenreKey) return;
+
     let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchRecommendations();
-        if (!cancelled) {
-          setRows(data);
-          setStatus("ready");
-        }
-      } catch {
-        if (!cancelled) {
-          setRows([]);
-          setStatus("error");
-          setLoadError(
-            "Could not load recommendations yet. Try rebuilding with `npm run build:recs` and then refresh.",
-          );
-        }
+    void fetchDiscoverBooks(topGenresForDiscover).then((books) => {
+      if (!cancelled) {
+        setDiscoverCache({ genreKey: discoverGenreKey, books });
       }
-    })();
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [fetchKey]);
+  }, [shouldFetchDiscover, discoverGenreKey, topGenresForDiscover, discoverCache.genreKey]);
+
+  const discoverCandidates = useMemo(() => {
+    if (!shouldFetchDiscover || !discoverGenreKey) return [];
+    if (discoverCache.genreKey !== discoverGenreKey) return [];
+    return discoverResultsToCandidates(discoverCache.books);
+  }, [shouldFetchDiscover, discoverGenreKey, discoverCache]);
+
+  const { rows, appNativeEmptyReason } = useMemo(() => {
+    const native = buildAppNativeRecommendations(state, { discoverCandidates });
+    const normalized = native.recommendations.map((r) => ({
+      ...r,
+      genres: normalizeGenreList(r.genres),
+    }));
+    return {
+      rows: normalized as Recommendation[],
+      appNativeEmptyReason: native.emptyReason,
+    };
+  }, [state, discoverCandidates]);
 
   const notShelvedRecs = useMemo(
     () => rows.filter((rec) => !state.userBooks[rec.bookId]),
     [rows, state.userBooks],
   );
 
-  const personalizationActive = useMemo(() => buildTasteSignals(state).active, [state]);
-
-  const personalizedNotShelved = useMemo(
-    () => sortRecommendationsPersonal(notShelvedRecs, state),
-    [notShelvedRecs, state],
-  );
+  const personalizationActive = tasteActive;
 
   const userTopGenreLower = useMemo(
     () => new Set(getUserTopGenreLabels(state, 5).map((l) => l.trim().toLowerCase())),
@@ -147,7 +156,7 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
 
   const unionLowerToDisplay = useMemo(() => {
     const m = new Map<string, string>();
-    for (const rec of personalizedNotShelved) {
+    for (const rec of notShelvedRecs) {
       for (const g of rec.genres) {
         const t = g.trim();
         if (!t) continue;
@@ -156,7 +165,7 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
       }
     }
     return m;
-  }, [personalizedNotShelved]);
+  }, [notShelvedRecs]);
 
   const sortedFilterGenres = useMemo(
     () => sortRecGenresForFilter(state, unionLowerToDisplay),
@@ -175,12 +184,12 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
   );
 
   const afterGenreFilter = useMemo(() => {
-    if (activeFilterLowerKeys.length === 0) return personalizedNotShelved;
+    if (activeFilterLowerKeys.length === 0) return notShelvedRecs;
     const sel = new Set(activeFilterLowerKeys);
-    return personalizedNotShelved.filter((rec) =>
+    return notShelvedRecs.filter((rec) =>
       rec.genres.some((g) => sel.has(g.trim().toLowerCase())),
     );
-  }, [personalizedNotShelved, activeFilterLowerKeys]);
+  }, [notShelvedRecs, activeFilterLowerKeys]);
 
   const displayRecs = useMemo(
     () => afterGenreFilter.slice(0, RECS_VISIBLE_COUNT),
@@ -199,18 +208,16 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
   const filterActive = activeFilterLowerKeys.length > 0;
   const queueAfterFilter = afterGenreFilter.length;
   const hasFilterNoMatches =
-    filterActive && queueAfterFilter === 0 && personalizedNotShelved.length > 0;
+    filterActive && queueAfterFilter === 0 && notShelvedRecs.length > 0;
   const poolExhausted = rows.length > 0 && notShelvedRecs.length === 0;
 
   const retryLoad = useCallback(() => {
-    setLoadError(null);
-    setStatus("loading");
-    setFetchKey((k) => k + 1);
+    setDiscoverCache({ genreKey: "", books: [] });
   }, []);
 
   return {
-    status,
-    loadError,
+    status: "ready",
+    loadError: null,
     retryLoad,
     rows,
     notShelvedRecs,
@@ -229,5 +236,7 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     hasFilterNoMatches,
     poolExhausted,
     personalizationActive,
+    appNativeEmptyReason,
+    discoverLoading,
   };
 }

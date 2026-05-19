@@ -5,6 +5,7 @@ import type { Book } from "@/lib/types";
 type WorkDetailsResponse = {
   description?: string;
   genres?: string[];
+  title?: string;
 };
 
 /** Load description + subjects from Open Library work JSON when adding to shelf. */
@@ -12,7 +13,9 @@ export async function enrichOpenLibraryBook(book: Book): Promise<Book> {
   if (!book.id.startsWith("openlibrary:")) return book;
 
   try {
-    const res = await fetch(`/api/books/work?id=${encodeURIComponent(book.id)}`, {
+    const params = new URLSearchParams({ id: book.id });
+    if (book.title.trim()) params.set("title", book.title.trim());
+    const res = await fetch(`/api/books/work?${params.toString()}`, {
       cache: "no-store",
     });
     if (!res.ok) return book;
@@ -27,7 +30,10 @@ export async function enrichOpenLibraryBook(book: Book): Promise<Book> {
         ? data.description.trim()
         : book.description;
 
-    return { ...book, description, genres };
+    const title =
+      typeof data.title === "string" && data.title.trim() ? data.title.trim() : book.title;
+
+    return { ...book, title, description, genres };
   } catch {
     return book;
   }

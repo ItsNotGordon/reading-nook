@@ -49,6 +49,7 @@ function parseBook(value: unknown): Book | null {
     publishedYear,
     averageRating,
     ratingsCount,
+    readinglogCount,
   } = value;
   if (typeof id !== "string" || typeof title !== "string" || typeof author !== "string") {
     return null;
@@ -80,6 +81,9 @@ function parseBook(value: unknown): Book | null {
   }
   if (typeof ratingsCount === "number" && Number.isFinite(ratingsCount)) {
     book.ratingsCount = Math.floor(ratingsCount);
+  }
+  if (typeof readinglogCount === "number" && Number.isFinite(readinglogCount)) {
+    book.readinglogCount = Math.floor(readinglogCount);
   }
   return book;
 }

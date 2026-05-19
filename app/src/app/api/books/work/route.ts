@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id")?.trim() ?? "";
+  const catalogTitle = searchParams.get("title")?.trim() ?? "";
 
   if (!id) {
     return NextResponse.json({ error: "Missing id query parameter." }, { status: 400 });
@@ -19,7 +20,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const details = await fetchOpenLibraryWorkDetails(id);
+    const details = await fetchOpenLibraryWorkDetails(id, {
+      catalogTitle: catalogTitle || undefined,
+    });
     if (!details) {
       return NextResponse.json({ error: "Work not found." }, { status: 404 });
     }
