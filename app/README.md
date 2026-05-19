@@ -4,10 +4,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 Run all commands from this **`app`** directory (where `package.json` lives).
 
-Generate the Add-tab book catalog (requires `../git-forked-database/*.csv`):
+### Live book search
+
+The **Add** tab searches books via [Open Library](https://openlibrary.org/) through the server route `/api/books/search`. No API key is required.
+
+### Legacy static catalog (recommendations pipeline)
+
+`npm run build:books` still generates `public/data/books.json` from Goodbooks CSVs for the offline recommender and related tooling. Add-tab **search** does not use that file.
 
 ```bash
 npm run build:books
+npm run build:recs   # optional: refresh recommendations.json
 ```
 
 Then start the dev server:
@@ -16,9 +23,14 @@ Then start the dev server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-If **Add** shows a catalog error, run `npm run build:books` again, then tap **Retry** on the Add page or refresh so the browser does not keep a cached failed fetch.
+For production:
+
+```bash
+npm run build
+npm start
+```
 
 You can start editing routes under `src/app/`. The page auto-updates as you save files.
 

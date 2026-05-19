@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { GenreChipPicker } from "@/components/GenreChipPicker";
 import type { Book, Shelf } from "@/lib/types";
 
 export const SHELF_CHOICES: { shelf: Shelf; title: string; subtitle: string }[] = [
@@ -29,10 +30,17 @@ export function shelfDisplayName(shelf: Shelf): string {
 type ShelfPickerSheetProps = {
   book: Book | null;
   onClose: () => void;
-  onChooseShelf: (shelf: Shelf) => void;
+  onChooseShelf: (shelf: Shelf, genres: string[]) => void;
 };
 
 export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSheetProps) {
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!book) return;
+    queueMicrotask(() => setSelectedGenres([...(book.genres ?? [])]));
+  }, [book]);
+
   useEffect(() => {
     if (!book) return;
     const onKey = (e: KeyboardEvent) => {
@@ -61,7 +69,7 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
         role="dialog"
         aria-modal="true"
         aria-labelledby="shelf-picker-title"
-        className="max-h-[min(85vh,520px)] w-full overflow-hidden rounded-t-2xl border border-border bg-background shadow-2xl sm:mx-auto sm:max-w-lg sm:rounded-2xl"
+        className="max-h-[min(90vh,640px)] w-full overflow-y-auto rounded-t-2xl border border-border bg-background shadow-2xl sm:mx-auto sm:max-w-lg sm:rounded-2xl"
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden />
         <div className="border-b border-border px-4 pb-3 pt-3 sm:pt-4">
@@ -70,12 +78,23 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
           </p>
           <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
         </div>
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+            Genres (optional)
+          </p>
+          <p className="mt-0.5 text-xs text-foreground-muted">
+            Add or adjust genres for this book.
+          </p>
+          <div className="mt-2">
+            <GenreChipPicker value={selectedGenres} onChange={setSelectedGenres} searchable />
+          </div>
+        </div>
         <div className="flex flex-col gap-1.5 p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {SHELF_CHOICES.map(({ shelf, title, subtitle }) => (
             <button
               key={shelf}
               type="button"
-              onClick={() => onChooseShelf(shelf)}
+              onClick={() => onChooseShelf(shelf, selectedGenres)}
               className="flex min-h-[48px] w-full flex-col justify-center rounded-xl border border-border bg-card-surface px-3 py-3 text-left transition-colors active:bg-accent-soft/35"
             >
               <span className="text-sm font-semibold text-foreground">{title}</span>

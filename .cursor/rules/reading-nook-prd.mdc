@@ -1,27 +1,54 @@
 ---
-description: Reading Nook — consult PRD; post-STAT product and scalable architecture
+description: Reading Nook — Product PRD is canonical; older PRDs are historical only
 globs: app/**/*
 alwaysApply: false
 ---
 
 # The Reading Nook and the PRD
 
-When editing files under `app/` for **The Reading Nook**, treat the product spec as source of truth:
+When editing files under `app/` for **The Reading Nook**:
 
-1. **Read first:** Open [`docs/PRD.md`](docs/PRD.md) → [`docs/Reading_Nook_Product_PRD.md`](docs/Reading_Nook_Product_PRD.md) (canonical as-built + friends-scale roadmap). Use older PRDs only for extra algorithm detail. Before you implement or materially change:
-   - tab names, routes, or shell layout  
-   - shelves, library, add flow, leaderboard/ranking, recs, profile  
-   - `AppState` / types / persistence / storage keys  
-   - sentiment buckets, progress modes, scoring, or recommendation scope  
+## Canonical spec (read first)
 
-2. **Product direction:** Friends-scale deployable app—not mass-market social, not class ML integration. Prioritize **tracking, pairwise ranking, deployability**, then **auth + Postgres/Supabase + sync + small-group friend features**. Do **not** treat Apriori + KNN extraction as the default next task.
+**[`docs/Reading_Nook_Product_PRD.md`](docs/Reading_Nook_Product_PRD.md)** supersedes all older PRDs for **current product decisions**. Use it as the sole source of truth for:
 
-3. **Preserved reference (do not drive roadmap):** `notebook.ipynb`, `recommender/`, and related Python stay as historical/reference material. Do not edit `notebook.ipynb` in place; copy if needed.
+- tab names, routes, shell layout, and redirects  
+- shelves, library, add flow (search + recs), ratings, profile, friends placeholder  
+- `AppState` / types / persistence / `reading-nook-v1` storage  
+- sentiment buckets, progress modes, derived scoring, recommendation scope  
+- friends-scale **roadmap** (deploy, auth, Supabase/Postgres, sync, friend features)
 
-4. **If the PRD is silent or ambiguous:** Say what is missing; do **not** invent requirements, tab sets, or data fields.
+Shortcut: [`docs/PRD.md`](docs/PRD.md) points to the Product PRD.
 
-5. **If code and PRD disagree:** Call out the conflict. Prefer the PRD unless the user explicitly says to diverge.
+## Historical / reference only
 
-6. **MVP vs future:** localStorage and static `public/data/*.json` are valid for the current app. Items in the PRD **future scalability roadmap** (auth, cloud DB, social, etc.) are **in scope only when the user asks**—but new code should not block that path (e.g. avoid more global-only rec assumptions without user request).
+Do **not** use these for current UI, routes, data model, or roadmap—they may be outdated:
 
-7. **Repo layout:** The Next.js app lives in `app/`. Root notebook, `recommender/`, and Python deps stay unchanged unless the user asks otherwise.
+- [`docs/Reading_Nook_PRD.md`](docs/Reading_Nook_PRD.md) — original MVP  
+- [`docs/Reading_Nook_Updated_PRD.md`](docs/Reading_Nook_Updated_PRD.md) — transition snapshot  
+
+Consult them only for **supplementary** algorithm or requirement detail (e.g. pairwise insertion math) when the Product PRD does not cover it.
+
+## Conflicts
+
+- **Product PRD vs older PRD:** follow **Reading_Nook_Product_PRD.md**.  
+- **Product PRD vs code:** call out the conflict; prefer Product PRD unless the user says to diverge.  
+- **Product PRD silent:** say what is missing; do not invent tabs, fields, or MVP scope.
+
+## Product direction
+
+Friends-scale deployable app—not mass-market social, not class ML integration. Prioritize **tracking, pairwise ranking, deployability**, then **auth + Postgres/Supabase + sync + small-group friend features**. Do **not** treat Apriori + KNN notebook extraction as the default next task.
+
+## Preserved reference (do not delete; do not drive roadmap)
+
+- `notebook.ipynb` — historical; do not edit in place; copy to experiment  
+- `recommender/` — offline JSON builds; keep unless user asks otherwise  
+- `git-forked-database/` — dataset for `build:books` / legacy rec scripts  
+
+## MVP vs future
+
+`localStorage` and `public/data/*.json` are valid for the current app. Roadmap items (auth, cloud DB, social) are in scope **only when the user asks**—but new code should not block that path.
+
+## Repo layout
+
+The Next.js app lives in `app/`. Do not change `notebook.ipynb` or remove `recommender/` unless the user explicitly requests it.

@@ -1,6 +1,8 @@
 # PRD: Reading Nook
 
-> **Note:** For the **canonical as-built spec** (accurate tabs, types, Add+recs layout), use **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**. This file is a transition snapshot; some details (e.g. Search | Recs segment) do not match the app.
+> **HISTORICAL / REFERENCE ONLY** — Do not use this file for current product decisions.  
+> **Canonical spec:** **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)** (UI, routes, data model, roadmap).  
+> This document is a transition snapshot; some details (e.g. Search | Recs segment) do not match the shipped app.
 
 ## 1. Product Overview
 
@@ -1065,19 +1067,6 @@ Follow [Future scalability roadmap](#future-scalability-roadmap) in order:
 
 ---
 
-## 25. Cursor Rule Summary
+## 25. Cursor Rule Summary (superseded)
 
-Cursor should follow these product rules:
-
-```txt
-1. Read Post-STAT Product Direction before major features.
-2. The app is local-first today unless a task is explicitly migrating to backend/auth/sync.
-3. Do not add backend/auth/social unless requested—but design so that path stays open.
-4. Do not reintroduce star ratings; use sentiment buckets + pairwise ranking.
-5. Keep Book metadata separate from UserBook user state.
-6. Offline JSON (build:books, build:recs) is valid for MVP; long-term recs should move server-side per user.
-7. Do not run Python/ML in the browser.
-8. Preserve notebook.ipynb and recommender/ as reference; do not edit notebook in place; do not prioritize Apriori+KNN integration as default next work.
-9. Keep UI mobile-first, cozy, and minimal.
-10. Prefer small incremental changes over large rewrites.
-```
+> Use **`docs/Reading_Nook_Product_PRD.md`** §21 and **`app/AGENTS.md`** instead. This section is kept for history only.

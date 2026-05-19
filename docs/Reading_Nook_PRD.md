@@ -1,6 +1,8 @@
 # PRD: The Reading Nook MVP
 
-> **Note:** For the **current shipped app**, routes, and friends-scale direction, use **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**. This file remains useful for original MVP requirements and algorithm detail; some navigation and type names are outdated.
+> **HISTORICAL / REFERENCE ONLY** — Do not use this file for current product decisions.  
+> **Canonical spec:** **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)** (UI, routes, data model, roadmap).  
+> This document is retained for original MVP requirements and algorithm detail. Navigation and type names here are outdated vs the shipped app.
 
 ## 1. Product Overview
 
@@ -1002,24 +1004,9 @@ Follow the [Future scalability roadmap](#future-scalability-roadmap) in **Post-S
 
 ---
 
-## 22. Cursor Prompt: Build From This PRD
+## 22. Cursor Prompt (superseded)
 
-You can paste this into Cursor:
-
-```txt
-Use this PRD as the source of truth for The Reading Nook.
-
-Reading Nook is a for-fun, long-term reading product (STAT 280 is done). Read "Post-STAT Product Direction" in docs/Reading_Nook_PRD.md before major features.
-
-Important:
-- Core UX: Goodreads-style shelves + Beli-style sentiment buckets and pairwise ranking (no star ratings).
-- Preserve notebook.ipynb and recommender/ as reference; do not edit notebook.ipynb in place.
-- Do not prioritize Apriori + KNN integration as the main roadmap.
-- MVP may use localStorage and static JSON; new infrastructure work should aim at APIs, Postgres/Supabase, auth, and cloud sync per the PRD roadmap.
-- When improving Recs, favor ranking-driven personalization and scalable server-side design over notebook wiring.
-
-Follow the PRD closely and avoid overbuilding beyond the current phase.
-```
+> Use **`docs/Reading_Nook_Product_PRD.md`** §21 (Cursor / Agent Rules) and **`app/AGENTS.md`** instead. This section is kept for history only.
 
 ---
 

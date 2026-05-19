@@ -10,6 +10,7 @@ import type {
 import { SENTIMENT_BUCKETS } from "./types";
 import { matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
+import { sanitizeCatalogGenres } from "./mergeCatalogGenres";
 import { getInitialState, defaultUserProfile } from "./storage";
 
 export type AppAction =
@@ -30,6 +31,7 @@ export type AppAction =
       orderedBookIds: BookId[];
     }
   | { type: "UPDATE_USER_BOOK_NOTES"; bookId: BookId; notes: string }
+  | { type: "UPDATE_CATALOG_GENRES"; bookId: BookId; genres: string[] }
   | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string };
 
 function clamp(n: number, min: number, max: number): number {
@@ -445,6 +447,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         userBooks: {
           ...state.userBooks,
           [action.bookId]: { ...ub, notes: nextNotes },
+        },
+      };
+    }
+
+    case "UPDATE_CATALOG_GENRES": {
+      const book = state.catalog[action.bookId];
+      if (!book) return state;
+      return {
+        ...state,
+        catalog: {
+          ...state.catalog,
+          [action.bookId]: {
+            ...book,
+            genres: sanitizeCatalogGenres(action.genres),
+          },
         },
       };
     }

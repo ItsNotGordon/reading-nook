@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
+import { GenreChipPicker } from "@/components/GenreChipPicker";
 import { useReadingNook } from "@/lib/app-state";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import type { BookId, SentimentBucket } from "@/lib/types";
@@ -45,6 +46,8 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
 
   const [editingNotes, setEditingNotes] = useState(false);
   const [draftNotes, setDraftNotes] = useState("");
+  const [editingGenres, setEditingGenres] = useState(false);
+  const [draftGenres, setDraftGenres] = useState<string[]>([]);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -69,6 +72,21 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
   const cancelNoteEdit = (): void => {
     setDraftNotes(rowUb.notes ?? "");
     setEditingNotes(false);
+  };
+
+  const saveGenres = (): void => {
+    actions.updateCatalogGenres(bookId, draftGenres);
+    setEditingGenres(false);
+  };
+
+  const cancelGenreEdit = (): void => {
+    setDraftGenres([...rowBook.genres]);
+    setEditingGenres(false);
+  };
+
+  const startGenreEdit = (): void => {
+    setDraftGenres([...rowBook.genres]);
+    setEditingGenres(true);
   };
 
   return (
@@ -144,10 +162,41 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Genres
-                </p>
-                {rowBook.genres.length > 0 ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                    Genres
+                  </p>
+                  {!editingGenres ? (
+                    <button
+                      type="button"
+                      onClick={() => startGenreEdit()}
+                      className="text-xs font-semibold text-accent hover:underline"
+                    >
+                      {rowBook.genres.length > 0 ? "Edit" : "Add genres"}
+                    </button>
+                  ) : null}
+                </div>
+                {editingGenres ? (
+                  <div className="mt-2 space-y-2">
+                    <GenreChipPicker value={draftGenres} onChange={setDraftGenres} searchable />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => cancelGenreEdit()}
+                        className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground-muted hover:bg-card-surface"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveGenres()}
+                        className="rounded-xl border border-border bg-accent px-3 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+                      >
+                        Save genres
+                      </button>
+                    </div>
+                  </div>
+                ) : rowBook.genres.length > 0 ? (
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {rowBook.genres.map((g) => (
                       <li

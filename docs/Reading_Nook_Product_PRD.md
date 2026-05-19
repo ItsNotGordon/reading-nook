@@ -316,7 +316,9 @@ Single screen (`AddTabClient`): catalog search on top, recommendations below.
 
 ### 9.1 Catalog search
 
-- Fetches `/data/books.json`  
+- Fetches `/api/books/search?q=…` (Open Library via server)  
+- **Genres** come from Open Library `subject` fields (BISAC `/` paths and LOC `*--Fiction` mapped to ~40 canonical labels; capped at 6). Users can **add or edit genres** from that same list when shelving a book or from Ratings book detail (optional on add; Add genres / Edit in detail sheet)  
+- On shelf add, `/api/books/work?id=openlibrary:…` enriches **description** and subjects from work JSON  
 - Requires **at least 2 characters** to show matches (`MIN_QUERY_LENGTH`)  
 - Filters out books already in `userBooks`  
 - Max **20** results shown  
@@ -335,7 +337,7 @@ Single screen (`AddTabClient`): catalog search on top, recommendations below.
 ### 9.3 Loading / errors
 
 - Loading states for catalog and recs  
-- Error UI with retry; catalog errors mention `npm run build:books`  
+- Search errors show retry (no `build:books` requirement for Add search)  
 - Rec errors mention `npm run build:recs`  
 
 ---

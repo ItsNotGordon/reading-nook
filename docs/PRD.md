@@ -1,11 +1,27 @@
-# Reading Nook — PRD
+# Reading Nook — PRD index
 
-**Canonical product spec (as-built + friends-scale direction):**  
+## Canonical (use for all current product work)
+
 **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**
 
-Use that document for current routes, data model, shipped behavior, deploy notes, and the roadmap toward auth/sync/friends.
+This file is the **source of truth** for:
 
-**Older / supplementary specs:**
+- current UI and navigation  
+- routes and redirects  
+- data model and persistence  
+- shipped behavior and friends-scale roadmap  
 
-- [Reading_Nook_PRD.md](./Reading_Nook_PRD.md) — original MVP (some nav/types outdated)  
-- [Reading_Nook_Updated_PRD.md](./Reading_Nook_Updated_PRD.md) — transition doc (partially outdated)
+It **supersedes** older PRDs when they conflict.
+
+---
+
+## Historical / reference only
+
+Do not use these for current product decisions (navigation, types, routes, or roadmap). They are kept for context and supplementary detail.
+
+| Document | Notes |
+| -------- | ----- |
+| [Reading_Nook_PRD.md](./Reading_Nook_PRD.md) | Original MVP spec; outdated tab names (`Leaderboard`, standalone `Recs`) and types (`currentlyReading`, `books` vs `catalog`) |
+| [Reading_Nook_Updated_PRD.md](./Reading_Nook_Updated_PRD.md) | Transition doc; e.g. Search \| Recs segment does not match the app |
+
+**Preserved assets (not deleted):** `notebook.ipynb`, `recommender/`, `git-forked-database/`.

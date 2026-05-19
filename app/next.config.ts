@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
         hostname: "s.gr-assets.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "covers.openlibrary.org",
+        pathname: "/**",
+      },
     ],
   },
 };

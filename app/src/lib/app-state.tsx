@@ -27,6 +27,7 @@ export type ReadingNookActions = {
   /** Wipe shelves, rankings, and cached catalog copies (localStorage only). */
   resetLibrary: () => void;
   updateUserBookNotes: (bookId: BookId, notes: string) => void;
+  updateCatalogGenres: (bookId: BookId, genres: string[]) => void;
   updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline">>) => void;
 };
 
@@ -79,6 +80,8 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       resetLibrary: () => dispatch({ type: "RESET_LIBRARY" }),
       updateUserBookNotes: (bookId, notes) =>
         dispatch({ type: "UPDATE_USER_BOOK_NOTES", bookId, notes }),
+      updateCatalogGenres: (bookId, genres) =>
+        dispatch({ type: "UPDATE_CATALOG_GENRES", bookId, genres }),
       updateProfile: (patch) => dispatch({ type: "UPDATE_PROFILE", ...patch }),
     }),
     [],

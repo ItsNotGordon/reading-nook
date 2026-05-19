@@ -7,6 +7,7 @@ import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { ShelfPickerSheet, shelfDisplayName } from "@/components/ShelfPickerSheet";
 import { useReadingNook } from "@/lib/app-state";
 import { catalogJsonToBook } from "@/lib/catalogBook";
+import { mergeCatalogGenres } from "@/lib/mergeCatalogGenres";
 import type { RecommendationsPoolModel, Recommendation } from "@/lib/useRecommendationsPool";
 import { RECS_VISIBLE_COUNT } from "@/lib/useRecommendationsPool";
 import type { Book, SentimentBucket, Shelf } from "@/lib/types";
@@ -159,7 +160,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
     return () => window.clearTimeout(t);
   }, [feedback]);
 
-  const chooseShelf = (shelf: Shelf) => {
+  const chooseShelf = (shelf: Shelf, userGenres: string[]) => {
     if (!pickerBook) return;
     const existing = state.userBooks[pickerBook.id];
     if (existing && existing.shelf === shelf) {
@@ -168,7 +169,12 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
       return;
     }
     const catalogEntry = state.catalog[pickerBook.id];
-    actions.addBookToShelf(pickerBook.id, shelf, catalogEntry ? undefined : pickerBook);
+    const base = catalogEntry ?? pickerBook;
+    const book = {
+      ...base,
+      genres: mergeCatalogGenres(base.genres, userGenres),
+    };
+    actions.addBookToShelf(pickerBook.id, shelf, book);
     const verb = existing ? "Moved to" : "Added to";
     setFeedback(`${verb} ${shelfDisplayName(shelf)}.`);
     if (shelf === "finished") {
