@@ -15,6 +15,8 @@ type ShelfSectionProps = {
   variant: BookCardVariant;
   emptyTitle: string;
   emptyBody: string;
+  /** DOM id for scroll-into-view from profile shelf snapshot links. */
+  sectionId?: string;
   onStartPairwise?: (bookId: string, bucket: SentimentBucket) => void;
   headerMeta?: ReactNode;
 };
@@ -25,6 +27,7 @@ export function ShelfSection({
   variant,
   emptyTitle,
   emptyBody,
+  sectionId,
   onStartPairwise,
   headerMeta,
 }: ShelfSectionProps) {
@@ -39,7 +42,7 @@ export function ShelfSection({
   }, [variant, firstBookId, items.length]);
 
   return (
-    <section className="space-y-3">
+    <section id={sectionId} className="scroll-mt-24 space-y-3">
       <div className="flex items-end justify-between gap-2 pr-0.5">
         <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
           {title}

@@ -7,15 +7,79 @@ import { EditProfileSheet } from "@/components/EditProfileSheet";
 import { PageShell } from "@/components/PageShell";
 import { useReadingNook } from "@/lib/app-state";
 import { getUserTopGenreRows, topCounts } from "@/lib/userTopGenres";
-import type { Book, SentimentBucket, UserBook } from "@/lib/types";
+import {
+  sentimentInsightSurface,
+  sentimentLabel,
+  sentimentTextColor,
+} from "@/lib/sentiment-display";
+import type { Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
 
 type BookWithMeta = { book: Book; userBook: UserBook };
+
+const INSIGHT_BUCKETS: SentimentBucket[] = ["liked", "okay", "disliked"];
+const SHELF_SNAPSHOT_COVER_LIMIT = 3;
+
+function shelfSortTimestamp(entry: BookWithMeta, shelf: Shelf): number {
+  const ub = entry.userBook;
+  if (shelf === "finished") {
+    const raw = ub.finishedSortAt ?? ub.finishedAt ?? ub.addedAt;
+    return Number.isFinite(Date.parse(raw)) ? Date.parse(raw) : -Infinity;
+  }
+  return Number.isFinite(Date.parse(ub.addedAt)) ? Date.parse(ub.addedAt) : -Infinity;
+}
+
+function shelfCoverPreviews(
+  entries: BookWithMeta[],
+  shelf: Shelf,
+  max: number,
+): Book[] {
+  return entries
+    .filter((e) => e.userBook.shelf === shelf)
+    .sort((a, b) => {
+      const aTs = shelfSortTimestamp(a, shelf);
+      const bTs = shelfSortTimestamp(b, shelf);
+      if (bTs !== aTs) return bTs - aTs;
+      return b.userBook.bookId.localeCompare(a.userBook.bookId);
+    })
+    .slice(0, max)
+    .map((e) => e.book);
+}
+
+function shelfSnapshotDetail(label: string, count: number): string {
+  const books = count === 1 ? "book" : "books";
+  if (label === "Want to Read") return `${count} ${books} on deck`;
+  if (label === "Currently Reading") return `${count} ${books} in progress`;
+  return `${count} ${books} completed`;
+}
+
+function shelfSnapshotHref(shelf: Shelf): string {
+  if (shelf === "finished") return "/ratings";
+  return `/library?shelf=${shelf}`;
+}
+
+function shelfSnapshotDestination(shelf: Shelf): string {
+  return shelf === "finished" ? "Ratings" : "Library";
+}
 
 function sentimentCount(
   items: BookWithMeta[],
   bucket: SentimentBucket,
 ): number {
   return items.filter((entry) => entry.userBook.sentimentBucket === bucket).length;
+}
+
+function recentTitlesForBucket(
+  catalog: Record<BookId, Book>,
+  orderedIds: readonly BookId[],
+  maxTitles: number,
+): string[] {
+  const out: string[] = [];
+  for (const id of orderedIds) {
+    if (out.length >= maxTitles) break;
+    const title = catalog[id]?.title?.trim();
+    if (title) out.push(title);
+  }
+  return out;
 }
 
 function LeafAccent({ className }: { className: string }) {
@@ -72,6 +136,24 @@ export default function ProfilePage() {
   const wantCount = userEntries.filter((e) => e.userBook.shelf === "want_to_read").length;
   const totalCount = userEntries.length;
 
+  const shelfSnapshotRows = useMemo(
+    () =>
+      (
+        [
+          { label: "Currently Reading", shelf: "reading" as const, count: readingCount },
+          { label: "Finished", shelf: "finished" as const, count: finishedCount },
+          { label: "Want to Read", shelf: "want_to_read" as const, count: wantCount },
+        ] as const
+      ).map((row) => ({
+        ...row,
+        covers:
+          row.count > 0
+            ? shelfCoverPreviews(userEntries, row.shelf, SHELF_SNAPSHOT_COVER_LIMIT)
+            : [],
+      })),
+    [readingCount, finishedCount, wantCount, userEntries],
+  );
+
   const scoredFinished = finishedEntries.filter((e) => e.userBook.derivedScore != null);
   const averageDerivedScore =
     scoredFinished.length > 0
@@ -82,6 +164,15 @@ export default function ProfilePage() {
   const likedCount = sentimentCount(finishedEntries, "liked");
   const okayCount = sentimentCount(finishedEntries, "okay");
   const dislikedCount = sentimentCount(finishedEntries, "disliked");
+  const ratedFinishedCount = likedCount + okayCount + dislikedCount;
+
+  const sentimentInsights = INSIGHT_BUCKETS.map((bucket) => {
+    const count = sentimentCount(finishedEntries, bucket);
+    const share =
+      ratedFinishedCount > 0 ? Math.round((count / ratedFinishedCount) * 100) : 0;
+    const highlights = recentTitlesForBucket(state.catalog, state.bucketRankings[bucket], 2);
+    return { bucket, count, share, highlights };
+  });
 
   const topGenres = getUserTopGenreRows(state, 5);
 
@@ -189,7 +280,7 @@ export default function ProfilePage() {
               </div>
               <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
                 <p className="text-3xl font-semibold text-foreground">{readingCount}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Currently reading</p>
+                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Currently Reading</p>
               </div>
               <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
                 <p className="text-3xl font-semibold text-foreground">{finishedCount}</p>
@@ -268,19 +359,41 @@ export default function ProfilePage() {
 
           <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <p className="text-sm font-semibold text-foreground">Recent insights</p>
+            {ratedFinishedCount > 0 ? (
+              <p className="mt-1 text-xs text-foreground-muted">
+                From {ratedFinishedCount} finished book{ratedFinishedCount === 1 ? "" : "s"} you&apos;ve
+                rated
+              </p>
+            ) : null}
             <div className="mt-3 space-y-2">
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-2.5">
-                <p className="text-xs font-semibold text-[#426447]">Liked: {likedCount}</p>
-                <p className="mt-1 text-xs text-foreground-muted">
-                  Okay: {okayCount} · Didn&apos;t like: {dislikedCount}
-                </p>
-              </div>
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-2.5">
-                <p className="text-xs text-foreground-muted">
-                  Want to read
-                </p>
-                <p className="mt-0.5 text-sm font-medium text-foreground">{wantCount} books on deck</p>
-              </div>
+              {sentimentInsights.map(({ bucket, count, share, highlights }) => (
+                <div
+                  key={bucket}
+                  className={`rounded-xl border px-3 py-2.5 ${sentimentInsightSurface(bucket)}`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className={`text-sm font-semibold ${sentimentTextColor(bucket)}`}>
+                      {sentimentLabel(bucket)}
+                    </p>
+                    <p className={`text-sm font-semibold tabular-nums ${sentimentTextColor(bucket)}`}>
+                      {count}
+                      {ratedFinishedCount > 0 ? (
+                        <span className="ml-1 text-xs font-medium opacity-80">({share}%)</span>
+                      ) : null}
+                    </p>
+                  </div>
+                  {highlights.length > 0 ? (
+                    <p className="mt-1.5 text-xs leading-relaxed text-foreground-muted">
+                      Top picks:{" "}
+                      <span className="text-foreground">{highlights.join(" · ")}</span>
+                    </p>
+                  ) : count > 0 ? (
+                    <p className="mt-1.5 text-xs text-foreground-muted">
+                      Rank books in Ratings to highlight favorites here.
+                    </p>
+                  ) : null}
+                </div>
+              ))}
             </div>
             {finishedCount === 0 ? (
               <p className="mt-3 text-sm leading-relaxed text-foreground-muted">
@@ -293,9 +406,39 @@ export default function ProfilePage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
               Shelf snapshot
             </p>
-            <p className="mt-2 text-sm text-foreground-muted">
-              You are actively reading {readingCount} and have finished {finishedCount} so far.
-            </p>
+            <div className="mt-3 space-y-2">
+              {shelfSnapshotRows.map(({ label, shelf, count, covers }) => (
+                <Link
+                  key={label}
+                  href={shelfSnapshotHref(shelf)}
+                  className="block rounded-xl border border-border/80 bg-background px-3 py-2.5 transition-colors hover:bg-accent-soft/20 active:bg-accent-soft/40"
+                  aria-label={`${label}, ${shelfSnapshotDetail(label, count)}. Open in ${shelfSnapshotDestination(shelf)}.`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-foreground-muted">{label}</p>
+                      <p className="mt-0.5 text-sm font-medium text-foreground">
+                        {shelfSnapshotDetail(label, count)}
+                      </p>
+                    </div>
+                    {covers.length > 0 ? (
+                      <div className="flex shrink-0 gap-1">
+                        {covers.map((book) => (
+                          <CoverThumb
+                            key={book.id}
+                            src={book.coverUrl}
+                            alt=""
+                            sizes="32px"
+                            fallbackLetter={book.title}
+                            className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md bg-border shadow-sm"
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </Link>
+              ))}
+            </div>
           </section>
         </>
           )}

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import type { Book, SentimentBucket, Shelf, UserBook } from "@/lib/types";
 import type { ShelfItem } from "./ShelfSection";
@@ -9,6 +10,17 @@ import { ShelfSection } from "./ShelfSection";
 import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
 
 const FINISHED_PREVIEW_LIMIT = 12;
+
+const SHELF_SECTION_ID: Record<Shelf, string> = {
+  reading: "shelf-reading",
+  finished: "shelf-finished",
+  want_to_read: "shelf-want",
+};
+
+function parseShelfParam(value: string | null): Shelf | null {
+  if (value === "reading" || value === "finished" || value === "want_to_read") return value;
+  return null;
+}
 
 function itemsForShelf(
   userBooks: Partial<Record<string, UserBook>>,
@@ -47,6 +59,8 @@ function itemsForShelf(
 
 export function LibraryShelves() {
   const { state } = useReadingNook();
+  const searchParams = useSearchParams();
+  const shelfParam = parseShelfParam(searchParams.get("shelf"));
   const [pairwise, setPairwise] = useState<{
     open: boolean;
     bookId: string | null;
@@ -72,6 +86,17 @@ export function LibraryShelves() {
 
   const libraryEmpty = reading.length === 0 && finished.length === 0 && want.length === 0;
 
+  useEffect(() => {
+    if (!shelfParam || libraryEmpty) return;
+    const id = SHELF_SECTION_ID[shelfParam];
+    const el = document.getElementById(id);
+    if (!el) return;
+    const frame = requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [shelfParam, libraryEmpty, reading.length, finished.length, want.length]);
+
   return (
     <div className="flex flex-col gap-10">
       {libraryEmpty ? (
@@ -89,6 +114,7 @@ export function LibraryShelves() {
         </div>
       ) : null}
       <ShelfSection
+        sectionId={SHELF_SECTION_ID.reading}
         title="Currently Reading"
         variant="reading"
         items={reading}
@@ -97,6 +123,7 @@ export function LibraryShelves() {
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
       />
       <ShelfSection
+        sectionId={SHELF_SECTION_ID.finished}
         title="Finished"
         variant="finished"
         items={finishedPreview}
@@ -121,6 +148,7 @@ export function LibraryShelves() {
         }
       />
       <ShelfSection
+        sectionId={SHELF_SECTION_ID.want_to_read}
         title="Want to Read"
         variant="want"
         items={want}
