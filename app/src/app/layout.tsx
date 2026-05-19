@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Literata } from "next/font/google";
-import { CloudLibrarySync } from "@/components/CloudLibrarySync";
 import { SupabaseAuthProvider } from "@/components/SupabaseAuthProvider";
+import { SyncStatusProvider } from "@/components/SyncStatusProvider";
 import { ProfileThemeApplier } from "@/components/ProfileThemeApplier";
 import { ReadingNookProvider } from "@/lib/app-state";
 import "./globals.css";
@@ -47,8 +47,7 @@ export default function RootLayout({
         <ReadingNookProvider>
           <ProfileThemeApplier />
           <SupabaseAuthProvider>
-            <CloudLibrarySync />
-            {children}
+            <SyncStatusProvider>{children}</SyncStatusProvider>
           </SupabaseAuthProvider>
         </ReadingNookProvider>
       </body>

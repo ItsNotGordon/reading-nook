@@ -165,6 +165,7 @@ export default function ProfilePage() {
   const favoriteBook = favoriteBookId ? state.catalog[favoriteBookId] : null;
   const favoriteUserBook = favoriteBookId ? state.userBooks[favoriteBookId] : null;
   const profileTheme = state.profile.theme ?? "plant";
+  const profileEditGated = cloudConfigured && !cloudUser;
 
   return (
     <PageShell>
@@ -174,6 +175,15 @@ export default function ProfilePage() {
       <div className="relative isolate -mx-4 overflow-hidden sm:-mx-6">
         <ProfileDecorationBackdrop theme={profileTheme} />
         <div className="relative z-10 flex flex-col gap-3 px-4 sm:px-6">
+          {profileEditGated ? (
+            <p className="rounded-xl border border-border/80 bg-card-surface/90 px-3 py-2.5 text-center text-xs text-foreground-muted backdrop-blur-[1px]">
+              Profile name, tagline, and themes sync when you{" "}
+              <Link href="/login?next=/profile" className="font-semibold text-accent underline-offset-2 hover:underline">
+                sign in
+              </Link>
+              .
+            </p>
+          ) : null}
           {totalCount === 0 ? (
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
@@ -185,13 +195,22 @@ export default function ProfilePage() {
             </h1>
             <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
             <div className="mt-4 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setEditProfileOpen(true)}
-                className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-              >
-                Edit profile
-              </button>
+              {profileEditGated ? (
+                <Link
+                  href="/login?next=/profile"
+                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+                >
+                  Sign in to customize
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditProfileOpen(true)}
+                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+                >
+                  Edit profile
+                </button>
+              )}
               <button
                 type="button"
                 disabled
@@ -226,13 +245,22 @@ export default function ProfilePage() {
             </h1>
             <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
             <div className="mt-4 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setEditProfileOpen(true)}
-                className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-              >
-                Edit profile
-              </button>
+              {profileEditGated ? (
+                <Link
+                  href="/login?next=/profile"
+                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+                >
+                  Sign in to customize
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditProfileOpen(true)}
+                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+                >
+                  Edit profile
+                </button>
+              )}
               <button
                 type="button"
                 disabled
@@ -434,7 +462,8 @@ export default function ProfilePage() {
             <p className="text-sm font-semibold text-foreground">Library backup</p>
             <p className="mt-1 text-xs text-foreground-muted">
               Export a JSON backup or import on another device. Import replaces your current library
-              on this device.
+              on this device. With cloud sign-in, import also uploads to your account after you
+              confirm.
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <button

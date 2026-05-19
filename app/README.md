@@ -49,16 +49,18 @@ npm start   # local production smoke test
 
 ## Optional: Supabase (accounts, sync, friends)
 
+Full checklist: **[`../docs/SUPABASE_SETUP.md`](../docs/SUPABASE_SETUP.md)**.
+
 1. Create a [Supabase](https://supabase.com) project.
 2. Run SQL in [`../supabase/migrations/001_reading_nook.sql`](../supabase/migrations/001_reading_nook.sql).
 3. Copy [`/.env.example`](.env.example) → `.env.local` and fill:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (server-only; friend invites by email)
-4. Enable Email auth (magic link) in Supabase dashboard.
-5. Redeploy or restart `npm run dev`.
+4. Enable Email auth (magic link); whitelist `/auth/callback` redirect URLs.
+5. Add the same env vars on **Vercel**, then redeploy.
 
-When configured, Profile shows **Account** (sign-in) and Friends supports invites + taste comparison for users who opt in to **Share shelves**.
+When configured, Profile shows **Account** (sign-in + sync status), conflict resolution when device and cloud differ, and Friends (invites, taste, optional read-only shelves).
 
 ## Scripts
 

@@ -24,6 +24,6 @@ npm start
 ## Data model on deploy
 
 - **Without Supabase:** each visitor’s library lives in **browser localStorage** only. Clearing site data or switching devices starts fresh.
-- **With Supabase:** sign-in enables cloud library sync and optional friend features (see `supabase/migrations/`).
+- **With Supabase:** sign-in enables cloud library sync and optional friend features (see [`SUPABASE_SETUP.md`](SUPABASE_SETUP.md)).
 
 Document this for anyone you share the URL with.

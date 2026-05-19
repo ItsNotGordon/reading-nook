@@ -166,28 +166,51 @@ export async function PATCH(request: Request) {
       ? String((body as { action: unknown }).action)
       : "";
 
-  if (!friendshipId || action !== "accept") {
-    return NextResponse.json({ error: "friendshipId and action=accept required." }, { status: 400 });
+  if (!friendshipId || !["accept", "decline", "cancel"].includes(action)) {
+    return NextResponse.json(
+      { error: "friendshipId and action (accept|decline|cancel) required." },
+      { status: 400 },
+    );
   }
 
   const { data: row, error: fetchError } = await supabase
     .from("friendships")
-    .select("id, addressee_id, status")
+    .select("id, requester_id, addressee_id, status")
     .eq("id", friendshipId)
     .maybeSingle();
 
   if (fetchError || !row) {
     return NextResponse.json({ error: "Friend request not found." }, { status: 404 });
   }
-  if (row.addressee_id !== user.id) {
-    return NextResponse.json({ error: "Only the recipient can accept." }, { status: 403 });
+  if (row.status !== "pending") {
+    return NextResponse.json({ error: "This request is no longer pending." }, { status: 409 });
   }
 
-  const { error } = await supabase
-    .from("friendships")
-    .update({ status: "accepted" })
-    .eq("id", friendshipId);
+  if (action === "accept") {
+    if (row.addressee_id !== user.id) {
+      return NextResponse.json({ error: "Only the recipient can accept." }, { status: 403 });
+    }
+    const { error } = await supabase
+      .from("friendships")
+      .update({ status: "accepted" })
+      .eq("id", friendshipId);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  }
 
+  if (action === "decline") {
+    if (row.addressee_id !== user.id) {
+      return NextResponse.json({ error: "Only the recipient can decline." }, { status: 403 });
+    }
+  } else if (action === "cancel") {
+    if (row.requester_id !== user.id) {
+      return NextResponse.json({ error: "Only the sender can cancel." }, { status: 403 });
+    }
+  }
+
+  const { error } = await supabase.from("friendships").delete().eq("id", friendshipId);
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

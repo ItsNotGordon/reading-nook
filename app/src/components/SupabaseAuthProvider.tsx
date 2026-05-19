@@ -18,7 +18,10 @@ type SupabaseAuthContextValue = {
   loading: boolean;
   user: User | null;
   shareShelves: boolean;
-  signInWithEmail: (email: string) => Promise<{ ok: boolean; message: string }>;
+  signInWithEmail: (
+    email: string,
+    redirectPath?: string,
+  ) => Promise<{ ok: boolean; message: string }>;
   signOut: () => Promise<void>;
   setShareShelves: (value: boolean) => Promise<void>;
   refreshShareShelves: () => Promise<void>; // re-fetch for current user
@@ -69,7 +72,7 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   }, [configured, refreshShareShelves]);
 
   const signInWithEmail = useCallback(
-    async (email: string) => {
+    async (email: string, redirectPath = "/profile") => {
       if (!configured) {
         return { ok: false, message: "Cloud sign-in is not configured on this deployment." };
       }
@@ -77,8 +80,9 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       if (!trimmed.includes("@")) {
         return { ok: false, message: "Enter a valid email address." };
       }
+      const safePath = redirectPath.startsWith("/") ? redirectPath : "/profile";
       const client = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/profile`;
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safePath)}`;
       const { error } = await client.auth.signInWithOtp({
         email: trimmed,
         options: { emailRedirectTo: redirectTo },

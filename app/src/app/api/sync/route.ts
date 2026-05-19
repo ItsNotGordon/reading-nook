@@ -86,15 +86,16 @@ export async function POST(request: Request) {
     tagline: profile.tagline,
   });
 
+  const updatedAt = new Date().toISOString();
   const { error } = await supabase.from("libraries").upsert({
     user_id: user.id,
     state,
-    updated_at: new Date().toISOString(),
+    updated_at: updatedAt,
   });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, updatedAt });
 }
