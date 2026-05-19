@@ -5,6 +5,7 @@ import {
   withEnglishLanguageQuery,
 } from "./englishTitle";
 import { openLibraryIdToWorkKey, workKeyToOpenLibraryId } from "./openLibraryIds";
+import { resolveCanonicalGenreFromQuery } from "@/lib/genreVocabulary";
 import { canonicalGenreToOlSubject } from "./genreToOlSubject";
 import { parseOpenLibrarySubjects } from "./openLibrarySubjects";
 import type { SearchBookResult } from "./types";
@@ -125,11 +126,28 @@ export async function searchOpenLibraryBooks(
   query: string,
   limit = 20,
 ): Promise<SearchBookResult[]> {
-  const url = new URL(OPEN_LIBRARY_SEARCH_URL);
-  url.searchParams.set("q", withEnglishLanguageQuery(query));
-  url.searchParams.set("limit", String(Math.min(Math.max(1, limit), 50)));
-  url.searchParams.set("fields", SEARCH_FIELDS);
-  return fetchOpenLibrarySearch(url);
+  const cap = Math.min(Math.max(1, limit), 50);
+  const canonicalGenre = resolveCanonicalGenreFromQuery(query);
+
+  const generalUrl = new URL(OPEN_LIBRARY_SEARCH_URL);
+  generalUrl.searchParams.set("q", withEnglishLanguageQuery(query));
+  generalUrl.searchParams.set("limit", String(cap));
+  generalUrl.searchParams.set("fields", SEARCH_FIELDS);
+
+  const [byGenre, general] = await Promise.all([
+    canonicalGenre ? discoverOpenLibraryByGenre(canonicalGenre, cap) : Promise.resolve([]),
+    fetchOpenLibrarySearch(generalUrl),
+  ]);
+
+  const seen = new Set<string>();
+  const merged: SearchBookResult[] = [];
+  for (const book of [...byGenre, ...general]) {
+    if (seen.has(book.id)) continue;
+    seen.add(book.id);
+    merged.push(book);
+    if (merged.length >= cap) break;
+  }
+  return merged;
 }
 
 /** Popular works for a canonical genre (sorted by reading-log activity). */

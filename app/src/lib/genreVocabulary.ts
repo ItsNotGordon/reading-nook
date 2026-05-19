@@ -205,3 +205,22 @@ export function canonicalForSegment(segment: string): AcceptedGenre | null {
   if (!key) return null;
   return CANONICAL_BY_SEGMENT_KEY.get(key) ?? null;
 }
+
+/** Map a user search string to a canonical genre label when it is an exact or unique match. */
+export function resolveCanonicalGenreFromQuery(query: string): AcceptedGenre | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  if (isAcceptedGenre(trimmed)) return trimmed as AcceptedGenre;
+
+  const fromSegment = canonicalForSegment(trimmed);
+  if (fromSegment) return fromSegment;
+
+  const q = segmentKey(trimmed);
+  for (const label of ACCEPTED_GENRES) {
+    if (segmentKey(label) === q) return label;
+  }
+
+  const partial = ACCEPTED_GENRES.filter((label) => segmentKey(label).includes(q));
+  if (partial.length === 1) return partial[0];
+  return null;
+}

@@ -49,7 +49,8 @@ function rowMatchesFilters(
     if (
       !row.title.toLowerCase().includes(ql) &&
       !row.author.toLowerCase().includes(ql) &&
-      !row.notes.toLowerCase().includes(ql)
+      !row.notes.toLowerCase().includes(ql) &&
+      !row.genres.some((g) => g.toLowerCase().includes(ql))
     ) {
       return false;
     }
@@ -181,12 +182,12 @@ export function RatingsPageClient() {
 
       <div className="sticky top-0 z-20 -mx-1 space-y-2 rounded-2xl border border-border/80 bg-background/95 px-3 py-3 shadow-sm backdrop-blur-sm">
         <label htmlFor="ratings-search" className="sr-only">
-          Search ratings
+          Search title, author, genre, or notes
         </label>
         <input
           id="ratings-search"
           type="search"
-          placeholder="Search title, author, or notes…"
+          placeholder="Search title, author, genre, or notes…"
           value={searchDraft}
           onChange={(e) => setSearchDraft(e.target.value)}
           onKeyDown={(e) => {

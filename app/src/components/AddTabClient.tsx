@@ -8,16 +8,14 @@ import { useRecommendationsPool } from "@/lib/useRecommendationsPool";
 
 export function AddTabClient() {
   const [searchQuery, setSearchQuery] = useState("");
-  const recs = useRecommendationsPool();
+  const recs = useRecommendationsPool(searchQuery);
 
   const genreBar =
     recs.status === "ready" && recs.sortedFilterGenres.length > 0 ? (
       <RecsGenreFilterBar
         sortedFilterGenres={recs.sortedFilterGenres}
         genresForChipRow={recs.genresForChipRow}
-        genreSearch={recs.genreSearch}
-        setGenreSearch={recs.setGenreSearch}
-        genreSearchNorm={recs.genreSearchNorm}
+        chipFilterQuery={searchQuery}
         filterActive={recs.filterActive}
         activeFilterLowerKeys={recs.activeFilterLowerKeys}
         userTopGenreLower={recs.userTopGenreLower}

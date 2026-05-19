@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import {
   buildAppNativeRecommendations,
@@ -46,9 +46,6 @@ export type RecommendationsPoolModel = {
   reshuffle: () => void;
   sortedFilterGenres: string[];
   genresForChipRow: string[];
-  genreSearch: string;
-  setGenreSearch: Dispatch<SetStateAction<string>>;
-  genreSearchNorm: string;
   activeFilterLowerKeys: string[];
   userTopGenreLower: Set<string>;
   toggleGenreFilter: (lower: string) => void;
@@ -95,14 +92,13 @@ async function fetchDiscoverBooks(genres: string[]): Promise<SearchBookResult[]>
   return books.filter(isSearchBook);
 }
 
-export function useRecommendationsPool(): RecommendationsPoolModel {
+export function useRecommendationsPool(chipFilterQuery = ""): RecommendationsPoolModel {
   const { state } = useReadingNook();
   const [discoverCache, setDiscoverCache] = useState<{
     genreKey: string;
     books: SearchBookResult[];
   }>({ genreKey: "", books: [] });
 
-  const [genreSearch, setGenreSearch] = useState("");
   const [selectedGenreLowerKeys, setSelectedGenreLowerKeys] = useState<string[]>([]);
   const [shuffleSample, setShuffleSample] = useState<{
     poolKey: string;
@@ -197,11 +193,11 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     [state, unionLowerToDisplay],
   );
 
-  const genreSearchNorm = genreSearch.trim().toLowerCase();
+  const chipFilterNorm = chipFilterQuery.trim().toLowerCase();
   const genresForChipRow = useMemo(() => {
-    if (!genreSearchNorm) return sortedFilterGenres;
-    return sortedFilterGenres.filter((label) => label.toLowerCase().includes(genreSearchNorm));
-  }, [sortedFilterGenres, genreSearchNorm]);
+    if (!chipFilterNorm) return sortedFilterGenres;
+    return sortedFilterGenres.filter((label) => label.toLowerCase().includes(chipFilterNorm));
+  }, [sortedFilterGenres, chipFilterNorm]);
 
   const activeFilterLowerKeys = useMemo(
     () => selectedGenreLowerKeys.filter((k) => unionLowerToDisplay.has(k)),
@@ -273,9 +269,6 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     reshuffle,
     sortedFilterGenres,
     genresForChipRow,
-    genreSearch,
-    setGenreSearch,
-    genreSearchNorm,
     activeFilterLowerKeys,
     userTopGenreLower,
     toggleGenreFilter,

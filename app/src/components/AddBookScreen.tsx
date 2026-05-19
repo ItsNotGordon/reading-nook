@@ -202,13 +202,13 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: 
   return (
     <div className="flex flex-col gap-4">
       <label className="sr-only" htmlFor="add-book-search">
-        Search by title or author
+        Search by title, author, or genre
       </label>
       <input
         id="add-book-search"
         type="search"
         autoComplete="off"
-        placeholder="Search by title or author…"
+        placeholder="Search by title, author, or genre…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="min-h-11 w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-base text-foreground shadow-inner outline-none ring-0 transition-shadow placeholder:text-foreground-muted/80 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
@@ -218,7 +218,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: 
 
       {!queryReady && normalizedQuery.length === 0 ? (
         <p className="text-xs text-foreground-muted/90">
-          Type at least {MIN_QUERY_LENGTH} letters to search by title or author.
+          Type at least {MIN_QUERY_LENGTH} letters — try a title, author, or genre like Fantasy.
         </p>
       ) : null}
 
