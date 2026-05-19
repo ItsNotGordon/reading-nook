@@ -25,11 +25,13 @@ function recommendationToBook(rec: Recommendation): Book {
 function RecommendationCard({
   rec,
   onSelect,
+  onDismiss,
   userTopGenreLower,
   personalizationActive,
 }: {
   rec: Recommendation;
   onSelect: () => void;
+  onDismiss?: () => void;
   userTopGenreLower: Set<string>;
   personalizationActive: boolean;
 }) {
@@ -44,15 +46,15 @@ function RecommendationCard({
   }, [rec.genres, userTopGenreLower]);
   const topGenres = orderedGenres.slice(0, 3);
   const chipBase = "rounded-full border px-2 py-0.5 text-[10px] font-medium";
-  const chipMatch = "border-[#b8d4bc] bg-[#e8f2ea] text-[#426447]";
+  const chipMatch = "border-border/80 bg-background text-accent";
   const chipDefault = "border-border/80 bg-background text-foreground-muted";
   return (
-    <li>
+    <li className="overflow-hidden rounded-2xl border border-border bg-card-surface shadow-sm ring-1 ring-black/[0.03]">
       <button
         type="button"
         onClick={onSelect}
         aria-label={`Add ${rec.title} to library`}
-        className="w-full rounded-2xl border border-border bg-card-surface p-3 text-left shadow-sm ring-1 ring-black/[0.03] transition-colors active:bg-accent-soft/30"
+        className="w-full p-3 text-left transition-colors active:bg-accent-soft/30"
       >
         <div className="flex items-start gap-3">
           <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-lg bg-border">
@@ -110,6 +112,17 @@ function RecommendationCard({
           </div>
         </div>
       </button>
+      {onDismiss ? (
+        <div className="flex justify-end border-t border-border/60 px-3 py-2">
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="min-h-11 rounded-full border border-border bg-background px-3 text-xs font-semibold text-foreground-muted shadow-sm active:bg-card-surface"
+          >
+            Not interested
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -122,7 +135,9 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
   const { state, actions } = useReadingNook();
   const {
     rows,
-    displayRecs,
+    filteredPool,
+    visibleRecs,
+    reshuffle,
     filterActive,
     queueAfterFilter,
     hasFilterNoMatches,
@@ -158,6 +173,14 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
     const t = window.setTimeout(() => setFeedback(null), 2800);
     return () => window.clearTimeout(t);
   }, [feedback]);
+
+  const dismissRec = useCallback(
+    (bookId: string) => {
+      actions.dismissRec(bookId);
+      setFeedback("Removed from recommendations.");
+    },
+    [actions],
+  );
 
   const chooseShelf = (shelf: Shelf, userGenres: string[]) => {
     if (!pickerBook) return;
@@ -224,22 +247,35 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
         ) : (
           <div className="min-w-0 space-y-3">
             <div className="space-y-1">
-              {filterActive && queueAfterFilter > RECS_VISIBLE_COUNT ? (
+              {queueAfterFilter > RECS_VISIBLE_COUNT ? (
                 <p className="text-xs text-foreground-muted/90">
-                  First {displayRecs.length} of {queueAfterFilter} matches for this filter.
+                  Showing {visibleRecs.length} of {queueAfterFilter} recommendations. Shuffle for
+                  a different set.
                 </p>
               ) : null}
               <p className="text-xs text-foreground-muted/90">Tap a book to add it to your library.</p>
             </div>
 
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={reshuffle}
+                disabled={filteredPool.length < 2}
+                className="min-h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50"
+              >
+                Shuffle
+              </button>
+            </div>
+
             <ul className="space-y-2.5">
-              {displayRecs.map((rec) => (
+              {visibleRecs.map((rec) => (
                 <RecommendationCard
                   key={rec.bookId}
                   rec={rec}
                   userTopGenreLower={userTopGenreLower}
                   personalizationActive={personalizationActive}
                   onSelect={() => openPickerForRec(rec)}
+                  onDismiss={() => dismissRec(rec.bookId)}
                 />
               ))}
             </ul>

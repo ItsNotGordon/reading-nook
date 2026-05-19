@@ -4,12 +4,15 @@ import { useMemo, useState } from "react";
 import { MAX_CATALOG_GENRES } from "@/lib/mergeCatalogGenres";
 import { ACCEPTED_GENRES } from "@/lib/genreVocabulary";
 
+type GenreChipVariant = "default" | "shelfPicker" | "filter";
+
 type GenreChipPickerProps = {
   value: string[];
   onChange: (genres: string[]) => void;
   max?: number;
   /** Show compact search above chips (default true). */
   searchable?: boolean;
+  variant?: GenreChipVariant;
 };
 
 export function GenreChipPicker({
@@ -17,6 +20,7 @@ export function GenreChipPicker({
   onChange,
   max = MAX_CATALOG_GENRES,
   searchable = true,
+  variant = "default",
 }: GenreChipPickerProps) {
   const [search, setSearch] = useState("");
   const selectedLower = useMemo(() => new Set(value.map((g) => g.toLowerCase())), [value]);
@@ -53,7 +57,7 @@ export function GenreChipPicker({
             placeholder="Search genres…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="min-h-10 w-full rounded-xl border border-border bg-card-surface px-3 py-2 text-sm text-foreground shadow-inner outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
+            className="min-h-10 w-full rounded-xl border border-border bg-card-surface px-3 py-2 text-base text-foreground shadow-inner outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
           />
           {searchNorm && chips.length === 0 ? (
             <p className="text-xs text-foreground-muted">No genres match that search.</p>
@@ -69,6 +73,12 @@ export function GenreChipPicker({
         {chips.map((label) => {
           const selected = selectedLower.has(label.toLowerCase());
           const disabled = !selected && atMax;
+          const unselectedClass =
+            variant === "shelfPicker"
+              ? "border-border bg-background text-foreground-muted"
+              : variant === "filter"
+                ? "border-border/80 bg-background text-foreground-muted"
+                : "border-border/80 bg-background text-foreground-muted";
           return (
             <button
               key={label}
@@ -81,7 +91,7 @@ export function GenreChipPicker({
                   ? "border-[#426447] bg-[#e8f2ea] text-[#426447]"
                   : disabled
                     ? "cursor-not-allowed border-border/50 bg-background/50 text-foreground-muted/50"
-                    : "border-border/80 bg-background text-foreground-muted active:bg-accent-soft/30"
+                    : `${unselectedClass} active:bg-accent-soft/30`
               }`}
             >
               {label}

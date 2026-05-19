@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import type { Book, UserBook, SentimentBucket } from "@/lib/types";
+import { SENTIMENT_BUCKETS } from "@/lib/types";
 import { sentimentLabel, sentimentTextColor } from "@/lib/sentiment-display";
 import {
   estimatedQualitativeLabel,
@@ -24,6 +25,7 @@ type BookCardProps = {
   userBook: UserBook;
   variant: BookCardVariant;
   onStartPairwise?: (bookId: string, bucket: SentimentBucket) => void;
+  onOpenRatedDetail?: (bookId: string) => void;
 };
 
 type ReadingProgressVm = {
@@ -62,14 +64,24 @@ function readingProgressView(book: Book, userBook: UserBook): ReadingProgressVm 
   };
 }
 
-export function BookCard({ book, userBook, variant, onStartPairwise }: BookCardProps) {
+export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRatedDetail }: BookCardProps) {
   const [coverFailed, setCoverFailed] = useState(false);
-  const { actions } = useReadingNook();
+  const { state, actions } = useReadingNook();
   const [progressOpen, setProgressOpen] = useState(false);
   const [wantOpen, setWantOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
 
   const progress = variant === "reading" ? readingProgressView(book, userBook) : null;
+
+  const isRatedFinished =
+    variant === "finished" &&
+    (userBook.sentimentBucket != null ||
+      SENTIMENT_BUCKETS.some((b) => state.bucketRankings[b]?.includes(userBook.bookId)));
+
+  const openFinished = () => {
+    if (isRatedFinished) onOpenRatedDetail?.(userBook.bookId);
+    else setFinishOpen(true);
+  };
 
   return (
     <>
@@ -81,7 +93,7 @@ export function BookCard({ book, userBook, variant, onStartPairwise }: BookCardP
           variant === "want"
             ? () => setWantOpen(true)
             : variant === "finished"
-              ? () => setFinishOpen(true)
+              ? openFinished
               : undefined
         }
         onKeyDown={
@@ -90,7 +102,7 @@ export function BookCard({ book, userBook, variant, onStartPairwise }: BookCardP
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   if (variant === "want") setWantOpen(true);
-                  else setFinishOpen(true);
+                  else openFinished();
                 }
               }
             : undefined

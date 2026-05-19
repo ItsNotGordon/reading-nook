@@ -1,5 +1,6 @@
 import type {
   AppState,
+  AppTheme,
   Book,
   BookId,
   BucketRankings,
@@ -9,6 +10,7 @@ import type {
   UserBook,
   UserProfile,
 } from "./types";
+import { APP_THEMES } from "./types";
 import { SENTIMENT_BUCKETS, SHELVES } from "./types";
 import { fractionToEstimatedRange, matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
@@ -244,7 +246,12 @@ export function defaultUserProfile(): UserProfile {
   return {
     displayName: DEFAULT_DISPLAY_NAME,
     tagline: DEFAULT_TAGLINE,
+    theme: "plant",
   };
+}
+
+function isAppTheme(value: unknown): value is AppTheme {
+  return typeof value === "string" && (APP_THEMES as string[]).includes(value);
 }
 
 const PROFILE_DISPLAY_MAX = 80;
@@ -259,7 +266,13 @@ function parseProfile(value: unknown): UserProfile {
     ? nameRaw.slice(0, PROFILE_DISPLAY_MAX)
     : d.displayName;
   const tagline = tagRaw ? tagRaw.slice(0, PROFILE_TAGLINE_MAX) : d.tagline;
-  return { displayName, tagline };
+  const theme = isAppTheme(value.theme) ? value.theme : d.theme;
+  return { displayName, tagline, theme };
+}
+
+function parseDismissedRecIds(value: unknown): BookId[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((id): id is BookId => typeof id === "string" && id.trim() !== "");
 }
 
 /** Default empty catalog and library; books are loaded from `public/data/books.json` in the Add flow. */
@@ -270,6 +283,7 @@ export function getInitialState(): AppState {
     userBooks: {},
     bucketRankings: emptyRankings(),
     profile: defaultUserProfile(),
+    dismissedRecIds: [],
   };
 }
 
@@ -342,6 +356,7 @@ export function parseStoredState(raw: string): AppState | null {
   }
 
   const profile = parseProfile(parsed.profile);
+  const dismissedRecIds = parseDismissedRecIds(parsed.dismissedRecIds);
 
   return {
     version: 1,
@@ -349,6 +364,7 @@ export function parseStoredState(raw: string): AppState | null {
     userBooks: nextUserBooks,
     bucketRankings: rankings,
     profile,
+    dismissedRecIds,
   };
 }
 

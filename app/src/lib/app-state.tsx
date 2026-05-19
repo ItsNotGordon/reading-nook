@@ -30,7 +30,8 @@ export type ReadingNookActions = {
   hydrateLibrary: (next: AppState) => void;
   updateUserBookNotes: (bookId: BookId, notes: string) => void;
   updateCatalogGenres: (bookId: BookId, genres: string[]) => void;
-  updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline">>) => void;
+  updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline" | "theme">>) => void;
+  dismissRec: (bookId: BookId) => void;
 };
 
 type ReadingNookContextValue = {
@@ -86,6 +87,7 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       updateCatalogGenres: (bookId, genres) =>
         dispatch({ type: "UPDATE_CATALOG_GENRES", bookId, genres }),
       updateProfile: (patch) => dispatch({ type: "UPDATE_PROFILE", ...patch }),
+      dismissRec: (bookId) => dispatch({ type: "DISMISS_REC", bookId }),
     }),
     [],
   );

@@ -60,10 +60,15 @@ export const SENTIMENT_BUCKETS: SentimentBucket[] = [
 
 export const SHELVES: Shelf[] = ["want_to_read", "reading", "finished"];
 
+export type AppTheme = "plant" | "coffee" | "matcha" | "cats";
+
+export const APP_THEMES: AppTheme[] = ["plant", "coffee", "matcha", "cats"];
+
 /** Local display name + tagline; persisted with AppState. */
 export type UserProfile = {
   displayName: string;
   tagline: string;
+  theme: AppTheme;
 };
 
 export type AppState = {
@@ -73,4 +78,6 @@ export type AppState = {
   userBooks: Partial<Record<BookId, UserBook>>;
   bucketRankings: BucketRankings;
   profile: UserProfile;
+  /** Recommendation bookIds the user marked as not interested. */
+  dismissedRecIds: BookId[];
 };

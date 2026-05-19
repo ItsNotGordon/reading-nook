@@ -1,5 +1,6 @@
 import type {
   AppState,
+  AppTheme,
   Book,
   BookId,
   BucketRankings,
@@ -32,7 +33,8 @@ export type AppAction =
     }
   | { type: "UPDATE_USER_BOOK_NOTES"; bookId: BookId; notes: string }
   | { type: "UPDATE_CATALOG_GENRES"; bookId: BookId; genres: string[] }
-  | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string };
+  | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string; theme?: AppTheme }
+  | { type: "DISMISS_REC"; bookId: BookId };
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -134,6 +136,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...action.payload,
         profile: action.payload.profile ?? defaultUserProfile(),
+        dismissedRecIds: action.payload.dismissedRecIds ?? [],
       };
 
     case "RESET_LIBRARY":
@@ -144,6 +147,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const d = defaultUserProfile();
       let displayName = state.profile.displayName;
       let tagline = state.profile.tagline;
+      let theme: AppTheme = state.profile.theme ?? d.theme;
       if (action.displayName !== undefined) {
         const t = action.displayName.trim().slice(0, 80);
         displayName = t || d.displayName;
@@ -152,10 +156,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         const t = action.tagline.trim().slice(0, 200);
         tagline = t || d.tagline;
       }
+      if (action.theme !== undefined) {
+        theme = action.theme;
+      }
       return {
         ...state,
-        profile: { displayName, tagline },
+        profile: { displayName, tagline, theme },
       };
+    }
+
+    case "DISMISS_REC": {
+      if (state.dismissedRecIds.includes(action.bookId)) return state;
+      return { ...state, dismissedRecIds: [...state.dismissedRecIds, action.bookId] };
     }
 
     case "ADD_BOOK_TO_SHELF": {
@@ -428,12 +440,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         seen.add(id);
         filtered.push(id);
       }
+      const nextRankings = {
+        ...state.bucketRankings,
+        [bucket]: filtered,
+      };
+      const nextUserBooks = applyDerivedScoresToUserBooks(
+        state.userBooks,
+        bucket,
+        filtered,
+      );
       return {
         ...state,
-        bucketRankings: {
-          ...state.bucketRankings,
-          [bucket]: filtered,
-        },
+        bucketRankings: nextRankings,
+        userBooks: nextUserBooks,
       };
     }
 

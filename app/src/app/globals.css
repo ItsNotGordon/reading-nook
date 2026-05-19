@@ -55,3 +55,49 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* App-wide theme presets */
+[data-theme="coffee"] {
+  --background: #f6f1eb;
+  --foreground: #2a2118;
+  --foreground-muted: #5c4f42;
+  --border: #c9b8a8;
+  --accent: #6f4e37;
+  --accent-soft: #dbc4b0;
+  --secondary-delight: #e8d4b8;
+  --on-secondary-delight: #5c4330;
+  --card-surface: #fffaf5;
+}
+
+[data-theme="matcha"] {
+  --background: #f4f8f1;
+  --foreground: #1f2a1f;
+  --foreground-muted: #4a5c4a;
+  --border: #b8c9b0;
+  --accent: #4f7a52;
+  --accent-soft: #c5dfc4;
+  --secondary-delight: #e3efd6;
+  --on-secondary-delight: #3f5a3f;
+  --card-surface: #fafdf8;
+}
+
+[data-theme="cats"] {
+  --background: #faf6f2;
+  --foreground: #2d2622;
+  --foreground-muted: #6a5c54;
+  --border: #d4c4bc;
+  --accent: #8b5e4a;
+  --accent-soft: #e8cfc0;
+  --secondary-delight: #f0ddd0;
+  --on-secondary-delight: #6b4a3d;
+  --card-surface: #fffcf9;
+}
+
+/* Prevent iOS Safari zoom on focused inputs in modals */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}

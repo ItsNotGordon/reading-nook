@@ -16,7 +16,8 @@ import {
   sentimentLabel,
   sentimentTextColor,
 } from "@/lib/sentiment-display";
-import type { Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
+import type { AppTheme, Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
+import { APP_THEMES } from "@/lib/types";
 
 type BookWithMeta = { book: Book; userBook: UserBook };
 
@@ -179,12 +180,12 @@ export default function ProfilePage() {
       {editProfileOpen ? (
         <EditProfileSheet profile={state.profile} onClose={() => setEditProfileOpen(false)} />
       ) : null}
-      <div className="relative isolate overflow-hidden rounded-[1.75rem] bg-gradient-to-b from-[#f7f1e7]/80 via-transparent to-transparent px-1 py-1">
-        <LeafAccent className="pointer-events-none absolute -left-8 top-3 h-24 w-24 -rotate-[18deg] text-[#7fa483]/35" />
-        <LeafAccent className="pointer-events-none absolute -right-10 top-36 h-32 w-32 rotate-[20deg] text-[#9bb391]/30" />
-        <LeafAccent className="pointer-events-none absolute -left-12 bottom-28 h-36 w-36 rotate-[10deg] text-[#789b7a]/25" />
+      <div className="relative isolate -mx-4 overflow-hidden sm:-mx-6">
+        <LeafAccent className="pointer-events-none absolute -left-14 top-0 h-32 w-32 -rotate-[18deg] text-[#7fa483]/35" />
+        <LeafAccent className="pointer-events-none absolute -right-16 top-24 h-40 w-40 rotate-[20deg] text-[#9bb391]/30" />
+        <LeafAccent className="pointer-events-none absolute -left-16 bottom-8 h-44 w-44 rotate-[10deg] text-[#789b7a]/25" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(245,226,184,0.24),transparent_36%),radial-gradient(circle_at_15%_55%,rgba(128,170,135,0.11),transparent_42%)]" />
-        <div className="relative z-10 flex flex-col gap-3">
+        <div className="relative z-10 flex flex-col gap-3 px-4 sm:px-6">
           {totalCount === 0 ? (
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
@@ -308,12 +309,16 @@ export default function ProfilePage() {
             {topGenres.length > 0 ? (
               <ul className="mt-3 grid grid-cols-2 gap-2">
                 {topGenres.map((g, idx) => (
-                  <li
-                    key={g.label}
-                    className="rounded-xl border border-border/80 bg-background px-3 py-2 text-xs text-foreground"
-                  >
-                    <p className="text-[10px] uppercase tracking-wider text-foreground-muted">{String(idx + 1).padStart(2, "0")}</p>
-                    <p className="mt-0.5 line-clamp-1 font-medium">{g.label}</p>
+                  <li key={g.label}>
+                    <Link
+                      href={`/ratings?genre=${encodeURIComponent(g.label)}`}
+                      className="block rounded-xl border border-border/80 bg-background px-3 py-2 text-xs text-foreground transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
+                    >
+                      <p className="text-[10px] uppercase tracking-wider text-foreground-muted">
+                        {String(idx + 1).padStart(2, "0")}
+                      </p>
+                      <p className="mt-0.5 line-clamp-1 font-medium">{g.label}</p>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -327,11 +332,13 @@ export default function ProfilePage() {
             {topAuthors.length > 0 ? (
               <ul className="mt-3 flex flex-wrap gap-2">
                 {topAuthors.map((a) => (
-                  <li
-                    key={a.label}
-                    className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground"
-                  >
-                    {a.label} <span className="text-foreground-muted">({a.count})</span>
+                  <li key={a.label}>
+                    <Link
+                      href={`/ratings?author=${encodeURIComponent(a.label)}`}
+                      className="inline-flex rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
+                    >
+                      {a.label} <span className="text-foreground-muted">({a.count})</span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -427,6 +434,30 @@ export default function ProfilePage() {
           )}
 
           <ProfileAccountSection />
+
+          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
+            <p className="text-sm font-semibold text-foreground">App theme</p>
+            <p className="mt-1 text-xs text-foreground-muted">
+              Applies across Library, Add, Ratings, and Profile.
+            </p>
+            <label htmlFor="app-theme-select" className="sr-only">
+              App theme
+            </label>
+            <select
+              id="app-theme-select"
+              value={state.profile.theme ?? "plant"}
+              onChange={(e) =>
+                actions.updateProfile({ theme: e.target.value as AppTheme })
+              }
+              className="mt-3 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base text-foreground"
+            >
+              {APP_THEMES.map((theme) => (
+                <option key={theme} value={theme}>
+                  {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                </option>
+              ))}
+            </select>
+          </section>
 
           <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <p className="text-sm font-semibold text-foreground">Library backup</p>

@@ -14,8 +14,11 @@ import { getUserTopGenreLabels, sortRecGenresForFilter } from "@/lib/userTopGenr
 import { normalizeGenreList } from "@/lib/genreNormalize";
 import type { SearchBookResult } from "@/lib/bookProviders/types";
 
-/** How many recommendation rows the UI shows at once (pool can be much larger). */
-export const RECS_VISIBLE_COUNT = 30;
+/** Max ranked recommendations kept in the client pool. */
+export const RECS_POOL_MAX = 60;
+
+/** How many recommendation cards the UI shows at once. */
+export const RECS_VISIBLE_COUNT = 10;
 
 export type Recommendation = {
   bookId: string;
@@ -38,7 +41,9 @@ export type RecommendationsPoolModel = {
   retryLoad: () => void;
   rows: Recommendation[];
   notShelvedRecs: Recommendation[];
-  displayRecs: Recommendation[];
+  filteredPool: Recommendation[];
+  visibleRecs: Recommendation[];
+  reshuffle: () => void;
   sortedFilterGenres: string[];
   genresForChipRow: string[];
   genreSearch: string;
@@ -69,6 +74,15 @@ function isSearchBook(value: unknown): value is SearchBookResult {
   );
 }
 
+function sampleRandomBookIds(pool: Recommendation[], count: number): string[] {
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, Math.min(count, shuffled.length)).map((r) => r.bookId);
+}
+
 async function fetchDiscoverBooks(genres: string[]): Promise<SearchBookResult[]> {
   if (genres.length === 0) return [];
   const params = new URLSearchParams({ genres: genres.join(",") });
@@ -90,6 +104,10 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
 
   const [genreSearch, setGenreSearch] = useState("");
   const [selectedGenreLowerKeys, setSelectedGenreLowerKeys] = useState<string[]>([]);
+  const [shuffleSample, setShuffleSample] = useState<{
+    poolKey: string;
+    ids: string[];
+  } | null>(null);
 
   const tasteActive = useMemo(() => buildTasteSignals(state).active, [state]);
   const unshelvedCatalogCount = useMemo(() => countUnshelvedCatalog(state), [state]);
@@ -131,7 +149,10 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
   }, [shouldFetchDiscover, discoverGenreKey, discoverCache]);
 
   const { rows, appNativeEmptyReason } = useMemo(() => {
-    const native = buildAppNativeRecommendations(state, { discoverCandidates });
+    const native = buildAppNativeRecommendations(state, {
+      discoverCandidates,
+      maxResults: RECS_POOL_MAX,
+    });
     const normalized = native.recommendations.map((r) => ({
       ...r,
       genres: normalizeGenreList(r.genres),
@@ -143,8 +164,12 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
   }, [state, discoverCandidates]);
 
   const notShelvedRecs = useMemo(
-    () => rows.filter((rec) => !state.userBooks[rec.bookId]),
-    [rows, state.userBooks],
+    () =>
+      rows.filter(
+        (rec) =>
+          !state.userBooks[rec.bookId] && !state.dismissedRecIds.includes(rec.bookId),
+      ),
+    [rows, state.userBooks, state.dismissedRecIds],
   );
 
   const personalizationActive = tasteActive;
@@ -183,7 +208,9 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     [selectedGenreLowerKeys, unionLowerToDisplay],
   );
 
-  const afterGenreFilter = useMemo(() => {
+  const filterActive = activeFilterLowerKeys.length > 0;
+
+  const filteredPool = useMemo(() => {
     if (activeFilterLowerKeys.length === 0) return notShelvedRecs;
     const sel = new Set(activeFilterLowerKeys);
     return notShelvedRecs.filter((rec) =>
@@ -191,10 +218,31 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     );
   }, [notShelvedRecs, activeFilterLowerKeys]);
 
-  const displayRecs = useMemo(
-    () => afterGenreFilter.slice(0, RECS_VISIBLE_COUNT),
-    [afterGenreFilter],
+  const poolKey = useMemo(
+    () =>
+      [
+        filteredPool.map((r) => r.bookId).join("|"),
+        filterActive ? activeFilterLowerKeys.join("|") : "",
+      ].join("::"),
+    [filteredPool, filterActive, activeFilterLowerKeys],
   );
+
+  const visibleRecs = useMemo(() => {
+    if (filteredPool.length === 0) return [];
+    const defaultVisible = filteredPool.slice(0, RECS_VISIBLE_COUNT);
+    if (!shuffleSample || shuffleSample.poolKey !== poolKey) {
+      return defaultVisible;
+    }
+    const byId = new Map(filteredPool.map((r) => [r.bookId, r]));
+    return shuffleSample.ids
+      .map((id) => byId.get(id))
+      .filter((r): r is Recommendation => Boolean(r));
+  }, [filteredPool, shuffleSample, poolKey]);
+
+  const reshuffle = useCallback(() => {
+    const ids = sampleRandomBookIds(filteredPool, RECS_VISIBLE_COUNT);
+    setShuffleSample({ poolKey, ids });
+  }, [filteredPool, poolKey]);
 
   const toggleGenreFilter = useCallback((lower: string) => {
     setSelectedGenreLowerKeys((prev) => {
@@ -205,8 +253,7 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
 
   const clearGenreFilters = useCallback(() => setSelectedGenreLowerKeys([]), []);
 
-  const filterActive = activeFilterLowerKeys.length > 0;
-  const queueAfterFilter = afterGenreFilter.length;
+  const queueAfterFilter = filteredPool.length;
   const hasFilterNoMatches =
     filterActive && queueAfterFilter === 0 && notShelvedRecs.length > 0;
   const poolExhausted = rows.length > 0 && notShelvedRecs.length === 0;
@@ -221,7 +268,9 @@ export function useRecommendationsPool(): RecommendationsPoolModel {
     retryLoad,
     rows,
     notShelvedRecs,
-    displayRecs,
+    filteredPool,
+    visibleRecs,
+    reshuffle,
     sortedFilterGenres,
     genresForChipRow,
     genreSearch,

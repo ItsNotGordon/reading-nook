@@ -8,6 +8,8 @@ import type { SentimentBucket, Shelf } from "@/lib/types";
 import { itemsForShelf } from "@/lib/shelfItems";
 import { ShelfSection } from "./ShelfSection";
 import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
+import { RatedBookDetailSheet } from "./RatedBookDetailSheet";
+import type { BookId } from "@/lib/types";
 
 const FINISHED_PREVIEW_LIMIT = 12;
 
@@ -26,6 +28,7 @@ export function LibraryShelves() {
   const { state } = useReadingNook();
   const searchParams = useSearchParams();
   const shelfParam = parseShelfParam(searchParams.get("shelf"));
+  const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
   const [pairwise, setPairwise] = useState<{
     open: boolean;
     bookId: string | null;
@@ -95,6 +98,7 @@ export function LibraryShelves() {
         emptyTitle="No finished books yet"
         emptyBody="Finished titles land here with room for a sentiment and a simple score when you are ready."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
+        onOpenRatedDetail={(bookId) => setDetailBookId(bookId)}
         headerMeta={
           <div className="flex items-center gap-2 text-[11px] font-medium">
             {finished.length > FINISHED_PREVIEW_LIMIT ? (
@@ -121,6 +125,17 @@ export function LibraryShelves() {
         emptyBody="Books you want to read will stack here—unhurried, one scroll at a time."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
       />
+
+      {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
+        <RatedBookDetailSheet
+          bookId={detailBookId}
+          onClose={() => setDetailBookId(null)}
+          onStartPairwise={(bookId, bucket) => {
+            setDetailBookId(null);
+            setPairwise({ open: true, bookId, bucket });
+          }}
+        />
+      ) : null}
 
       {pairwise.open && pairwise.bookId && pairwise.bucket ? (
         <PairwiseComparisonSheet

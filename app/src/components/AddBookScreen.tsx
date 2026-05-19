@@ -211,7 +211,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: 
         placeholder="Search by title or author…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="min-h-11 w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-sm text-foreground shadow-inner outline-none ring-0 transition-shadow placeholder:text-foreground-muted/80 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
+        className="min-h-11 w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-base text-foreground shadow-inner outline-none ring-0 transition-shadow placeholder:text-foreground-muted/80 focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
       />
 
       {afterSearch ? <div className="min-w-0">{afterSearch}</div> : null}

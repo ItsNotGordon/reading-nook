@@ -18,6 +18,7 @@ type ShelfSectionProps = {
   /** DOM id for scroll-into-view from profile shelf snapshot links. */
   sectionId?: string;
   onStartPairwise?: (bookId: string, bucket: SentimentBucket) => void;
+  onOpenRatedDetail?: (bookId: string) => void;
   headerMeta?: ReactNode;
 };
 
@@ -29,6 +30,7 @@ export function ShelfSection({
   emptyBody,
   sectionId,
   onStartPairwise,
+  onOpenRatedDetail,
   headerMeta,
 }: ShelfSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,7 @@ export function ShelfSection({
                   userBook={userBook}
                   variant={variant}
                   onStartPairwise={onStartPairwise}
+                  onOpenRatedDetail={onOpenRatedDetail}
                 />
               </li>
             ))}

@@ -73,20 +73,35 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
       >
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden />
         <div className="border-b border-border px-4 pb-3 pt-3 sm:pt-4">
-          <p id="shelf-picker-title" className="font-serif text-lg font-semibold text-foreground">
-            Add to shelf
-          </p>
-          <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p id="shelf-picker-title" className="font-serif text-lg font-semibold text-foreground">
+                Add to shelf
+              </p>
+              <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={onClose}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-card-surface text-lg leading-none text-foreground-muted active:bg-accent-soft/35"
+            >
+              ×
+            </button>
+          </div>
         </div>
         <div className="border-b border-border px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
             Genres (optional)
           </p>
-          <p className="mt-0.5 text-xs text-foreground-muted">
-            Add or adjust genres for this book.
-          </p>
+          <p className="mt-0.5 text-xs text-foreground-muted">Tap to select genres for this book.</p>
           <div className="mt-2">
-            <GenreChipPicker value={selectedGenres} onChange={setSelectedGenres} searchable />
+            <GenreChipPicker
+              value={selectedGenres}
+              onChange={setSelectedGenres}
+              searchable
+              variant="shelfPicker"
+            />
           </div>
         </div>
         <div className="flex flex-col gap-1.5 p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">

@@ -3,13 +3,16 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { GenreChipPicker } from "@/components/GenreChipPicker";
+import { MoveShelfSheet } from "@/components/MoveShelfSheet";
+import { SentimentPicker } from "@/components/SentimentPicker";
 import { useReadingNook } from "@/lib/app-state";
 import { sentimentLabel } from "@/lib/sentiment-display";
-import type { BookId, SentimentBucket } from "@/lib/types";
+import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
 
 type RatedBookDetailSheetProps = {
   bookId: BookId;
   onClose: () => void;
+  onStartPairwise?: (bookId: BookId, bucket: SentimentBucket) => void;
 };
 
 function scoreColorClass(bucket: SentimentBucket): string {
@@ -27,7 +30,7 @@ function formatFinishedAt(iso: string | null): string {
 
 const BUCKET_ORDER: SentimentBucket[] = ["liked", "okay", "disliked"];
 
-export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetProps) {
+export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: RatedBookDetailSheetProps) {
   const { state, actions } = useReadingNook();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
@@ -48,6 +51,8 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
   const [draftNotes, setDraftNotes] = useState("");
   const [editingGenres, setEditingGenres] = useState(false);
   const [draftGenres, setDraftGenres] = useState<string[]>([]);
+  const [changingSentiment, setChangingSentiment] = useState(false);
+  const [moveShelfOpen, setMoveShelfOpen] = useState(false);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -87,6 +92,28 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
   const startGenreEdit = (): void => {
     setDraftGenres([...rowBook.genres]);
     setEditingGenres(true);
+  };
+
+  const chooseSentiment = (bucket: SentimentBucket): void => {
+    if (displayBucket === bucket) {
+      setChangingSentiment(false);
+      return;
+    }
+    const existingIds = (state.bucketRankings[bucket] ?? []).filter((id) => id !== bookId);
+    if (existingIds.length === 0) {
+      actions.insertBookIntoBucketAtIndex(bookId, bucket, 0);
+      setChangingSentiment(false);
+      return;
+    }
+    onStartPairwise?.(bookId, bucket);
+    setChangingSentiment(false);
+  };
+
+  const moveToShelf = (shelf: Shelf): void => {
+    if (shelf === "finished") return;
+    actions.moveBookToShelf(bookId, shelf);
+    setMoveShelfOpen(false);
+    onClose();
   };
 
   return (
@@ -159,6 +186,33 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
                   Finished
                 </p>
                 <p className="mt-1 text-sm text-foreground">{formatFinishedAt(rowUb.finishedAt)}</p>
+              </div>
+
+              <div className="space-y-2 border-t border-dashed border-border/70 pt-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setChangingSentiment((v) => !v)}
+                    className="min-h-10 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground active:bg-accent-soft/35"
+                  >
+                    Change how I felt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMoveShelfOpen(true)}
+                    className="min-h-10 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground active:bg-accent-soft/35"
+                  >
+                    Move to shelf…
+                  </button>
+                </div>
+                {changingSentiment ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-foreground-muted">
+                      Pick a new feeling — you may rank it in your list.
+                    </p>
+                    <SentimentPicker value={displayBucket} onChoose={chooseSentiment} />
+                  </div>
+                ) : null}
               </div>
 
               <div>
@@ -279,6 +333,14 @@ export function RatedBookDetailSheet({ bookId, onClose }: RatedBookDetailSheetPr
           </div>
         </div>
       </div>
+
+      {moveShelfOpen ? (
+        <MoveShelfSheet
+          book={rowBook}
+          onChoose={moveToShelf}
+          onClose={() => setMoveShelfOpen(false)}
+        />
+      ) : null}
     </dialog>
   );
 }

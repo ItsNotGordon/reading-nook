@@ -11,7 +11,7 @@ export const APP_NATIVE_SOURCE_DISCOVER = "openlibrary-discover";
 /** Fetch OL discover when unshelved catalog count is below this. */
 export const CATALOG_UNSHELVED_DISCOVER_THRESHOLD = 15;
 
-const DEFAULT_MAX_RESULTS = 30;
+const DEFAULT_MAX_RESULTS = 60;
 const BASE_CATALOG_SCORE = 5;
 
 export type AppNativeRecommendationsInput = {
