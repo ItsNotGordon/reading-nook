@@ -1,5 +1,5 @@
 ---
-description: Reading Nook — consult PRD before product, UX, tabs, or data model changes
+description: Reading Nook — consult PRD; post-STAT product and scalable architecture
 globs: app/**/*
 alwaysApply: false
 ---
@@ -8,16 +8,20 @@ alwaysApply: false
 
 When editing files under `app/` for **The Reading Nook**, treat the product spec as source of truth:
 
-1. **Read first:** Open [`docs/PRD.md`](docs/PRD.md) and follow it to [`docs/Reading_Nook_PRD.md`](docs/Reading_Nook_PRD.md) (full spec) before you implement or materially change:
+1. **Read first:** Open [`docs/PRD.md`](docs/PRD.md) → [`docs/Reading_Nook_Product_PRD.md`](docs/Reading_Nook_Product_PRD.md) (canonical as-built + friends-scale roadmap). Use older PRDs only for extra algorithm detail. Before you implement or materially change:
    - tab names, routes, or shell layout  
    - shelves, library, add flow, leaderboard/ranking, recs, profile  
-   - `AppState` / types / persistence / localStorage keys  
+   - `AppState` / types / persistence / storage keys  
    - sentiment buckets, progress modes, scoring, or recommendation scope  
 
-2. **If the PRD is silent or ambiguous:** Say what is missing; do **not** invent MVP requirements, tab sets, or data fields.
+2. **Product direction:** Friends-scale deployable app—not mass-market social, not class ML integration. Prioritize **tracking, pairwise ranking, deployability**, then **auth + Postgres/Supabase + sync + small-group friend features**. Do **not** treat Apriori + KNN extraction as the default next task.
 
-3. **If code and PRD disagree:** Call out the conflict. Prefer the PRD unless the user explicitly says to diverge.
+3. **Preserved reference (do not drive roadmap):** `notebook.ipynb`, `recommender/`, and related Python stay as historical/reference material. Do not edit `notebook.ipynb` in place; copy if needed.
 
-4. **Out of scope:** Do not expand into items the PRD lists as out-of-scope (e.g. auth, cloud DB, social) unless the user explicitly asks.
+4. **If the PRD is silent or ambiguous:** Say what is missing; do **not** invent requirements, tab sets, or data fields.
 
-5. **Repo layout:** The Next.js app lives in `app/`. Root `notebook.ipynb`, Python, and `requirements.txt` stay unchanged unless the user asks otherwise.
+5. **If code and PRD disagree:** Call out the conflict. Prefer the PRD unless the user explicitly says to diverge.
+
+6. **MVP vs future:** localStorage and static `public/data/*.json` are valid for the current app. Items in the PRD **future scalability roadmap** (auth, cloud DB, social, etc.) are **in scope only when the user asks**—but new code should not block that path (e.g. avoid more global-only rec assumptions without user request).
+
+7. **Repo layout:** The Next.js app lives in `app/`. Root notebook, `recommender/`, and Python deps stay unchanged unless the user asks otherwise.

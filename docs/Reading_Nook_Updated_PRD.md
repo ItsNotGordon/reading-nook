@@ -1,12 +1,14 @@
 # PRD: Reading Nook
 
+> **Note:** For the **canonical as-built spec** (accurate tabs, types, Add+recs layout), use **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**. This file is a transition snapshot; some details (e.g. Search | Recs segment) do not match the app.
+
 ## 1. Product Overview
 
 **Product Name:** Reading Nook  
 **Product Type:** Mobile-first reading tracker and recommendation web app  
 **Platform:** Next.js web app optimized for mobile browsers  
-**Primary User:** Single user, local-first MVP  
-**Current Project Context:** CSULB / STAT-style portfolio project evolving from a STAT 280 Apriori + KNN recommender into a usable reading product.
+**Primary User:** Single user today; multi-user and cloud sync on the long-term roadmap  
+**Current Project Context:** Reading Nook began as a STAT 280 project; **the class is finished**. The product is now a **for-fun app with long-term potential**—reading tracking and pairwise ranking first, scalable infrastructure and social features over time.
 
 Reading Nook is a cozy, mobile-first app for tracking books, ranking finished reads, and discovering recommendations based on personal taste.
 
@@ -17,10 +19,10 @@ Goodreads-style library tracking
 +
 Beli-style pairwise preference ranking
 +
-offline recommendation generation from book metadata and future ML work
+offline recommendation generation from book metadata and user ranking signals
 ```
 
-The app is currently local-first. It does not require accounts, a backend, or a database. The user’s library, progress, finished books, sentiment buckets, and rankings are stored in localStorage. Catalog and recommendations are generated offline as JSON files.
+The app is currently **local-first** (localStorage, static JSON under `public/data/`). That remains the shipped baseline. New work should move toward **APIs, Postgres/Supabase, auth, and cloud sync** without breaking shelves, progress, or pairwise ranking—see **[Post-STAT Product Direction](#post-stat-product-direction)**.
 
 ---
 
@@ -50,7 +52,41 @@ This makes ratings feel:
 - easier to maintain
 - more useful for recommendations
 
-The app should feel like a personal reading companion, not a social media platform.
+The app should feel like a personal reading companion, not a social media platform. Social and friend features are **future** additions (Friends tab is a placeholder today), not the current core loop.
+
+---
+
+## Post-STAT Product Direction
+
+### From class project to product
+
+STAT 280 is complete. Reading Nook is no longer a portfolio or statistics deliverable. The north star is a product people keep using: **track → finish → rank → discover**, with optional **friend libraries and taste comparison** once identity and sync exist.
+
+The **current app** (Library, Ratings, Add with search + recs, Profile, Friends placeholder; localStorage + `books.json` / `recommendations.json`) is the baseline. Extend it toward scalable architecture; do not treat class-era ML extraction as the default next milestone.
+
+### STAT 280 work: preserved, not the roadmap
+
+| Asset | Role going forward |
+| ----- | ------------------ |
+| `notebook.ipynb` | Original Apriori + KNN exploration; **do not edit in place**—copy to experiment. |
+| `recommender/` | Offline scripts → `recommendations.json`; reference patterns, not the long-term rec engine. |
+| `git-forked-database/` | Goodreads-style CSVs for catalog/rec builds; not required for future hosted catalog APIs. |
+
+**Not the main roadmap:** wiring Apriori + KNN from the notebook into the app, or “Phase 2: extract real recommender” as the primary product goal.
+
+**Is the roadmap:** ranking-driven taste signals, better Recs from user behavior, then **book metadata API → Supabase/Postgres → auth → cloud sync → friend libraries → taste comparison → scalable per-user recommendations**.
+
+### Future scalability roadmap
+
+1. **Real book metadata and search API** — replace or supplement static `books.json` with hosted search, covers, editions, stable external IDs.  
+2. **Supabase / Postgres** — libraries, rankings, and rec artifacts in normalized tables with migrations.  
+3. **Authentication** — server-authoritative identity (email/OAuth/magic link).  
+4. **Cloud sync** — same library and bucket rankings on every device; sensible offline/conflict behavior.  
+5. **Friend libraries** — opt-in shared shelves and finished rankings with privacy controls.  
+6. **Taste comparison** — overlap and divergence with friends (genres, rank correlation, shared favorites)—not a generic social feed.  
+7. **Scalable recommendations** — per-user or per-cohort scoring in backend jobs; cache feeds per user. Ranking signals (buckets, pairwise order, derived scores) stay central; star ratings stay out.
+
+**Architecture principles:** thin Next.js client; auth + Postgres as source of truth; optional batch/ML workers; Beli-style buckets and pairwise ranking unchanged as the taste capture model.
 
 ---
 
@@ -202,7 +238,7 @@ book_tags.csv
 tags.csv
 ```
 
-### 5.4 Notebook
+### 5.4 Notebook (reference only)
 
 The original STAT 280 notebook remains at:
 
@@ -210,7 +246,7 @@ The original STAT 280 notebook remains at:
 notebook.ipynb
 ```
 
-It is the source of truth for future Apriori + KNN extraction, but it should not be directly wired into the app.
+It is **historical reference** for how the class hybrid recommender was explored. It should not be edited in place, should not be wired into the Next.js app, and is **not** the source of truth for the product roadmap. See [Post-STAT Product Direction](#post-stat-product-direction).
 
 ---
 
@@ -261,9 +297,9 @@ The Recs screen fetches:
 Current recommender status:
 
 ```txt
-offline JSON pipeline exists
-recommendations display in app
-real Apriori + KNN extraction is not fully implemented yet
+offline JSON pipeline exists (recommender/ → recommendations.json)
+recommendations display in Add tab with client-side personalization from rankings
+long-term target: per-user recs from backend, not deeper notebook extraction
 ```
 
 ---
@@ -810,25 +846,33 @@ The Recs screen should:
 - highlight user top genres
 - sort by display score descending
 
-### 17.4 Future ML Integration
+### 17.4 Future recommendations (scalable)
 
-The current recommender is not yet the full STAT 280 Apriori + KNN recommender.
+Today: static `recommendations.json` plus **in-app personalization** from sentiment buckets, pairwise order, and derived scores.
 
-Future recommender should use:
+Target (post-STAT roadmap):
 
 ```txt
-liked books
-okay books
-disliked books
-derived scores
-bucket rankings
-genre metadata
-Goodbooks ratings
-Apriori genre rules
-KNN classification/ranking
+user library + bucket rankings in Postgres
+↓
+recommendation service / scheduled job
+↓
+per-user rec feed (API)
+↓
+Add tab Recs UI
 ```
 
-The notebook should be extracted into reusable Python modules, not executed inside the web app.
+Signals to use (same product philosophy, better infrastructure):
+
+```txt
+liked / okay / disliked buckets
+derived scores and within-bucket rank
+genre and author affinity from finished books
+negative signals from disliked bucket
+catalog metadata from a real book API
+```
+
+The STAT 280 notebook and `recommender/` may inform scoring ideas but are **not** the planned production path. Do not run Python/ML in the browser.
 
 ---
 
@@ -874,15 +918,13 @@ show future direction without implementing backend/social features
 
 It should clearly communicate that shared libraries are not built yet.
 
-Future possibilities:
+Future possibilities (aligned with [Future scalability roadmap](#future-scalability-roadmap)):
 
-- compare books with friends
-- see friend shelves
-- shared recommendations
-- book clubs
-- taste overlap
+- friend libraries and opt-in shelf sharing
+- taste comparison and overlap (not a full social feed)
+- shared or comparative recommendations
 
-But these are out of scope for current MVP unless backend/auth is added.
+These require **auth + cloud data** first. The Friends tab stays a placeholder until that work is explicitly requested.
 
 ---
 
@@ -920,99 +962,49 @@ It should not run:
 - inside React components
 - during normal page navigation
 
-Future structure may include:
-
-```txt
-recommender/data.py
-recommender/apriori_model.py
-recommender/knn_model.py
-recommender/generate_recommendations.py
-```
+The `recommender/` folder may keep evolving for **local/offline builds** until a hosted rec service exists. New modules should favor **user ranking inputs** and clear JSON contracts, not notebook parity for its own sake.
 
 ---
 
-## 21. STAT 280 / Notebook Integration Plan
+## 21. Historical STAT 280 artifacts (reference only)
 
-The original notebook should be treated as the reference implementation for the ML recommender.
+**Do not** treat the following as the active product roadmap:
 
-Do not directly wire notebook cells into the app.
+- Auditing `notebook.ipynb` for Apriori + KNN extraction phases
+- Porting notebook cells into the Next.js app
+- Completing “full STAT 280 hybrid” as the definition of done for Recs
 
-Instead, migrate in phases:
-
-### Phase 1: Audit Notebook
-
-Identify:
+**Do** preserve:
 
 ```txt
-data loading
-cleaning
-tag/genre construction
-Apriori baskets
-Apriori rules
-KNN features
-KNN training/evaluation
-hybrid recommender output
+notebook.ipynb          — read-only reference; copy to experiment
+recommender/            — offline JSON generation for local MVP
+git-forked-database/    — dataset for build:books / legacy rec scripts
 ```
 
-### Phase 2: Extract Data Prep
-
-Move reusable loading and cleaning logic into Python scripts/modules.
-
-### Phase 3: Extract Apriori
-
-Move genre basket and association rule logic into a reusable module.
-
-### Phase 4: Extract KNN
-
-Move KNN feature construction and prediction logic into a reusable module.
-
-### Phase 5: Connect User Preferences
-
-Map app state into recommender inputs:
-
-```txt
-liked bucket
-okay bucket
-disliked bucket
-derivedScore
-bucketRankings
-```
-
-### Phase 6: Generate Recommendations
-
-Output:
-
-```txt
-recommendations.json
-```
-
-with reasons and scores.
-
-### Phase 7: Display in Recs UI
-
-The existing frontend should already be able to consume generated recommendations.
+For what to build next, use **[Post-STAT Product Direction](#post-stat-product-direction)** and section **24. Product roadmap** below—not a notebook extraction plan.
 
 ---
 
-## 22. Out of Scope For Current MVP
+## 22. Out of Scope For Current MVP (still on product roadmap)
 
-Do not implement yet:
+Not built in the local-first MVP unless explicitly requested:
 
 ```txt
 authentication
-cloud database
+cloud database (e.g. Supabase/Postgres)
 multi-device sync
 real Friends system
 reviews/comments
 notifications
-server-side recommender
-live API search
+server-side per-user recommender
+live API book search
 social feed
 book clubs
 real-time collaboration
 ```
 
-The product should remain local-first until there is a clear reason to add backend complexity.
+The app **stays local-first today**. Items above are **intended future phases** (see Future scalability roadmap), not rejected forever. Implement them when the user asks or when a migration task is scoped—not by default on every change.
 
 ---
 
@@ -1034,56 +1026,42 @@ The MVP is successful when the user can:
 12. Add recommended books to their library
 13. Refresh without losing local data
 
-The portfolio version is successful when the project clearly demonstrates:
+The product is successful long-term when it delivers:
 
 ```txt
-frontend product design
-local-first state management
-mobile UX
-pairwise ranking algorithm
-derived scoring system
-offline data pipeline
-future ML recommender integration
+reliable reading tracking and ranking on any device
+personalized discovery from real taste signals
+optional social/taste comparison without becoming a feed
+maintainable backend (auth, Postgres, APIs) under the same UX principles
 ```
 
 ---
 
-## 24. Current Priority Roadmap
+## 24. Product roadmap
 
-### Priority 1: Stabilize Current MVP
+### Near term: strengthen the local-first app
 
-- fix Add tab mobile catalog loading issue
-- verify localStorage migrations
-- polish empty/loading/error states
-- test mobile navigation
-- ensure `npm run build`, `npm run lint`, `npm run build:books`, and `npm run build:recs` all work
+- polish Add tab (catalog + recs loading, errors, mobile)
+- verify localStorage migrations and `npm run build` / `lint` / `build:books` / `build:recs`
+- improve Recs via **ranking-driven personalization** in the client (not notebook extraction)
+- document run/deploy flow (`dev` vs `build` + `start`)
 
-### Priority 2: Extract Real Recommender
+### Medium term: scalable foundations
 
-- inspect notebook
-- document migration plan
-- extract data prep
-- extract genre Apriori logic
-- extract KNN feature/model logic
-- generate real recommendations JSON
+Follow [Future scalability roadmap](#future-scalability-roadmap) in order:
 
-### Priority 3: Portfolio Polish
+1. Real book metadata/search API  
+2. Supabase/Postgres schema for users, libraries, rankings  
+3. Authentication  
+4. Cloud sync  
+5. Friend libraries (Friends tab becomes real)  
+6. Taste comparison  
+7. Scalable per-user recommendations (replace or supplement global `recommendations.json`)
 
-- write README with screenshots
-- explain architecture
-- explain ranking algorithm
-- explain recommender pipeline
-- add demo data reset/seed option
-- deploy to Vercel
+### Deprioritized unless explicitly requested
 
-### Priority 4: Future Product Expansion
-
-- backend
-- auth
-- cloud sync
-- real Friends tab
-- shared libraries
-- real API search
+- Apriori + KNN notebook extraction as the main Recs strategy  
+- Portfolio-only polish that does not serve real usage  
 
 ---
 
@@ -1092,14 +1070,14 @@ future ML recommender integration
 Cursor should follow these product rules:
 
 ```txt
-1. The app is local-first unless explicitly changed.
-2. Do not add backend/auth/social features unless requested.
-3. Do not reintroduce star ratings.
-4. Scores are derived from pairwise ranking.
+1. Read Post-STAT Product Direction before major features.
+2. The app is local-first today unless a task is explicitly migrating to backend/auth/sync.
+3. Do not add backend/auth/social unless requested—but design so that path stays open.
+4. Do not reintroduce star ratings; use sentiment buckets + pairwise ranking.
 5. Keep Book metadata separate from UserBook user state.
-6. Recommender runs offline and outputs JSON.
+6. Offline JSON (build:books, build:recs) is valid for MVP; long-term recs should move server-side per user.
 7. Do not run Python/ML in the browser.
-8. Treat notebook.ipynb as the ML reference, not production code.
+8. Preserve notebook.ipynb and recommender/ as reference; do not edit notebook in place; do not prioritize Apriori+KNN integration as default next work.
 9. Keep UI mobile-first, cozy, and minimal.
 10. Prefer small incremental changes over large rewrites.
 ```

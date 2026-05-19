@@ -1,5 +1,7 @@
 # PRD: The Reading Nook MVP
 
+> **Note:** For the **current shipped app**, routes, and friends-scale direction, use **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**. This file remains useful for original MVP requirements and algorithm detail; some navigation and type names are outdated.
+
 ## 1. Product Overview
 
 **Product Name:** The Reading Nook  
@@ -7,11 +9,13 @@
 **Target Platform:** Next.js web app, optimized for iPhone/mobile browser  
 **MVP Storage:** localStorage  
 **Primary User:** Single user  
-**Project Goal:** Convert the existing STAT 280 book recommendation project into a usable reading tracker app with a Beli-style ranking system.
+**Project Goal:** A mobile-first reading tracker with Beli-style pairwise ranking—built for long-term use, not as a class deliverable.
 
 The Reading Nook is a mobile-first reading tracker that combines Goodreads-style book organization with Beli-inspired pairwise ranking. Instead of asking users to manually assign arbitrary star ratings, the app asks users to place finished books into broad sentiment buckets and then rank books through direct comparisons.
 
-The app should eventually support recommendation logic powered by user rankings and the existing STAT 280 Apriori + KNN notebook, but the MVP should focus first on product architecture, reading tracking, and ranking.
+The product started as a STAT 280 project; that phase is complete. Going forward, treat Reading Nook as a **for-fun product with long-term potential**: reading tracking and pairwise ranking are the core; recommendations and social features should scale with real infrastructure, not with one-off notebook integration.
+
+See **[Post-STAT Product Direction](#post-stat-product-direction)** for what is preserved from the class work and what to build next.
 
 ---
 
@@ -84,7 +88,65 @@ Do not build yet:
 - notifications
 - multiple users
 
-The existing STAT 280 Apriori + KNN notebook should be preserved for later recommendation work, but it should not drive the initial MVP architecture. You should also never change the content of notebook.ipynb. If you ever need to use it, create a new copy and refer to the copy in the future.
+The historical STAT 280 notebook and `recommender/` pipeline are **reference material only**—see [Post-STAT Product Direction](#post-stat-product-direction). Do not change the content of `notebook.ipynb`; if you need to experiment, copy it first.
+
+---
+
+## Post-STAT Product Direction
+
+### From class project to product
+
+STAT 280 is finished. Reading Nook is no longer scoped as a statistics coursework artifact. The north star is a **personal reading product** people actually use: track what you read, rank what you finish, discover what to read next, and eventually compare taste with friends—all on infrastructure that can grow beyond a single browser and static JSON files.
+
+The MVP (localStorage, static catalog/recs JSON, single user) remains valid as **shipped baseline behavior**. New work should move the product toward **scalable architecture** without breaking the core ranking and shelf flows.
+
+### STAT 280 work: preserved, not the roadmap
+
+The following stay in the repo as **historical and reference material**:
+
+| Asset | Role going forward |
+| ----- | ------------------ |
+| `notebook.ipynb` | Original Apriori + KNN exploration; **do not edit in place**. Copy if you need to experiment. |
+| `recommender/` | Offline Python that builds `app/public/data/recommendations.json`; useful patterns, not the long-term rec engine. |
+| `git-forked-database/` | Goodreads-style dataset used by the class pipeline. |
+
+**What we are not optimizing for:** wiring Apriori + KNN from the notebook directly into the Next.js app as the main recommendation strategy, or treating notebook extraction as the next milestone.
+
+**What we are optimizing for:** product primitives that survive at scale—**shelves, progress, sentiment buckets, pairwise rankings, derived scores**, and recommendation signals derived from **user behavior**, served through maintainable APIs and storage.
+
+When improving Recs today, prefer **personalization from rankings and genres in app state** (and simple offline baselines) over deeper notebook coupling. When replacing Recs later, plan for **server-side, per-user scoring**—not a larger static JSON export from class-era ML.
+
+### Future scalability roadmap
+
+Ordered by typical dependency (earlier items unblock later ones). None of this is required for the current local-only MVP; it is the **intended product arc** for agents and contributors.
+
+1. **Real book metadata and search API**  
+   Replace or supplement static `books.json` with a hosted catalog (e.g. Open Library, Google Books, or a commercial API): search, covers, editions, genres, and stable external IDs.
+
+2. **Supabase / Postgres database**  
+   Move books, user libraries, rankings, and recommendation artifacts off `localStorage` and static files into normalized tables with migrations, backups, and queryable taste data.
+
+3. **Authentication**  
+   Sign-in (email, OAuth, or magic link) so identity is server-authoritative and data is not tied to one device.
+
+4. **Cloud sync**  
+   Read/write library and bucket rankings from any device; conflict handling for offline edits; optional export.
+
+5. **Friend libraries**  
+   Opt-in sharing of shelves and finished rankings (privacy controls first—what is public vs friends-only).
+
+6. **Taste comparison**  
+   Surface overlap and divergence with friends (shared genres, rank correlation, “you both loved X”) without reducing the app to a social feed.
+
+7. **Scalable recommendations**  
+   Per-user or per-cohort scoring in a backend job or edge function: ranking signals, genre/author affinity, negative signals from disliked bucket, and optional collaborative filtering—**not** a single global `recommendations.json` checked into the repo.
+
+**Architecture principles for future work:**
+
+- **Client:** Next.js app stays thin—UI, optimistic updates, and typed API clients.
+- **Server:** Auth + Postgres (Supabase is the default assumption unless the repo adopts something else) as source of truth.
+- **ML / batch:** Optional workers or scheduled jobs for heavy rec computation; results cached per user.
+- **Preserve UX:** Beli-style buckets and pairwise ranking remain the primary taste capture mechanism; star ratings stay out of scope.
 
 ---
 
@@ -676,25 +738,31 @@ The app should not depend on the STAT 280 notebook yet.
 
 ### Later Version
 
-The Recs tab will eventually use the existing STAT 280 Apriori + KNN recommendation work.
+Recs should evolve toward **per-user, server-computed recommendations** using ranking signals (buckets, pairwise order, derived scores) and catalog metadata—not toward deeper integration of the STAT 280 notebook.
 
-Possible later pipeline:
+Interim pipeline (current repo):
 
 ```txt
-ranked user books
-+ sentiment buckets
-+ derived scores
-+ genre metadata
-+ book metadata
+ranked user books + sentiment + derived scores + genres
 ↓
-Python recommender
+offline build (recommender/ or app scripts) → recommendations.json
 ↓
-recommendations.json
-↓
-Next.js frontend
-↓
-Recs tab
+Next.js Recs tab (+ client-side personalization where implemented)
 ```
+
+Target pipeline (post-STAT roadmap):
+
+```txt
+user library + rankings in Postgres
+↓
+recommendation service / batch job
+↓
+per-user rec feed API
+↓
+Next.js Recs tab
+```
+
+The STAT 280 notebook and `recommender/` remain useful references for scoring ideas; they are not the target production architecture.
 
 ### Recommendation Inputs Later
 
@@ -928,12 +996,9 @@ Build in this order:
 3. Profile stats
 4. Top genres
 
-### Phase 7: ML Integration Later
+### Phase 7: Product scale (post-MVP)
 
-1. Revisit STAT 280 notebook
-2. Convert recommender logic into Python pipeline
-3. Export recommendations as JSON
-4. Display JSON recommendations in Recs tab
+Follow the [Future scalability roadmap](#future-scalability-roadmap) in **Post-STAT Product Direction**—book APIs, Supabase/Postgres, auth, sync, social, and scalable recs—in that general order. Do not treat Apriori + KNN notebook extraction as Phase 7.
 
 ---
 
@@ -942,31 +1007,18 @@ Build in this order:
 You can paste this into Cursor:
 
 ```txt
-Use this PRD as the source of truth for The Reading Nook MVP.
+Use this PRD as the source of truth for The Reading Nook.
 
-We are converting an existing STAT 280 book recommendation repo into a mobile-first Next.js reading tracker web app.
+Reading Nook is a for-fun, long-term reading product (STAT 280 is done). Read "Post-STAT Product Direction" in docs/Reading_Nook_PRD.md before major features.
 
 Important:
-- Do not modify notebook.ipynb right now.
-- Do not integrate the Apriori + KNN recommender yet.
-- Focus on the MVP app architecture first.
-- Use TypeScript, Tailwind CSS, and localStorage.
-- The app is single-user only.
-- The core product idea is Goodreads-style tracking plus Beli-style pairwise ranking instead of star ratings.
+- Core UX: Goodreads-style shelves + Beli-style sentiment buckets and pairwise ranking (no star ratings).
+- Preserve notebook.ipynb and recommender/ as reference; do not edit notebook.ipynb in place.
+- Do not prioritize Apriori + KNN integration as the main roadmap.
+- MVP may use localStorage and static JSON; new infrastructure work should aim at APIs, Postgres/Supabase, auth, and cloud sync per the PRD roadmap.
+- When improving Recs, favor ranking-driven personalization and scalable server-side design over notebook wiring.
 
-Build incrementally in this order:
-1. Core types
-2. localStorage app state
-3. Library tab
-4. Add flow
-5. Progress tracking
-6. Finish book flow
-7. Sentiment buckets
-8. Pairwise ranking
-9. Derived scores
-10. Basic recommendations/profile
-
-Follow the PRD closely and avoid overbuilding.
+Follow the PRD closely and avoid overbuilding beyond the current phase.
 ```
 
 ---
