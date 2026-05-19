@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Literata } from "next/font/google";
+import { CloudLibrarySync } from "@/components/CloudLibrarySync";
+import { SupabaseAuthProvider } from "@/components/SupabaseAuthProvider";
 import { ReadingNookProvider } from "@/lib/app-state";
 import "./globals.css";
 
@@ -21,6 +23,7 @@ export const metadata: Metadata = {
     template: "%s · The Reading Nook",
   },
   description: "A cozy place for your reading life.",
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
@@ -40,7 +43,12 @@ export default function RootLayout({
       className={`${dmSans.variable} ${literata.variable} h-full antialiased`}
     >
       <body className="min-h-dvh bg-background text-foreground">
-        <ReadingNookProvider>{children}</ReadingNookProvider>
+        <ReadingNookProvider>
+          <SupabaseAuthProvider>
+            <CloudLibrarySync />
+            {children}
+          </SupabaseAuthProvider>
+        </ReadingNookProvider>
       </body>
     </html>
   );

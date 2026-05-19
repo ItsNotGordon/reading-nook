@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
-import type { Book, SentimentBucket, Shelf, UserBook } from "@/lib/types";
-import type { ShelfItem } from "./ShelfSection";
+import type { SentimentBucket, Shelf } from "@/lib/types";
+import { itemsForShelf } from "@/lib/shelfItems";
 import { ShelfSection } from "./ShelfSection";
 import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
 
@@ -20,41 +20,6 @@ const SHELF_SECTION_ID: Record<Shelf, string> = {
 function parseShelfParam(value: string | null): Shelf | null {
   if (value === "reading" || value === "finished" || value === "want_to_read") return value;
   return null;
-}
-
-function itemsForShelf(
-  userBooks: Partial<Record<string, UserBook>>,
-  catalog: Record<string, Book>,
-  shelf: Shelf,
-): ShelfItem[] {
-  const out: ShelfItem[] = [];
-  for (const ub of Object.values(userBooks)) {
-    if (!ub || ub.shelf !== shelf) continue;
-    const book = catalog[ub.bookId];
-    if (book) out.push({ book, userBook: ub });
-  }
-  if (shelf === "finished") {
-    // Newest finish action first. Prefer finishedSortAt, then finishedAt, then addedAt.
-    out.sort((a, b) => {
-      const aRaw = a.userBook.finishedSortAt ?? a.userBook.finishedAt ?? a.userBook.addedAt;
-      const bRaw = b.userBook.finishedSortAt ?? b.userBook.finishedAt ?? b.userBook.addedAt;
-      const aTs = Number.isFinite(Date.parse(aRaw)) ? Date.parse(aRaw) : -Infinity;
-      const bTs = Number.isFinite(Date.parse(bRaw)) ? Date.parse(bRaw) : -Infinity;
-      if (bTs !== aTs) return bTs - aTs;
-      const aAddedTs = Number.isFinite(Date.parse(a.userBook.addedAt))
-        ? Date.parse(a.userBook.addedAt)
-        : -Infinity;
-      const bAddedTs = Number.isFinite(Date.parse(b.userBook.addedAt))
-        ? Date.parse(b.userBook.addedAt)
-        : -Infinity;
-      if (bAddedTs !== aAddedTs) return bAddedTs - aAddedTs;
-      // Stable tie-breaker (keeps deterministic order when timestamps match)
-      return b.userBook.bookId.localeCompare(a.userBook.bookId);
-    });
-  } else {
-    out.sort((a, b) => a.userBook.addedAt.localeCompare(b.userBook.addedAt));
-  }
-  return out;
 }
 
 export function LibraryShelves() {

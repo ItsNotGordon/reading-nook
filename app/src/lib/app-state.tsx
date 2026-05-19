@@ -26,6 +26,8 @@ export type ReadingNookActions = {
   updateBucketRankings: (bucket: SentimentBucket, orderedBookIds: BookId[]) => void;
   /** Wipe shelves, rankings, and cached catalog copies (localStorage only). */
   resetLibrary: () => void;
+  /** Replace library from backup file or cloud sync. */
+  hydrateLibrary: (next: AppState) => void;
   updateUserBookNotes: (bookId: BookId, notes: string) => void;
   updateCatalogGenres: (bookId: BookId, genres: string[]) => void;
   updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline">>) => void;
@@ -78,6 +80,7 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       updateBucketRankings: (bucket, orderedBookIds) =>
         dispatch({ type: "UPDATE_BUCKET_RANKINGS", bucket, orderedBookIds }),
       resetLibrary: () => dispatch({ type: "RESET_LIBRARY" }),
+      hydrateLibrary: (next) => dispatch({ type: "HYDRATE", payload: next }),
       updateUserBookNotes: (bookId, notes) =>
         dispatch({ type: "UPDATE_USER_BOOK_NOTES", bookId, notes }),
       updateCatalogGenres: (bookId, genres) =>

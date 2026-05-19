@@ -1,50 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Reading Nook (Next.js app)
 
-## Getting Started
+A cozy, mobile-first reading tracker: shelve books, track progress, finish with sentiment, rank in buckets, and get personalized recommendations from your taste + Open Library.
 
-Run all commands from this **`app`** directory (where `package.json` lives).
+Run all commands from this **`app`** directory.
 
-### Live book search
-
-The **Add** tab searches books via [Open Library](https://openlibrary.org/) through the server route `/api/books/search`. No API key is required.
-
-### Legacy static catalog (recommendations pipeline)
-
-`npm run build:books` still generates `public/data/books.json` from Goodbooks CSVs for the offline recommender and related tooling. Add-tab **search** does not use that file.
+## Getting started
 
 ```bash
-npm run build:books
-npm run build:recs   # optional: refresh recommendations.json
-```
-
-Then start the dev server:
-
-```bash
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Open [http://localhost:3000](http://localhost:3000).
 
-For production:
+### Live book search & recommendations
+
+- **Add** tab searches [Open Library](https://openlibrary.org/) via `/api/books/search` (no API key).
+- Recommendations use your **local library + rankings** (hybrid Apriori/KNN + popularity), not the legacy Goodbooks JSON pool.
+
+### Legacy offline tooling (optional)
+
+```bash
+npm run build:books   # public/data/books.json from Goodbooks CSVs
+npm run build:recs    # public/data/recommendations.json — not used by live UI
+```
+
+## Your data
+
+| Mode | Where data lives |
+|------|------------------|
+| **Default** | This browser’s `localStorage` only — each device/profile is separate |
+| **Optional cloud** | Supabase (see below) — sign-in syncs library across devices |
+
+**Deployed without Supabase:** everyone who opens your URL still has an isolated library on their own phone/browser until you add env vars and run migrations.
+
+Profile → **Library backup** exports a JSON file; **Import** restores or moves libraries between devices.
+
+## Deploy
+
+See [../docs/DEPLOY.md](../docs/DEPLOY.md).
+
+Quick path: Vercel → import repo → set **Root Directory** to `app` → Deploy.
 
 ```bash
 npm run build
-npm start
+npm start   # local production smoke test
 ```
 
-You can start editing routes under `src/app/`. The page auto-updates as you save files.
+## Optional: Supabase (accounts, sync, friends)
 
-## Learn More
+1. Create a [Supabase](https://supabase.com) project.
+2. Run SQL in [`../supabase/migrations/001_reading_nook.sql`](../supabase/migrations/001_reading_nook.sql).
+3. Copy [`/.env.example`](.env.example) → `.env.local` and fill:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (server-only; friend invites by email)
+4. Enable Email auth (magic link) in Supabase dashboard.
+5. Redeploy or restart `npm run dev`.
 
-To learn more about Next.js, take a look at the following resources:
+When configured, Profile shows **Account** (sign-in) and Friends supports invites + taste comparison for users who opt in to **Share shelves**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint |
+| `npm test` | Unit tests (tsx) |

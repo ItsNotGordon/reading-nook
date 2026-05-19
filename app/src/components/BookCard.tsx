@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import type { Book, UserBook, SentimentBucket } from "@/lib/types";
-import { sentimentLabel } from "@/lib/sentiment-display";
+import { sentimentLabel, sentimentTextColor } from "@/lib/sentiment-display";
 import {
   estimatedQualitativeLabel,
   estimatedRangeMidpoint,
@@ -60,12 +60,6 @@ function readingProgressView(book: Book, userBook: UserBook): ReadingProgressVm 
     line1: formatEstimatedPercentRange([lo, hi]),
     line2: estimatedQualitativeLabel([lo, hi]),
   };
-}
-
-function sentimentScoreColor(bucket: SentimentBucket): string {
-  if (bucket === "liked") return "text-[#426447]";
-  if (bucket === "okay") return "text-[#a27f00]";
-  return "text-[#b13d34]";
 }
 
 export function BookCard({ book, userBook, variant, onStartPairwise }: BookCardProps) {
@@ -175,7 +169,7 @@ export function BookCard({ book, userBook, variant, onStartPairwise }: BookCardP
                   <div className="flex items-center gap-1.5">
                     <ScoreBadge
                       score={userBook.derivedScore}
-                      scoreClassName={sentimentScoreColor(userBook.sentimentBucket)}
+                      scoreClassName={sentimentTextColor(userBook.sentimentBucket)}
                     />
                   </div>
                   <p className="text-[10px] font-medium text-foreground-muted">

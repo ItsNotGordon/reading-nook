@@ -1,11 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { EditProfileSheet } from "@/components/EditProfileSheet";
 import { PageShell } from "@/components/PageShell";
+import { ProfileAccountSection } from "@/components/ProfileAccountSection";
+import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { useReadingNook } from "@/lib/app-state";
+import { downloadLibraryBackup, readLibraryBackupFile } from "@/lib/libraryBackup";
+import { itemsForShelf } from "@/lib/shelfItems";
 import { getUserTopGenreRows, topCounts } from "@/lib/userTopGenres";
 import {
   sentimentInsightSurface,
@@ -18,32 +22,6 @@ type BookWithMeta = { book: Book; userBook: UserBook };
 
 const INSIGHT_BUCKETS: SentimentBucket[] = ["liked", "okay", "disliked"];
 const SHELF_SNAPSHOT_COVER_LIMIT = 3;
-
-function shelfSortTimestamp(entry: BookWithMeta, shelf: Shelf): number {
-  const ub = entry.userBook;
-  if (shelf === "finished") {
-    const raw = ub.finishedSortAt ?? ub.finishedAt ?? ub.addedAt;
-    return Number.isFinite(Date.parse(raw)) ? Date.parse(raw) : -Infinity;
-  }
-  return Number.isFinite(Date.parse(ub.addedAt)) ? Date.parse(ub.addedAt) : -Infinity;
-}
-
-function shelfCoverPreviews(
-  entries: BookWithMeta[],
-  shelf: Shelf,
-  max: number,
-): Book[] {
-  return entries
-    .filter((e) => e.userBook.shelf === shelf)
-    .sort((a, b) => {
-      const aTs = shelfSortTimestamp(a, shelf);
-      const bTs = shelfSortTimestamp(b, shelf);
-      if (bTs !== aTs) return bTs - aTs;
-      return b.userBook.bookId.localeCompare(a.userBook.bookId);
-    })
-    .slice(0, max)
-    .map((e) => e.book);
-}
 
 function shelfSnapshotDetail(label: string, count: number): string {
   const books = count === 1 ? "book" : "books";
@@ -116,7 +94,10 @@ function profileAvatarInitials(displayName: string): string {
 
 export default function ProfilePage() {
   const { state, actions } = useReadingNook();
+  const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const initials = profileAvatarInitials(state.profile.displayName);
 
   const userEntries = useMemo<BookWithMeta[]>(() => {
@@ -148,10 +129,12 @@ export default function ProfilePage() {
         ...row,
         covers:
           row.count > 0
-            ? shelfCoverPreviews(userEntries, row.shelf, SHELF_SNAPSHOT_COVER_LIMIT)
+            ? itemsForShelf(state.userBooks, state.catalog, row.shelf)
+                .slice(0, SHELF_SNAPSHOT_COVER_LIMIT)
+                .map((e) => e.book)
             : [],
       })),
-    [readingCount, finishedCount, wantCount, userEntries],
+    [readingCount, finishedCount, wantCount, state.userBooks, state.catalog],
   );
 
   const scoredFinished = finishedEntries.filter((e) => e.userBook.derivedScore != null);
@@ -442,14 +425,79 @@ export default function ProfilePage() {
           </section>
         </>
           )}
+
+          <ProfileAccountSection />
+
+          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
+            <p className="text-sm font-semibold text-foreground">Library backup</p>
+            <p className="mt-1 text-xs text-foreground-muted">
+              Export a JSON backup or import on another device. Import replaces your current library
+              on this device.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => downloadLibraryBackup(state)}
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+              >
+                Export backup
+              </button>
+              <button
+                type="button"
+                onClick={() => importInputRef.current?.click()}
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+              >
+                Import backup
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  void readLibraryBackupFile(file)
+                    .then((next) => {
+                      const ok = window.confirm(
+                        "Replace your library on this device with this backup? This cannot be undone.",
+                      );
+                      if (!ok) return;
+                      actions.hydrateLibrary(next);
+                      setImportMessage("Library imported on this device.");
+                      if (cloudConfigured && cloudUser) {
+                        void fetch("/api/sync", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ state: next }),
+                        });
+                      }
+                    })
+                    .catch((err: unknown) => {
+                      setImportMessage(
+                        err instanceof Error ? err.message : "Could not import backup.",
+                      );
+                    });
+                }}
+              />
+            </div>
+            {importMessage ? (
+              <p className="mt-2 text-xs text-foreground-muted">{importMessage}</p>
+            ) : null}
+          </section>
+
           <section className="rounded-2xl border border-dashed border-amber-900/25 bg-card-surface/90 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <p className="text-xs font-semibold uppercase tracking-wider text-amber-900/70">
               Danger zone
             </p>
             <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
               Remove every book from your shelves, clear progress and ratings, and drop cached book
-              metadata stored in this browser. This only affects this device; nothing is sent to a
-              server. You cannot undo this.
+              metadata on this device.
+              {cloudConfigured && cloudUser
+                ? " Your cloud copy may remain until you clear it from the database or overwrite it after signing in again."
+                : " Data is not sent to a server unless you use cloud sign-in."}{" "}
+              You cannot undo this.
             </p>
             <button
               type="button"

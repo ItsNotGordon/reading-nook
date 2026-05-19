@@ -2,12 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import type { Book, UserBook } from "@/lib/types";
 import type { BookCardVariant } from "./BookCard";
 import { BookCard } from "./BookCard";
 import type { SentimentBucket } from "@/lib/types";
+import type { ShelfItem } from "@/lib/shelfItems";
 
-export type ShelfItem = { book: Book; userBook: UserBook };
+export type { ShelfItem };
 
 type ShelfSectionProps = {
   title: string;
