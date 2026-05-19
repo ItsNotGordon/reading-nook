@@ -5,6 +5,9 @@ import { useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { EditProfileSheet } from "@/components/EditProfileSheet";
 import { PageShell } from "@/components/PageShell";
+import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
+import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
+import { ProfileDecorationBackdrop } from "@/components/ProfileDecorationBackdrop";
 import { ProfileAccountSection } from "@/components/ProfileAccountSection";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { useReadingNook } from "@/lib/app-state";
@@ -16,8 +19,7 @@ import {
   sentimentLabel,
   sentimentTextColor,
 } from "@/lib/sentiment-display";
-import type { AppTheme, Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
-import { APP_THEMES } from "@/lib/types";
+import type { Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
 
 type BookWithMeta = { book: Book; userBook: UserBook };
 
@@ -61,24 +63,6 @@ function recentTitlesForBucket(
   return out;
 }
 
-function LeafAccent({ className }: { className: string }) {
-  return (
-    <svg viewBox="0 0 120 120" aria-hidden="true" className={className}>
-      <path
-        d="M61 11c20 12 32 32 31 54-1 21-13 38-31 49-19-11-31-28-32-49C28 43 40 23 61 11Z"
-        fill="currentColor"
-      />
-      <path d="M61 22v74" stroke="#ffffff55" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M61 33c-10-2-20 1-27 7" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-      <path d="M61 46c-10-2-20 1-27 8" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-      <path d="M61 59c-10-1-18 2-24 8" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-      <path d="M61 33c10-2 20 1 27 7" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-      <path d="M61 46c10-2 20 1 27 8" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-      <path d="M61 59c10-1 18 2 24 8" stroke="#ffffff4d" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 /** Two-letter avatar from display name; fallback "RN". */
 function profileAvatarInitials(displayName: string): string {
   const t = displayName.trim();
@@ -98,6 +82,12 @@ export default function ProfilePage() {
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
+  const [pairwise, setPairwise] = useState<{
+    open: boolean;
+    bookId: BookId | null;
+    bucket: SentimentBucket | null;
+  }>({ open: false, bookId: null, bucket: null });
   const importInputRef = useRef<HTMLInputElement>(null);
   const initials = profileAvatarInitials(state.profile.displayName);
 
@@ -174,6 +164,7 @@ export default function ProfilePage() {
     null;
   const favoriteBook = favoriteBookId ? state.catalog[favoriteBookId] : null;
   const favoriteUserBook = favoriteBookId ? state.userBooks[favoriteBookId] : null;
+  const profileTheme = state.profile.theme ?? "plant";
 
   return (
     <PageShell>
@@ -181,10 +172,7 @@ export default function ProfilePage() {
         <EditProfileSheet profile={state.profile} onClose={() => setEditProfileOpen(false)} />
       ) : null}
       <div className="relative isolate -mx-4 overflow-hidden sm:-mx-6">
-        <LeafAccent className="pointer-events-none absolute -left-14 top-0 h-32 w-32 -rotate-[18deg] text-[#7fa483]/35" />
-        <LeafAccent className="pointer-events-none absolute -right-16 top-24 h-40 w-40 rotate-[20deg] text-[#9bb391]/30" />
-        <LeafAccent className="pointer-events-none absolute -left-16 bottom-8 h-44 w-44 rotate-[10deg] text-[#789b7a]/25" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_12%,rgba(245,226,184,0.24),transparent_36%),radial-gradient(circle_at_15%_55%,rgba(128,170,135,0.11),transparent_42%)]" />
+        <ProfileDecorationBackdrop theme={profileTheme} />
         <div className="relative z-10 flex flex-col gap-3 px-4 sm:px-6">
           {totalCount === 0 ? (
         <>
@@ -281,8 +269,13 @@ export default function ProfilePage() {
 
           <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <p className="text-sm font-semibold text-foreground">Favorite book</p>
-            {favoriteBook && favoriteUserBook ? (
-              <div className="mt-3 flex items-center gap-3 rounded-xl border border-border/80 bg-background p-3">
+            {favoriteBook && favoriteUserBook && favoriteBookId ? (
+              <button
+                type="button"
+                onClick={() => setDetailBookId(favoriteBookId)}
+                aria-label={`View details for ${favoriteBook.title}`}
+                className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background p-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
+              >
                 <CoverThumb
                   src={favoriteBook.coverUrl}
                   alt=""
@@ -294,7 +287,7 @@ export default function ProfilePage() {
                   <p className="truncate text-sm font-semibold text-foreground">{favoriteBook.title}</p>
                   <p className="truncate text-xs text-foreground-muted">{favoriteBook.author}</p>
                 </div>
-              </div>
+              </button>
             ) : (
               <p className="mt-3 text-sm text-foreground-muted">
                 Finish and rank a few books to reveal your favorite.
@@ -357,9 +350,11 @@ export default function ProfilePage() {
             ) : null}
             <div className="mt-3 space-y-2">
               {sentimentInsights.map(({ bucket, count, share, highlights }) => (
-                <div
+                <Link
                   key={bucket}
-                  className={`rounded-xl border px-3 py-2.5 ${sentimentInsightSurface(bucket)}`}
+                  href={`/ratings?bucket=${bucket}`}
+                  aria-label={`View ${sentimentLabel(bucket)} books in Ratings`}
+                  className={`block rounded-xl border px-3 py-2.5 transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40 ${sentimentInsightSurface(bucket)}`}
                 >
                   <div className="flex items-baseline justify-between gap-2">
                     <p className={`text-sm font-semibold ${sentimentTextColor(bucket)}`}>
@@ -382,7 +377,7 @@ export default function ProfilePage() {
                       Rank books in Ratings to highlight favorites here.
                     </p>
                   ) : null}
-                </div>
+                </Link>
               ))}
             </div>
             {finishedCount === 0 ? (
@@ -434,30 +429,6 @@ export default function ProfilePage() {
           )}
 
           <ProfileAccountSection />
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-sm font-semibold text-foreground">App theme</p>
-            <p className="mt-1 text-xs text-foreground-muted">
-              Applies across Library, Add, Ratings, and Profile.
-            </p>
-            <label htmlFor="app-theme-select" className="sr-only">
-              App theme
-            </label>
-            <select
-              id="app-theme-select"
-              value={state.profile.theme ?? "plant"}
-              onChange={(e) =>
-                actions.updateProfile({ theme: e.target.value as AppTheme })
-              }
-              className="mt-3 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base text-foreground"
-            >
-              {APP_THEMES.map((theme) => (
-                <option key={theme} value={theme}>
-                  {theme.charAt(0).toUpperCase() + theme.slice(1)}
-                </option>
-              ))}
-            </select>
-          </section>
 
           <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <p className="text-sm font-semibold text-foreground">Library backup</p>
@@ -517,34 +488,26 @@ export default function ProfilePage() {
               <p className="mt-2 text-xs text-foreground-muted">{importMessage}</p>
             ) : null}
           </section>
-
-          <section className="rounded-2xl border border-dashed border-amber-900/25 bg-card-surface/90 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-900/70">
-              Danger zone
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-              Remove every book from your shelves, clear progress and ratings, and drop cached book
-              metadata on this device.
-              {cloudConfigured && cloudUser
-                ? " Your cloud copy may remain until you clear it from the database or overwrite it after signing in again."
-                : " Data is not sent to a server unless you use cloud sign-in."}{" "}
-              You cannot undo this.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                const ok = window.confirm(
-                  "Clear all library data from this device? This removes shelves, progress, ratings, rankings, and cached books. This only affects local storage on this device and cannot be undone.",
-                );
-                if (ok) actions.resetLibrary();
-              }}
-              className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-900/35 bg-background px-4 text-sm font-semibold text-amber-950 shadow-sm active:bg-amber-100/60"
-            >
-              Clear all library data
-            </button>
-          </section>
         </div>
       </div>
+      {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
+        <RatedBookDetailSheet
+          bookId={detailBookId}
+          onClose={() => setDetailBookId(null)}
+          onStartPairwise={(bookId, bucket) => {
+            setDetailBookId(null);
+            setPairwise({ open: true, bookId, bucket });
+          }}
+        />
+      ) : null}
+
+      {pairwise.open && pairwise.bookId && pairwise.bucket ? (
+        <PairwiseComparisonSheet
+          newBookId={pairwise.bookId}
+          bucket={pairwise.bucket}
+          onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
+        />
+      ) : null}
     </PageShell>
   );
 }

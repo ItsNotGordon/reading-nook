@@ -109,7 +109,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--nav-border)] bg-[var(--nav-bar-bg)] backdrop-blur-md supports-[backdrop-filter]:bg-[color-mix(in_srgb,var(--nav-bar-bg)_88%,transparent)]"
       aria-label="Primary"
     >
       <div
@@ -124,20 +124,24 @@ export function BottomNav() {
               href={href}
               className={`flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-medium transition-colors ${
                 active
-                  ? "text-accent"
+                  ? "text-[var(--nav-accent)]"
                   : "text-foreground-muted hover:text-foreground"
               }`}
             >
               <span
                 className={
                   active
-                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-[0_8px_20px_-6px_rgba(66,100,71,0.35)]"
+                    ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--nav-accent)] text-white shadow-[var(--nav-active-shadow)]"
                     : "flex h-9 w-9 shrink-0 items-center justify-center"
                 }
               >
                 <Icon className="h-6 w-6 shrink-0" />
               </span>
-              <span className={`truncate ${active ? "font-semibold text-accent" : ""}`}>{label}</span>
+              <span
+                className={`truncate ${active ? "font-semibold text-[var(--nav-accent)]" : ""}`}
+              >
+                {label}
+              </span>
             </Link>
           );
         })}

@@ -9,7 +9,7 @@ import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { PageShell } from "@/components/PageShell";
 import { useReadingNook } from "@/lib/app-state";
 import { sentimentLabel } from "@/lib/sentiment-display";
-import type { BookId, SentimentBucket } from "@/lib/types";
+import { SENTIMENT_BUCKETS, type BookId, type SentimentBucket } from "@/lib/types";
 
 const BUCKET_ORDER: SentimentBucket[] = ["liked", "okay", "disliked"];
 
@@ -35,7 +35,9 @@ function rowMatchesFilters(
   genre: string | null,
   author: string | null,
   q: string | null,
+  bucket: SentimentBucket | null,
 ): boolean {
+  if (bucket && row.bucket !== bucket) return false;
   if (genre) {
     const gl = genre.trim().toLowerCase();
     if (!row.genres.some((g) => g.trim().toLowerCase() === gl)) return false;
@@ -65,6 +67,11 @@ export function RatingsPageClient() {
   const genreFilter = searchParams.get("genre");
   const authorFilter = searchParams.get("author");
   const qFilter = searchParams.get("q");
+  const bucketParam = searchParams.get("bucket");
+  const bucketFilter: SentimentBucket | null =
+    bucketParam && (SENTIMENT_BUCKETS as readonly string[]).includes(bucketParam)
+      ? (bucketParam as SentimentBucket)
+      : null;
 
   const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
   const [editOrder, setEditOrder] = useState(false);
@@ -99,8 +106,11 @@ export function RatingsPageClient() {
   }, [state.bucketRankings, state.catalog, state.userBooks]);
 
   const filteredRows = useMemo(
-    () => mergedRows.filter((row) => rowMatchesFilters(row, genreFilter, authorFilter, qFilter)),
-    [mergedRows, genreFilter, authorFilter, qFilter],
+    () =>
+      mergedRows.filter((row) =>
+        rowMatchesFilters(row, genreFilter, authorFilter, qFilter, bucketFilter),
+      ),
+    [mergedRows, genreFilter, authorFilter, qFilter, bucketFilter],
   );
 
   const openDetailBookId = useMemo(() => {
@@ -109,7 +119,7 @@ export function RatingsPageClient() {
     return detailBookId;
   }, [detailBookId, state.catalog, state.userBooks]);
 
-  const hasActiveFilters = Boolean(genreFilter || authorFilter || qFilter);
+  const hasActiveFilters = Boolean(genreFilter || authorFilter || qFilter || bucketFilter);
 
   const setQueryParam = useCallback(
     (key: string, value: string | null) => {
@@ -153,11 +163,11 @@ export function RatingsPageClient() {
           genres: b.genres,
           notes: ub.notes ?? "",
         };
-        return rowMatchesFilters(row, genreFilter, authorFilter, qFilter);
+        return rowMatchesFilters(row, genreFilter, authorFilter, qFilter, bucketFilter);
       });
       return { bucket, ids };
     });
-  }, [state, genreFilter, authorFilter, qFilter]);
+  }, [state, genreFilter, authorFilter, qFilter, bucketFilter]);
 
   return (
     <PageShell title="Ratings">
@@ -207,7 +217,7 @@ export function RatingsPageClient() {
             <button
               type="button"
               onClick={clearFilters}
-              className="min-h-9 rounded-xl border border-border bg-background px-3 text-xs font-medium text-foreground-muted"
+              className="min-h-9 rounded-xl border border-border bg-card-surface px-3 text-xs font-semibold text-foreground"
             >
               Clear filters
             </button>
@@ -239,6 +249,11 @@ export function RatingsPageClient() {
             {qFilter ? (
               <span className="rounded-full border border-border bg-card-surface px-2.5 py-1 text-xs">
                 Search: {qFilter}
+              </span>
+            ) : null}
+            {bucketFilter ? (
+              <span className="rounded-full border border-border bg-card-surface px-2.5 py-1 text-xs">
+                {sentimentLabel(bucketFilter)}
               </span>
             ) : null}
           </div>
