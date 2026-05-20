@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { EditProfileSheet } from "@/components/EditProfileSheet";
-import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { ProfileHeroCard } from "@/components/ProfileHeroCard";
 import { PageShell } from "@/components/PageShell";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
@@ -77,6 +77,7 @@ export default function ProfilePage() {
   }>({ open: false, bookId: null, bucket: null });
   const importInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [usernameRefreshKey, setUsernameRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!cloudConfigured || !cloudUser) return;
@@ -167,7 +168,11 @@ export default function ProfilePage() {
       {editProfileOpen ? (
         <EditProfileSheet
           profile={state.profile}
-          onClose={() => setEditProfileOpen(false)}
+          onClose={() => {
+            setEditProfileOpen(false);
+            setUsernameRefreshKey((k) => k + 1);
+          }}
+          onUsernameSaved={() => setUsernameRefreshKey((k) => k + 1)}
           onAvatarChange={setAvatarUrl}
         />
       ) : null}
@@ -185,44 +190,16 @@ export default function ProfilePage() {
           ) : null}
           {totalCount === 0 ? (
         <>
-          <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <ProfileAvatar
-              name={state.profile.displayName}
-              avatarUrl={cloudUser ? avatarUrl : null}
-              size="lg"
-              className="mx-auto bg-background"
-            />
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
-              {state.profile.displayName}
-            </h1>
-            <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
-            <div className="mt-4 flex justify-center gap-2">
-              {profileEditGated ? (
-                <Link
-                  href="/login?next=/profile"
-                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-                >
-                  Sign in to customize
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditProfileOpen(true)}
-                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-                >
-                  Edit profile
-                </button>
-              )}
-              <button
-                type="button"
-                disabled
-                title="Not in this preview"
-                className="min-h-9 cursor-not-allowed rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted opacity-70"
-              >
-                Share library
-              </button>
-            </div>
-          </section>
+          <ProfileHeroCard
+            displayName={state.profile.displayName}
+            tagline={state.profile.tagline}
+            avatarUrl={avatarUrl}
+            cloudConfigured={cloudConfigured}
+            cloudUser={Boolean(cloudUser)}
+            profileEditGated={profileEditGated}
+            usernameRefreshKey={usernameRefreshKey}
+            onEditProfile={() => setEditProfileOpen(true)}
+          />
           <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
             <p className="font-medium text-foreground">Your nook is empty</p>
             <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
@@ -238,44 +215,16 @@ export default function ProfilePage() {
         </>
       ) : (
         <>
-          <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <ProfileAvatar
-              name={state.profile.displayName}
-              avatarUrl={cloudUser ? avatarUrl : null}
-              size="lg"
-              className="mx-auto"
-            />
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
-              {state.profile.displayName}
-            </h1>
-            <p className="mt-1 text-sm italic text-foreground-muted">{state.profile.tagline}</p>
-            <div className="mt-4 flex justify-center gap-2">
-              {profileEditGated ? (
-                <Link
-                  href="/login?next=/profile"
-                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-                >
-                  Sign in to customize
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditProfileOpen(true)}
-                  className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
-                >
-                  Edit profile
-                </button>
-              )}
-              <button
-                type="button"
-                disabled
-                title="Not in this preview"
-                className="min-h-9 cursor-not-allowed rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted opacity-70"
-              >
-                Share library
-              </button>
-            </div>
-          </section>
+          <ProfileHeroCard
+            displayName={state.profile.displayName}
+            tagline={state.profile.tagline}
+            avatarUrl={avatarUrl}
+            cloudConfigured={cloudConfigured}
+            cloudUser={Boolean(cloudUser)}
+            profileEditGated={profileEditGated}
+            usernameRefreshKey={usernameRefreshKey}
+            onEditProfile={() => setEditProfileOpen(true)}
+          />
 
           <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
             <div className="grid grid-cols-2 gap-2.5">
