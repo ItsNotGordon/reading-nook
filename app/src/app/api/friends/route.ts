@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { findFriendshipBetween, relationshipWithViewer } from "@/lib/friendshipStatus";
+import { normalizeUsername } from "@/lib/username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 type FriendRow = {
   friendshipId: string;
   userId: string;
+  username: string | null;
   displayName: string;
   tagline: string;
   shareShelves: boolean;
@@ -43,13 +45,14 @@ export async function GET() {
     const otherId = link.requester_id === user.id ? link.addressee_id : link.requester_id;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("display_name, tagline, share_shelves")
+      .select("username, display_name, tagline, share_shelves")
       .eq("id", otherId)
       .maybeSingle();
 
     friends.push({
       friendshipId: link.id,
       userId: otherId,
+      username: profile?.username ?? null,
       displayName: profile?.display_name ?? "Reader",
       tagline: profile?.tagline ?? "",
       shareShelves: Boolean(profile?.share_shelves),
@@ -84,43 +87,57 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const email =
-    typeof body === "object" && body !== null && "email" in body
-      ? String((body as { email: unknown }).email).trim().toLowerCase()
+  const userId =
+    typeof body === "object" && body !== null && "userId" in body
+      ? String((body as { userId: unknown }).userId).trim()
       : "";
-  if (!email || !email.includes("@")) {
-    return NextResponse.json({ error: "Valid email required." }, { status: 400 });
+  const username =
+    typeof body === "object" && body !== null && "username" in body
+      ? normalizeUsername(String((body as { username: unknown }).username))
+      : "";
+
+  let targetId = userId;
+  if (!targetId && username) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", username)
+      .maybeSingle();
+    if (!profile) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    targetId = profile.id;
   }
 
-  let admin;
-  try {
-    admin = createSupabaseAdminClient();
-  } catch {
-    return NextResponse.json(
-      { error: "Server missing SUPABASE_SERVICE_ROLE_KEY for invites." },
-      { status: 503 },
-    );
+  if (!targetId) {
+    return NextResponse.json({ error: "userId or username required." }, { status: 400 });
   }
-
-  const { data: list, error: lookupError } = await admin.auth.admin.listUsers();
-  if (lookupError) {
-    return NextResponse.json({ error: lookupError.message }, { status: 500 });
-  }
-
-  const target = list.users.find((u) => u.email?.toLowerCase() === email);
-  if (!target) {
-    return NextResponse.json(
-      { error: "No account with that email. They need to sign in once first." },
-      { status: 404 },
-    );
-  }
-  if (target.id === user.id) {
+  if (targetId === user.id) {
     return NextResponse.json({ error: "You cannot add yourself." }, { status: 400 });
+  }
+
+  const { links, error: linkError } = await findFriendshipBetween(supabase, user.id, targetId);
+  if (linkError) {
+    return NextResponse.json({ error: linkError }, { status: 500 });
+  }
+
+  const { relationship, friendshipId } = relationshipWithViewer(user.id, targetId, links);
+  if (relationship === "accepted") {
+    return NextResponse.json({ error: "You are already friends." }, { status: 409 });
+  }
+  if (relationship === "pending_outgoing") {
+    return NextResponse.json({ error: "Friend request already sent." }, { status: 409 });
+  }
+  if (relationship === "pending_incoming" && friendshipId) {
+    return NextResponse.json(
+      { error: "They already sent you a request. Accept it from your invites." },
+      { status: 409 },
+    );
   }
 
   const { error } = await supabase.from("friendships").insert({
     requester_id: user.id,
-    addressee_id: target.id,
+    addressee_id: targetId,
     status: "pending",
   });
 

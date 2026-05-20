@@ -1,5 +1,6 @@
 import type { AppState } from "./types";
 import { SENTIMENT_BUCKETS } from "./types";
+import { getInitialState } from "./storage";
 import { countShelvedBooks } from "./tasteComparison";
 
 /** Stable fingerprint for conflict detection (not cryptographic). */
@@ -80,14 +81,34 @@ export type SyncMergeDecision =
       cloudUpdatedAt: string;
     };
 
+export type DecideInitialSyncOptions = {
+  /** When true, never upload local data without explicit user choice (account switch). */
+  preventAutoPush?: boolean;
+};
+
 export function decideInitialSync(
   local: AppState,
   cloud: AppState | null,
   cloudUpdatedAt: string | null,
+  options?: DecideInitialSyncOptions,
 ): SyncMergeDecision {
   const localCount = countShelvedBooks(local);
+  const preventAutoPush = options?.preventAutoPush ?? false;
+
   if (!cloud) {
-    if (localCount > 0) return { action: "push", local };
+    if (localCount > 0) {
+      if (preventAutoPush) {
+        return {
+          action: "conflict",
+          local,
+          cloud: getInitialState(),
+          localCount,
+          cloudCount: 0,
+          cloudUpdatedAt: cloudUpdatedAt ?? new Date().toISOString(),
+        };
+      }
+      return { action: "push", local };
+    }
     return { action: "noop" };
   }
 
@@ -96,6 +117,16 @@ export function decideInitialSync(
     return { action: "hydrate", cloud };
   }
   if (cloudCount === 0 && localCount > 0) {
+    if (preventAutoPush) {
+      return {
+        action: "conflict",
+        local,
+        cloud,
+        localCount,
+        cloudCount,
+        cloudUpdatedAt: cloudUpdatedAt ?? new Date().toISOString(),
+      };
+    }
     return { action: "push", local };
   }
   if (localCount === 0 && cloudCount === 0) {

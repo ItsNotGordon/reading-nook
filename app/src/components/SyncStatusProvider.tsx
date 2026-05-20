@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { AppState } from "@/lib/types";
 import { useReadingNook } from "@/lib/app-state";
+import { isAccountSwitch, setLastAuthUserId } from "@/lib/authSession";
 import {
   decideInitialSync,
   fetchCloudLibrary,
@@ -99,23 +100,33 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     [actions],
   );
 
-  const runInitialPull = useCallback(async () => {
-    setStatus("syncing");
-    setStatusMessage(null);
-    const pull = await fetchCloudLibrary();
-    if (pull.kind === "error") {
-      setStatus("error");
-      setStatusMessage(pull.message);
-      readyToPush.current = true;
-      return;
-    }
-    const local = stateRef.current;
-    if (pull.kind === "empty") {
-      await applyDecision(decideInitialSync(local, null, null));
-      return;
-    }
-    await applyDecision(decideInitialSync(local, pull.state, pull.updatedAt));
-  }, [applyDecision]);
+  const runInitialPull = useCallback(
+    async (userId: string) => {
+      setStatus("syncing");
+      setStatusMessage(null);
+      const preventAutoPush = isAccountSwitch(userId);
+      const pull = await fetchCloudLibrary();
+      if (pull.kind === "error") {
+        setStatus("error");
+        setStatusMessage(pull.message);
+        readyToPush.current = true;
+        setLastAuthUserId(userId);
+        return;
+      }
+      const local = stateRef.current;
+      const syncOptions = { preventAutoPush };
+      if (pull.kind === "empty") {
+        await applyDecision(decideInitialSync(local, null, null, syncOptions));
+        setLastAuthUserId(userId);
+        return;
+      }
+      await applyDecision(
+        decideInitialSync(local, pull.state, pull.updatedAt, syncOptions),
+      );
+      setLastAuthUserId(userId);
+    },
+    [applyDecision],
+  );
 
   useEffect(() => {
     if (!configured || !user) {
@@ -133,7 +144,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     readyToPush.current = false;
     const startTimer = window.setTimeout(() => {
       setConflict(null);
-      void runInitialPull();
+      void runInitialPull(user.id);
     }, 0);
     return () => window.clearTimeout(startTimer);
   }, [configured, user, runInitialPull]);

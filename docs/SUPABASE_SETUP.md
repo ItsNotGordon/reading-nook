@@ -14,7 +14,11 @@ In Supabase → **SQL Editor**, paste and run:
 
 [`supabase/migrations/001_reading_nook.sql`](../supabase/migrations/001_reading_nook.sql)
 
+Then run [`supabase/migrations/002_profiles_username.sql`](../supabase/migrations/002_profiles_username.sql) for **@username** friend search.
+
 This creates `profiles`, `libraries`, `friendships`, and row-level security policies.
+
+**Env tip:** `NEXT_PUBLIC_SUPABASE_URL` must be the project root URL (e.g. `https://xxx.supabase.co`), not the REST path (`.../rest/v1`).
 
 ## 3. Enable magic-link email auth
 
@@ -26,6 +30,20 @@ This creates `profiles`, `libraries`, `friendships`, and row-level security poli
      - `http://localhost:3000/auth/callback` (local dev)
 
 Magic links expire quickly; open the link on the **same class of device** (phone vs desktop) you started from when possible.
+
+## 3b. Google OAuth (recommended)
+
+Google sign-in avoids Supabase email rate limits during development.
+
+1. **Google Cloud Console** → APIs & Services → **Credentials** → Create **OAuth 2.0 Client ID** (Web application).
+2. **Authorized redirect URI:** copy from Supabase → **Authentication** → **Providers** → **Google** (looks like `https://<project-ref>.supabase.co/auth/v1/callback`).
+3. **Supabase** → **Authentication** → **Providers** → **Google** → enable; paste **Client ID** and **Client Secret**.
+4. Confirm **Redirect URLs** (Authentication → URL configuration) still include your app callback:
+   - `https://reading-nook-beta.vercel.app/auth/callback`
+   - `http://localhost:3000/auth/callback`
+5. Keep **Email** enabled if you want magic-link fallback.
+
+No extra app env vars — credentials live in Supabase. Same email on Google and magic link may auto-link depending on Supabase **Automatic linking** settings.
 
 ## 4. Environment variables
 
@@ -49,23 +67,23 @@ Project → **Settings** → **Environment Variables** (Production + Preview if 
 |----------|--------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Same as dashboard |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Required for friend invites by email |
+| `SUPABASE_SERVICE_ROLE_KEY` | Optional (reserved for future admin tasks) |
 
 Redeploy after adding variables.
 
 ## 5. Verify on two devices
 
-1. Open your deployed app → **`/login`** or **Profile** → **Account**.
-2. You should **not** see “local storage only” — enter email → magic link.
+1. Open your deployed app → **`/login`** or **Profile** → **Account**. Set a **@username** in Edit profile (required for Friends).
+2. You should **not** see “local storage only” — use **Continue with Google** or email magic link.
 3. Sign in on **phone** with books in local library → first sign-in should upload or prompt if cloud also has data.
 4. Sign in on **laptop** with the **same email** → library should match after sync (~2s debounce).
 5. Add a book on one device → appears on the other after a short delay.
 
 ## 6. Friends (optional)
 
-- Both people must sign in at least once (creates `auth.users`).
-- Inviter uses **Friends** → invite by email.
-- Recipient accepts on **Friends** or Profile flow.
+- Both people must sign in and set a **@username** (Profile → Edit profile). Usernames are 3–24 characters: lowercase letters, numbers, and underscore only.
+- Use **Friends** → search usernames → open a profile → **Add friend**.
+- The other person accepts or declines under **Incoming requests**; you can cancel **Sent requests**.
 - **Share shelves with friends** (Profile → Account) is opt-in; without it, friends only see taste stats you allow via the API.
 
 ## Troubleshooting
@@ -74,6 +92,7 @@ Redeploy after adding variables.
 |---------|--------|
 | “Local storage only” on Profile | Env vars missing on Vercel or wrong root directory (`app`) |
 | Magic link doesn’t sign in | Redirect URL not whitelisted; link opened in different browser profile |
+| Google sign-in fails or loops | Google redirect URI must be Supabase `.../auth/v1/callback`; app `/auth/callback` in Supabase Redirect URLs |
 | Invite: “No account with that email” | Friend must sign in once before invite |
 | Sync conflict dialog | Both devices had different libraries; pick device or cloud |
 | 503 on `/api/sync` | Supabase env not loaded in that deployment |

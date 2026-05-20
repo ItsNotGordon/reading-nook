@@ -2,18 +2,23 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { MagicLinkAuthForm } from "@/components/MagicLinkAuthForm";
 import { PageShell } from "@/components/PageShell";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
+import { getRequiresReauth } from "@/lib/authSession";
 
 type LoginPageClientProps = {
   nextPath: string;
+  authError?: string | null;
 };
 
-export function LoginPageClient({ nextPath }: LoginPageClientProps) {
+export function LoginPageClient({ nextPath, authError = null }: LoginPageClientProps) {
   const router = useRouter();
   const { configured, loading, user } = useSupabaseAuth();
+  const [requiresReauth] = useState(() =>
+    typeof window !== "undefined" ? getRequiresReauth() : false,
+  );
 
   useEffect(() => {
     if (loading || !user) return;
@@ -59,14 +64,25 @@ export function LoginPageClient({ nextPath }: LoginPageClientProps) {
   return (
     <PageShell title="Sign in">
       <section className="rounded-2xl border border-border bg-card-surface/95 p-5 shadow-sm ring-1 ring-black/[0.03]">
-        <MagicLinkAuthForm redirectPath={nextPath} />
+        {requiresReauth ? (
+          <p className="mb-4 text-sm text-foreground-muted">
+            Sign in to continue using Reading Nook on this device. Your previous session was
+            signed out and local library data was cleared from this browser.
+          </p>
+        ) : null}
+        <MagicLinkAuthForm redirectPath={nextPath} authError={authError} />
       </section>
-      <p className="mt-6 text-center text-sm text-foreground-muted">
-        <Link href="/library" className="font-semibold text-accent underline-offset-2 hover:underline">
-          Continue without signing in
-        </Link>
-        <span className="mt-1 block text-xs">Your library stays on this device until you sign in.</span>
-      </p>
+      {!requiresReauth ? (
+        <p className="mt-6 text-center text-sm text-foreground-muted">
+          <Link
+            href="/library"
+            className="font-semibold text-accent underline-offset-2 hover:underline"
+          >
+            Continue without signing in
+          </Link>
+          <span className="mt-1 block text-xs">Your library stays on this device until you sign in.</span>
+        </p>
+      ) : null}
     </PageShell>
   );
 }

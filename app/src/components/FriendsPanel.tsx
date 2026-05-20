@@ -3,17 +3,27 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { FriendLibrarySheet } from "./FriendLibrarySheet";
+import { FriendProfileSheet } from "./FriendProfileSheet";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
+import { normalizeUsername } from "@/lib/username";
 import type { TasteComparison } from "@/lib/tasteComparison";
 
 type FriendRow = {
   friendshipId: string;
   userId: string;
+  username: string | null;
   displayName: string;
   tagline: string;
   shareShelves: boolean;
   status: "pending" | "accepted";
   direction: "incoming" | "outgoing";
+};
+
+type SearchUser = {
+  id: string;
+  username: string;
+  displayName: string;
+  tagline: string;
 };
 
 type TasteResponse = {
@@ -36,11 +46,23 @@ async function patchFriendship(friendshipId: string, action: "accept" | "decline
 export function FriendsPanel() {
   const { configured, loading, user } = useSupabaseAuth();
   const [friends, setFriends] = useState<FriendRow[]>([]);
-  const [email, setEmail] = useState("");
+  const [hasUsername, setHasUsername] = useState<boolean | null>(null);
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
+  const [searchBusy, setSearchBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [tasteByFriend, setTasteByFriend] = useState<Record<string, TasteResponse | "loading">>({});
   const [shelfFriend, setShelfFriend] = useState<{ id: string; name: string } | null>(null);
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
+
+  const loadUsername = useCallback(async () => {
+    const res = await fetch("/api/profile/username");
+    if (!res.ok) return;
+    const data = (await res.json()) as { username?: string | null; hasUsername?: boolean };
+    setHasUsername(Boolean(data.hasUsername));
+    setMyUsername(data.username ?? null);
+  }, []);
 
   const loadFriends = useCallback(async () => {
     const res = await fetch("/api/friends");
@@ -51,17 +73,28 @@ export function FriendsPanel() {
 
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-    void (async () => {
-      const res = await fetch("/api/friends");
-      if (!res.ok || cancelled) return;
-      const data = (await res.json()) as { friends?: FriendRow[] };
-      if (!cancelled) setFriends(data.friends ?? []);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+    const frame = requestAnimationFrame(() => {
+      void loadUsername();
+      void loadFriends();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [user, loadUsername, loadFriends]);
+
+  const searchTerm = normalizeUsername(searchQuery);
+  const canSearch = Boolean(user && hasUsername && searchTerm.length >= 2);
+  const visibleSearchResults = canSearch ? searchResults : [];
+
+  useEffect(() => {
+    if (!canSearch) return;
+    const timer = window.setTimeout(() => {
+      setSearchBusy(true);
+      void fetch(`/api/users/search?q=${encodeURIComponent(searchTerm)}`)
+        .then((res) => res.json())
+        .then((data: { users?: SearchUser[] }) => setSearchResults(data.users ?? []))
+        .finally(() => setSearchBusy(false));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm, canSearch]);
 
   const loadTaste = useCallback(async (friendId: string) => {
     setTasteByFriend((prev) => ({ ...prev, [friendId]: "loading" }));
@@ -87,8 +120,7 @@ export function FriendsPanel() {
       <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center shadow-inner">
         <p className="font-medium text-foreground">Friends need cloud accounts</p>
         <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-          Configure Supabase on this deployment to invite friends and compare taste. Until then,
-          your library stays private on this device. See{" "}
+          Configure Supabase on this deployment to find friends by username. See{" "}
           <span className="font-medium">docs/SUPABASE_SETUP.md</span>.
         </p>
       </div>
@@ -104,8 +136,7 @@ export function FriendsPanel() {
       <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center shadow-inner">
         <p className="font-medium text-foreground">Sign in to use Friends</p>
         <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-          Compare genres and liked titles with people you accept. There is no public feed — friends
-          are opt-in.
+          Search by @username, view profiles, and send friend requests.
         </p>
         <Link
           href="/login?next=/friends"
@@ -117,64 +148,81 @@ export function FriendsPanel() {
     );
   }
 
+  if (hasUsername === false) {
+    return (
+      <div className="rounded-2xl border border-border bg-card-surface/95 p-5 text-center shadow-sm">
+        <p className="font-medium text-foreground">Choose your @username</p>
+        <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
+          Usernames are required so friends can find you. Set yours in Edit profile.
+        </p>
+        <Link
+          href="/profile"
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-accent px-5 text-sm font-semibold text-white shadow-sm"
+        >
+          Go to Profile
+        </Link>
+      </div>
+    );
+  }
+
+  if (hasUsername === null) {
+    return <p className="text-sm text-foreground-muted">Loading…</p>;
+  }
+
   return (
     <div className="space-y-6">
-      <p className="text-xs leading-relaxed text-foreground-muted">
-        Friends are opt-in. They only see shelf details if you enable{" "}
-        <span className="font-medium text-foreground">Share shelves</span> on Profile → Account.
-      </p>
-
-      <form
-        className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setBusy(true);
-          setStatus(null);
-          void fetch("/api/friends", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          })
-            .then(async (res) => {
-              const data = (await res.json()) as { error?: string };
-              if (!res.ok) {
-                setStatus(data.error ?? "Could not send invite.");
-                return;
-              }
-              setStatus("Friend request sent.");
-              setEmail("");
-              await loadFriends();
-            })
-            .finally(() => setBusy(false));
-        }}
-      >
-        <p className="text-sm font-semibold text-foreground">Invite a friend</p>
-        <p className="mt-1 text-xs text-foreground-muted">
-          They must have signed in at least once on this app.
+      {myUsername ? (
+        <p className="text-xs text-foreground-muted">
+          You are <span className="font-semibold text-foreground">@{myUsername}</span>
         </p>
-        <div className="mt-3 flex gap-2">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="friend@example.com"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="shrink-0 rounded-xl border border-border bg-background px-4 text-sm font-semibold shadow-sm active:bg-accent-soft/40 disabled:opacity-60"
-          >
-            Invite
-          </button>
-        </div>
-        {status ? <p className="mt-2 text-xs text-foreground-muted">{status}</p> : null}
-      </form>
+      ) : null}
+
+      <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm">
+        <label htmlFor="friend-search" className="text-sm font-semibold text-foreground">
+          Search usernames
+        </label>
+        <input
+          id="friend-search"
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search @username"
+          className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+          autoComplete="off"
+        />
+        {searchBusy ? <p className="mt-2 text-xs text-foreground-muted">Searching…</p> : null}
+        {canSearch && !searchBusy && visibleSearchResults.length === 0 ? (
+          <p className="mt-2 text-xs text-foreground-muted">No users found.</p>
+        ) : null}
+        {visibleSearchResults.length > 0 ? (
+          <ul className="mt-3 space-y-1">
+            {visibleSearchResults.map((u) => (
+              <li key={u.id}>
+                <button
+                  type="button"
+                  onClick={() => setProfileUsername(u.username)}
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-accent-soft/25"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold">
+                    {u.displayName.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">@{u.username}</span>
+                    <span className="block truncate text-xs text-foreground-muted">{u.displayName}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      {status ? <p className="text-xs text-foreground-muted">{status}</p> : null}
 
       {pendingIncoming.length > 0 ? (
         <section>
           <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-            Incoming invites
+            Incoming requests
           </p>
           <ul className="mt-2 space-y-2">
             {pendingIncoming.map((f) => (
@@ -182,10 +230,16 @@ export function FriendsPanel() {
                 key={f.friendshipId}
                 className="flex items-center justify-between gap-2 rounded-2xl border border-border/80 bg-background px-4 py-3"
               >
-                <div>
-                  <p className="font-medium text-foreground">{f.displayName}</p>
+                <button
+                  type="button"
+                  onClick={() => f.username && setProfileUsername(f.username)}
+                  className="min-w-0 text-left"
+                >
+                  <p className="font-medium text-foreground">
+                    {f.username ? `@${f.username}` : f.displayName}
+                  </p>
                   {f.tagline ? <p className="text-xs text-foreground-muted">{f.tagline}</p> : null}
-                </div>
+                </button>
                 <div className="flex shrink-0 gap-1.5">
                   <button
                     type="button"
@@ -219,7 +273,7 @@ export function FriendsPanel() {
       {pendingOutgoing.length > 0 ? (
         <section>
           <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-            Sent invites
+            Sent requests
           </p>
           <ul className="mt-2 space-y-2">
             {pendingOutgoing.map((f) => (
@@ -227,10 +281,15 @@ export function FriendsPanel() {
                 key={f.friendshipId}
                 className="flex items-center justify-between gap-2 rounded-2xl border border-dashed border-border/80 bg-card-surface/50 px-4 py-3"
               >
-                <div>
-                  <p className="font-medium text-foreground">{f.displayName}</p>
-                  <p className="text-[11px] text-foreground-muted">Waiting for them to accept</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => f.username && setProfileUsername(f.username)}
+                  className="min-w-0 text-left"
+                >
+                  <p className="font-medium text-foreground">
+                    {f.username ? `@${f.username}` : f.displayName}
+                  </p>
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -248,13 +307,9 @@ export function FriendsPanel() {
         </section>
       ) : null}
 
-      {accepted.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
-        <p className="text-sm text-foreground-muted">No friends yet — invite someone above.</p>
-      ) : accepted.length > 0 ? (
+      {accepted.length > 0 ? (
         <section>
-          <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-            Friends
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">Friends</p>
           <ul className="mt-2 space-y-3">
             {accepted.map((f) => {
               const taste = tasteByFriend[f.userId];
@@ -263,17 +318,16 @@ export function FriendsPanel() {
                   key={f.friendshipId}
                   className="rounded-2xl border border-border/80 bg-background px-4 py-3 shadow-sm"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-foreground">{f.displayName}</p>
-                      {f.tagline ? (
-                        <p className="text-xs text-foreground-muted">{f.tagline}</p>
-                      ) : null}
-                      <p className="mt-1 text-[11px] text-foreground-muted">
-                        {f.shareShelves ? "Shares shelves with you" : "Shelves private"}
-                      </p>
-                    </div>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => f.username && setProfileUsername(f.username)}
+                    className="w-full text-left"
+                  >
+                    <p className="font-medium text-foreground">
+                      {f.username ? `@${f.username}` : f.displayName}
+                    </p>
+                    {f.tagline ? <p className="text-xs text-foreground-muted">{f.tagline}</p> : null}
+                  </button>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <button
                       type="button"
@@ -296,45 +350,18 @@ export function FriendsPanel() {
                     <p className="mt-2 text-xs text-foreground-muted">Loading…</p>
                   ) : taste ? (
                     <div className="mt-2 space-y-2 rounded-xl border border-border/60 bg-card-surface/50 p-3 text-xs text-foreground-muted">
-                      {!taste.shareShelves ? (
-                        <p>They have not enabled shelf sharing.</p>
-                      ) : (
-                        <>
-                          {taste.shelfCounts ? (
-                            <p>
-                              Their shelves: {taste.shelfCounts.reading} reading ·{" "}
-                              {taste.shelfCounts.finished} finished · {taste.shelfCounts.want} want
-                              to read
-                            </p>
-                          ) : null}
-                          {taste.comparison ? (
-                            <>
-                              {taste.comparison.sharedGenres.length > 0 ? (
-                                <p>
-                                  <span className="font-semibold text-foreground">Shared genres:</span>{" "}
-                                  {taste.comparison.sharedGenres.join(", ")}
-                                </p>
-                              ) : (
-                                <p>No overlapping top genres yet.</p>
-                              )}
-                              {taste.comparison.sharedLikedTitles.length > 0 ? (
-                                <p>
-                                  <span className="font-semibold text-foreground">Both liked:</span>{" "}
-                                  {taste.comparison.sharedLikedTitles.join(" · ")}
-                                </p>
-                              ) : (
-                                <p>No overlapping liked picks yet.</p>
-                              )}
-                              <p className="text-[11px]">
-                                You: {taste.comparison.yourFinishedCount} finished · Them:{" "}
-                                {taste.comparison.friendFinishedCount} finished
-                              </p>
-                            </>
-                          ) : (
-                            <p>Sync your library to compare taste.</p>
-                          )}
-                        </>
-                      )}
+                      {taste.comparison?.sharedGenres.length ? (
+                        <p>
+                          <span className="font-semibold text-foreground">Shared genres:</span>{" "}
+                          {taste.comparison.sharedGenres.join(", ")}
+                        </p>
+                      ) : null}
+                      {taste.comparison?.sharedLikedTitles.length ? (
+                        <p>
+                          <span className="font-semibold text-foreground">Both liked:</span>{" "}
+                          {taste.comparison.sharedLikedTitles.join(" · ")}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </li>
@@ -342,6 +369,19 @@ export function FriendsPanel() {
             })}
           </ul>
         </section>
+      ) : accepted.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
+        <p className="text-sm text-foreground-muted">No friends yet — search for someone above.</p>
+      ) : null}
+
+      {profileUsername ? (
+        <FriendProfileSheet
+          username={profileUsername}
+          onClose={() => setProfileUsername(null)}
+          onFriendsChange={() => {
+            void loadFriends();
+            setProfileUsername(null);
+          }}
+        />
       ) : null}
 
       {shelfFriend ? (

@@ -1,11 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { MagicLinkAuthForm } from "./MagicLinkAuthForm";
 import { SyncStatusLine } from "./SyncStatusLine";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 
 export function ProfileAccountSection() {
   const { configured, loading, user, shareShelves, signOut, setShareShelves } = useSupabaseAuth();
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!configured || !user) return;
+    let cancelled = false;
+    void fetch("/api/profile/username")
+      .then((res) => res.json())
+      .then((data: { username?: string | null }) => {
+        if (!cancelled) setMyUsername(data.username ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [configured, user]);
 
   if (!configured) {
     return (
@@ -32,6 +48,15 @@ export function ProfileAccountSection() {
             Signed in as <span className="font-medium text-foreground">{user.email}</span>. Changes
             sync to the cloud after a short pause (~2 seconds).
           </p>
+          {myUsername ? (
+            <p className="text-sm text-foreground-muted">
+              Username: <span className="font-semibold text-foreground">@{myUsername}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-amber-900/80">
+              Set your @username in Edit profile to use Friends search.
+            </p>
+          )}
           <SyncStatusLine />
           <label className="flex items-start gap-2 text-sm text-foreground">
             <input
@@ -49,7 +74,8 @@ export function ProfileAccountSection() {
             </span>
           </label>
           <p className="text-xs text-foreground-muted">
-            Signing out keeps your library on this device. Your cloud copy stays tied to this email.
+            Signing out clears your library from this browser. Your cloud copy stays tied to this
+            account — sign in again to restore it.
           </p>
           <button
             type="button"

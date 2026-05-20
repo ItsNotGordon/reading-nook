@@ -66,6 +66,18 @@ describe("cloudSync", () => {
     }
   });
 
+  it("preventAutoPush forces conflict instead of silent push on account switch", () => {
+    const local = withBook("x");
+    const push = decideInitialSync(local, null, null);
+    assert.equal(push.action, "push");
+    const blocked = decideInitialSync(local, null, null, { preventAutoPush: true });
+    assert.equal(blocked.action, "conflict");
+    if (blocked.action === "conflict") {
+      assert.equal(blocked.cloudCount, 0);
+      assert.equal(blocked.localCount, 1);
+    }
+  });
+
   it("fingerprints differ when libraries differ", () => {
     const local = withBook("a");
     const cloud = withBook("b");

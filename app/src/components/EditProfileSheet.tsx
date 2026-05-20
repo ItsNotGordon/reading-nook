@@ -6,23 +6,30 @@ import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { themePreviewSrc } from "@/components/ProfileDecorationBackdrop";
 import { useReadingNook } from "@/lib/app-state";
 import { downloadLibraryBackup } from "@/lib/libraryBackup";
+import { normalizeUsername } from "@/lib/username";
 import type { UserProfile } from "@/lib/types";
 import { APP_THEMES } from "@/lib/types";
 
 type EditProfileSheetProps = {
   profile: UserProfile;
   onClose: () => void;
+  onUsernameSaved?: () => void;
 };
 
-export function EditProfileSheet({ profile, onClose }: EditProfileSheetProps) {
+export function EditProfileSheet({ profile, onClose, onUsernameSaved }: EditProfileSheetProps) {
   const { state, actions } = useReadingNook();
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const headingId = useId();
   const nameFieldId = useId();
   const tagFieldId = useId();
+  const usernameFieldId = useId();
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [tagline, setTagline] = useState(profile.tagline);
+  const [username, setUsername] = useState("");
+  const [usernameHint, setUsernameHint] = useState<string | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [usernameBusy, setUsernameBusy] = useState(false);
   const profileTheme = state.profile.theme ?? "plant";
 
   useEffect(() => {
@@ -31,7 +38,52 @@ export function EditProfileSheet({ profile, onClose }: EditProfileSheetProps) {
     if (!d.open) d.showModal();
   }, []);
 
-  function save(): void {
+  useEffect(() => {
+    if (!cloudConfigured || !cloudUser) return;
+    void fetch("/api/profile/username")
+      .then((res) => res.json())
+      .then((data: { username?: string | null }) => {
+        if (data.username) setUsername(data.username);
+      })
+      .catch(() => undefined);
+  }, [cloudConfigured, cloudUser]);
+
+  const usernameNormalized = normalizeUsername(username);
+  const usernameTooShort =
+    cloudConfigured && cloudUser && usernameNormalized.length > 0 && usernameNormalized.length < 3;
+
+  useEffect(() => {
+    if (!cloudConfigured || !cloudUser || usernameNormalized.length < 3) return;
+    const timer = window.setTimeout(() => {
+      setUsernameBusy(true);
+      void fetch(`/api/profile/username?check=${encodeURIComponent(usernameNormalized)}`)
+        .then((res) => res.json())
+        .then((data: { available?: boolean; error?: string | null }) => {
+          setUsernameAvailable(Boolean(data.available));
+          setUsernameHint(data.available ? "Available" : (data.error ?? "Taken"));
+        })
+        .finally(() => setUsernameBusy(false));
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [usernameNormalized, cloudConfigured, cloudUser]);
+
+  async function save(): Promise<void> {
+    if (cloudConfigured && cloudUser) {
+      const raw = normalizeUsername(username);
+      if (raw.length >= 3) {
+        const res = await fetch("/api/profile/username", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: raw }),
+        });
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) {
+          setUsernameHint(data.error ?? "Could not save username.");
+          return;
+        }
+        onUsernameSaved?.();
+      }
+    }
     actions.updateProfile({ displayName, tagline });
     onClose();
   }
@@ -98,6 +150,45 @@ export function EditProfileSheet({ profile, onClose }: EditProfileSheetProps) {
                   {displayName.length} / 80
                 </p>
               </div>
+
+              {cloudConfigured && cloudUser ? (
+                <div className="space-y-1.5 rounded-xl border border-border bg-card-surface/80 p-3">
+                  <label
+                    htmlFor={usernameFieldId}
+                    className="text-xs font-semibold uppercase tracking-wider text-foreground-muted"
+                  >
+                    Username
+                  </label>
+                  <p className="text-xs text-foreground-muted">
+                    Required for Friends. Lowercase letters, numbers, underscore only.
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-foreground-muted">@</span>
+                    <input
+                      id={usernameFieldId}
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(normalizeUsername(e.target.value))}
+                      maxLength={24}
+                      autoComplete="username"
+                      className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground shadow-inner outline-none focus:border-accent/50"
+                    />
+                  </div>
+                  {usernameTooShort || usernameHint ? (
+                    <p
+                      className={`text-xs ${
+                        usernameAvailable ? "text-accent" : "text-foreground-muted"
+                      }`}
+                    >
+                      {usernameBusy
+                        ? "Checking…"
+                        : usernameTooShort
+                          ? "At least 3 characters."
+                          : usernameHint}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="space-y-1.5">
                 <label
@@ -212,7 +303,7 @@ export function EditProfileSheet({ profile, onClose }: EditProfileSheetProps) {
               </button>
               <button
                 type="button"
-                onClick={() => save()}
+                onClick={() => void save()}
                 className="rounded-xl border border-border bg-accent py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-95"
               >
                 Save

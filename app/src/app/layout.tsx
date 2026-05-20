@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Literata } from "next/font/google";
+import { AuthSignOutBridge } from "@/components/AuthSignOutBridge";
 import { SupabaseAuthProvider } from "@/components/SupabaseAuthProvider";
 import { SyncStatusProvider } from "@/components/SyncStatusProvider";
 import { ProfileThemeApplier } from "@/components/ProfileThemeApplier";
@@ -47,6 +48,7 @@ export default function RootLayout({
         <ReadingNookProvider>
           <ProfileThemeApplier />
           <SupabaseAuthProvider>
+            <AuthSignOutBridge />
             <SyncStatusProvider>{children}</SyncStatusProvider>
           </SupabaseAuthProvider>
         </ReadingNookProvider>
