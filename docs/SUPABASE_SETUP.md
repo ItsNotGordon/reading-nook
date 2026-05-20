@@ -16,6 +16,8 @@ In Supabase → **SQL Editor**, paste and run:
 
 Then run [`supabase/migrations/002_profiles_username.sql`](../supabase/migrations/002_profiles_username.sql) for **@username** friend search.
 
+Then run [`supabase/migrations/003_profiles_avatar.sql`](../supabase/migrations/003_profiles_avatar.sql) for **profile photos** (Storage bucket `avatars`).
+
 This creates `profiles`, `libraries`, `friendships`, and row-level security policies.
 
 **Env tip:** `NEXT_PUBLIC_SUPABASE_URL` must be the project root URL (e.g. `https://xxx.supabase.co`), not the REST path (`.../rest/v1`).

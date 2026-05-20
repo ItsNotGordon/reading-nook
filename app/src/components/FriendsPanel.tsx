@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { FriendLibrarySheet } from "./FriendLibrarySheet";
 import { FriendProfileSheet } from "./FriendProfileSheet";
+import { ProfileAvatar } from "./ProfileAvatar";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 import { normalizeUsername } from "@/lib/username";
 import type { TasteComparison } from "@/lib/tasteComparison";
@@ -13,6 +14,7 @@ type FriendRow = {
   userId: string;
   username: string | null;
   displayName: string;
+  avatarUrl: string | null;
   tagline: string;
   shareShelves: boolean;
   status: "pending" | "accepted";
@@ -23,6 +25,7 @@ type SearchUser = {
   id: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   tagline: string;
 };
 
@@ -203,9 +206,7 @@ export function FriendsPanel() {
                   onClick={() => setProfileUsername(u.username)}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-accent-soft/25"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-xs font-semibold">
-                    {u.displayName.slice(0, 2).toUpperCase()}
-                  </span>
+                  <ProfileAvatar name={u.displayName} avatarUrl={u.avatarUrl} size="sm" />
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-foreground">@{u.username}</span>
                     <span className="block truncate text-xs text-foreground-muted">{u.displayName}</span>

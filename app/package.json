@@ -9,14 +9,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/bookProviders/openLibrarySubjects.test.ts src/lib/bookProviders/englishTitle.test.ts src/lib/mergeCatalogGenres.test.ts src/lib/recommender/weightedApriori.test.ts src/lib/recommender/sentimentKnn.test.ts src/lib/recommender/popularityScore.test.ts src/lib/appNativeRecommendations.test.ts src/lib/cloudSync.test.ts src/lib/username.test.ts"
+    "test": "npx tsx --test src/lib/bookProviders/openLibrarySubjects.test.ts src/lib/bookProviders/englishTitle.test.ts src/lib/mergeCatalogGenres.test.ts src/lib/recommender/weightedApriori.test.ts src/lib/recommender/sentimentKnn.test.ts src/lib/recommender/popularityScore.test.ts src/lib/appNativeRecommendations.test.ts src/lib/cloudSync.test.ts src/lib/username.test.ts src/lib/profileAvatar.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.0",
     "next": "16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-easy-crop": "^5.5.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

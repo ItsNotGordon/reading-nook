@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { EditProfileSheet } from "@/components/EditProfileSheet";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PageShell } from "@/components/PageShell";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
@@ -63,20 +64,6 @@ function recentTitlesForBucket(
   return out;
 }
 
-/** Two-letter avatar from display name; fallback "RN". */
-function profileAvatarInitials(displayName: string): string {
-  const t = displayName.trim();
-  if (!t) return "RN";
-  const parts = t.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    const a = parts[0][0];
-    const b = parts[1][0];
-    if (a && b) return (a + b).toUpperCase();
-  }
-  const w = parts[0] ?? t;
-  return w.slice(0, 2).toUpperCase();
-}
-
 export default function ProfilePage() {
   const { state, actions } = useReadingNook();
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
@@ -89,7 +76,15 @@ export default function ProfilePage() {
     bucket: SentimentBucket | null;
   }>({ open: false, bookId: null, bucket: null });
   const importInputRef = useRef<HTMLInputElement>(null);
-  const initials = profileAvatarInitials(state.profile.displayName);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cloudConfigured || !cloudUser) return;
+    void fetch("/api/profile/avatar")
+      .then((res) => res.json())
+      .then((data: { avatarUrl?: string | null }) => setAvatarUrl(data.avatarUrl ?? null))
+      .catch(() => undefined);
+  }, [cloudConfigured, cloudUser]);
 
   const userEntries = useMemo<BookWithMeta[]>(() => {
     const out: BookWithMeta[] = [];
@@ -170,7 +165,11 @@ export default function ProfilePage() {
   return (
     <PageShell>
       {editProfileOpen ? (
-        <EditProfileSheet profile={state.profile} onClose={() => setEditProfileOpen(false)} />
+        <EditProfileSheet
+          profile={state.profile}
+          onClose={() => setEditProfileOpen(false)}
+          onAvatarChange={setAvatarUrl}
+        />
       ) : null}
       <div className="relative isolate -mx-4 overflow-hidden sm:-mx-6">
         <ProfileDecorationBackdrop theme={profileTheme} />
@@ -187,9 +186,12 @@ export default function ProfilePage() {
           {totalCount === 0 ? (
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border bg-background font-serif text-xl font-semibold text-foreground">
-              {initials}
-            </div>
+            <ProfileAvatar
+              name={state.profile.displayName}
+              avatarUrl={cloudUser ? avatarUrl : null}
+              size="lg"
+              className="mx-auto bg-background"
+            />
             <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
               {state.profile.displayName}
             </h1>
@@ -237,9 +239,12 @@ export default function ProfilePage() {
       ) : (
         <>
           <section className="rounded-[1.75rem] border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border bg-[radial-gradient(circle_at_50%_30%,#f7f2e8_0%,#ece3d3_85%)] font-serif text-xl font-semibold text-foreground">
-              {initials}
-            </div>
+            <ProfileAvatar
+              name={state.profile.displayName}
+              avatarUrl={cloudUser ? avatarUrl : null}
+              size="lg"
+              className="mx-auto"
+            />
             <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
               {state.profile.displayName}
             </h1>

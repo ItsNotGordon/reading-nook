@@ -64,7 +64,7 @@ export type AppTheme = "plant" | "coffee" | "matcha" | "cats";
 
 export const APP_THEMES: AppTheme[] = ["plant", "coffee", "matcha", "cats"];
 
-/** Local display name + tagline; persisted with AppState. */
+/** Local name + tagline; `displayName` maps to `display_name` in cloud profiles. */
 export type UserProfile = {
   displayName: string;
   tagline: string;

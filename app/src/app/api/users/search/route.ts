@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   const { data: rows, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, tagline")
+    .select("id, username, display_name, tagline, avatar_url")
     .not("username", "is", null)
     .neq("id", user.id)
     .ilike("username", `${q}%`)
@@ -42,6 +42,7 @@ export async function GET(request: Request) {
     id: row.id,
     username: row.username as string,
     displayName: row.display_name ?? "Reader",
+    avatarUrl: row.avatar_url ?? null,
     tagline: row.tagline ?? "",
   }));
 

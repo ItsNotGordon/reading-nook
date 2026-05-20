@@ -6,6 +6,7 @@ import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { themePreviewSrc } from "@/components/ProfileDecorationBackdrop";
 import { useReadingNook } from "@/lib/app-state";
 import { downloadLibraryBackup } from "@/lib/libraryBackup";
+import { ProfilePhotoPicker } from "@/components/ProfilePhotoPicker";
 import { normalizeUsername } from "@/lib/username";
 import type { UserProfile } from "@/lib/types";
 import { APP_THEMES } from "@/lib/types";
@@ -14,9 +15,15 @@ type EditProfileSheetProps = {
   profile: UserProfile;
   onClose: () => void;
   onUsernameSaved?: () => void;
+  onAvatarChange?: (url: string | null) => void;
 };
 
-export function EditProfileSheet({ profile, onClose, onUsernameSaved }: EditProfileSheetProps) {
+export function EditProfileSheet({
+  profile,
+  onClose,
+  onUsernameSaved,
+  onAvatarChange,
+}: EditProfileSheetProps) {
   const { state, actions } = useReadingNook();
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -30,6 +37,7 @@ export function EditProfileSheet({ profile, onClose, onUsernameSaved }: EditProf
   const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameBusy, setUsernameBusy] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const profileTheme = state.profile.theme ?? "plant";
 
   useEffect(() => {
@@ -46,7 +54,18 @@ export function EditProfileSheet({ profile, onClose, onUsernameSaved }: EditProf
         if (data.username) setUsername(data.username);
       })
       .catch(() => undefined);
+    void fetch("/api/profile/avatar")
+      .then((res) => res.json())
+      .then((data: { avatarUrl?: string | null }) => {
+        setAvatarUrl(data.avatarUrl ?? null);
+      })
+      .catch(() => undefined);
   }, [cloudConfigured, cloudUser]);
+
+  function handleAvatarChange(url: string | null) {
+    setAvatarUrl(url);
+    onAvatarChange?.(url);
+  }
 
   const usernameNormalized = normalizeUsername(username);
   const usernameTooShort =
@@ -131,13 +150,24 @@ export function EditProfileSheet({ profile, onClose, onUsernameSaved }: EditProf
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="space-y-5 px-4 py-4">
+              {cloudConfigured && cloudUser ? (
+                <ProfilePhotoPicker
+                  userId={cloudUser.id}
+                  name={displayName}
+                  avatarUrl={avatarUrl}
+                  onAvatarChange={handleAvatarChange}
+                />
+              ) : null}
               <div className="space-y-1.5">
                 <label
                   htmlFor={nameFieldId}
                   className="text-xs font-semibold uppercase tracking-wider text-foreground-muted"
                 >
-                  Display name
+                  Name
                 </label>
+                <p className="text-xs text-foreground-muted">
+                  Your real or preferred name — separate from @username.
+                </p>
                 <input
                   id={nameFieldId}
                   type="text"

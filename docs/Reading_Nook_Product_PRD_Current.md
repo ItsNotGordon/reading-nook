@@ -699,7 +699,8 @@ Profile is both a stats page and a cozy personal space.
 
 It includes:
 
-- display name
+- name (display name in data)
+- @username (when signed in, for Friends)
 - tagline
 - account section
 - library stats
@@ -748,7 +749,8 @@ Old global palette switching via `ThemeApplier` should not be reintroduced.
 
 Edit Profile currently owns:
 
-- display name
+- name
+- @username (cloud)
 - tagline
 - profile background picker
 - danger zone / clear library data

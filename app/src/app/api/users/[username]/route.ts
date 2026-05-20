@@ -31,7 +31,7 @@ export async function GET(
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, tagline, share_shelves")
+    .select("id, username, display_name, tagline, share_shelves, avatar_url")
     .eq("username", username)
     .maybeSingle();
 
@@ -53,6 +53,7 @@ export async function GET(
     id: profile.id,
     username: profile.username,
     displayName: profile.display_name ?? "Reader",
+    avatarUrl: profile.avatar_url ?? null,
     tagline: profile.tagline ?? "",
     shareShelves: Boolean(profile.share_shelves),
     relationship,

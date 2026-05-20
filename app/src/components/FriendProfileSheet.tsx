@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FriendRelationship } from "@/lib/friendshipStatus";
 import { FriendLibrarySheet } from "./FriendLibrarySheet";
+import { ProfileAvatar } from "./ProfileAvatar";
 import type { TasteComparison } from "@/lib/tasteComparison";
 
 type PublicProfile = {
   id: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   tagline: string;
   shareShelves: boolean;
   relationship: FriendRelationship;
@@ -27,16 +29,6 @@ type FriendProfileSheetProps = {
   onClose: () => void;
   onFriendsChange: () => void;
 };
-
-function profileInitials(displayName: string): string {
-  const t = displayName.trim();
-  if (!t) return "RN";
-  const parts = t.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return t.slice(0, 2).toUpperCase();
-}
 
 async function patchFriendship(friendshipId: string, action: "accept" | "decline" | "cancel") {
   const res = await fetch("/api/friends", {
@@ -172,9 +164,12 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
                 <p className="text-sm text-red-700">{error}</p>
               ) : profile ? (
                 <div className="space-y-4 text-center">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-border bg-card-surface font-serif text-xl font-semibold text-foreground">
-                    {profileInitials(profile.displayName)}
-                  </div>
+                  <ProfileAvatar
+                    name={profile.displayName}
+                    avatarUrl={profile.avatarUrl}
+                    size="lg"
+                    className="mx-auto"
+                  />
                   <div>
                     <p className="font-serif text-2xl font-semibold text-foreground">{profile.displayName}</p>
                     <p className="mt-1 text-sm text-foreground-muted">@{profile.username}</p>
