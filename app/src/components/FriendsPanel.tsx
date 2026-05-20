@@ -234,12 +234,17 @@ export function FriendsPanel() {
                 <button
                   type="button"
                   onClick={() => f.username && setProfileUsername(f.username)}
-                  className="min-w-0 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <p className="font-medium text-foreground">
-                    {f.username ? `@${f.username}` : f.displayName}
-                  </p>
-                  {f.tagline ? <p className="text-xs text-foreground-muted">{f.tagline}</p> : null}
+                  <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground">
+                      {f.username ? `@${f.username}` : f.displayName}
+                    </span>
+                    {f.tagline ? (
+                      <span className="block truncate text-xs text-foreground-muted">{f.tagline}</span>
+                    ) : null}
+                  </span>
                 </button>
                 <div className="flex shrink-0 gap-1.5">
                   <button
@@ -285,11 +290,17 @@ export function FriendsPanel() {
                 <button
                   type="button"
                   onClick={() => f.username && setProfileUsername(f.username)}
-                  className="min-w-0 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
-                  <p className="font-medium text-foreground">
-                    {f.username ? `@${f.username}` : f.displayName}
-                  </p>
+                  <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-foreground">
+                      {f.username ? `@${f.username}` : f.displayName}
+                    </span>
+                    {f.tagline ? (
+                      <span className="block truncate text-xs text-foreground-muted">{f.tagline}</span>
+                    ) : null}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -322,12 +333,17 @@ export function FriendsPanel() {
                   <button
                     type="button"
                     onClick={() => f.username && setProfileUsername(f.username)}
-                    className="w-full text-left"
+                    className="flex w-full items-center gap-3 text-left"
                   >
-                    <p className="font-medium text-foreground">
-                      {f.username ? `@${f.username}` : f.displayName}
-                    </p>
-                    {f.tagline ? <p className="text-xs text-foreground-muted">{f.tagline}</p> : null}
+                    <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-foreground">
+                        {f.username ? `@${f.username}` : f.displayName}
+                      </span>
+                      {f.tagline ? (
+                        <span className="block truncate text-xs text-foreground-muted">{f.tagline}</span>
+                      ) : null}
+                    </span>
                   </button>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <button
