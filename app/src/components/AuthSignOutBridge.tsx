@@ -5,14 +5,14 @@ import { useReadingNook } from "@/lib/app-state";
 import { useRegisterSignOutSideEffect } from "@/components/SupabaseAuthProvider";
 import { clearLastAuthUserId, setRequiresReauth } from "@/lib/authSession";
 
-/** Clears local library and sets reauth flag before Supabase sign-out runs. */
+/** Clears local library, profile, and sets reauth flag before Supabase sign-out runs. */
 export function AuthSignOutBridge() {
   const { actions } = useReadingNook();
   const registerSignOutSideEffect = useRegisterSignOutSideEffect();
 
   useEffect(() => {
     registerSignOutSideEffect(async () => {
-      actions.resetLibrary();
+      actions.resetSession();
       setRequiresReauth();
       clearLastAuthUserId();
     });

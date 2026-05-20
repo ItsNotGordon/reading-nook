@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { AppState } from "@/lib/types";
-import { parseStoredState } from "@/lib/storage";
+import { applyProfileDbFields, getInitialState, parseStoredState } from "@/lib/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -20,6 +20,12 @@ export async function GET() {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
 
+  const { data: profileRow } = await supabase
+    .from("profiles")
+    .select("display_name, tagline")
+    .eq("id", user.id)
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from("libraries")
     .select("state, updated_at")
@@ -31,14 +37,26 @@ export async function GET() {
   }
 
   if (!data) {
+    if (profileRow) {
+      const state = applyProfileDbFields(
+        getInitialState(),
+        profileRow.display_name,
+        profileRow.tagline,
+      );
+      return NextResponse.json({ state, updatedAt: null });
+    }
     return NextResponse.json({ state: null, updatedAt: null });
   }
 
   const raw = typeof data.state === "string" ? data.state : JSON.stringify(data.state);
-  const state = parseStoredState(raw);
-  if (!state) {
+  const parsed = parseStoredState(raw);
+  if (!parsed) {
     return NextResponse.json({ error: "Invalid cloud library payload." }, { status: 500 });
   }
+
+  const state = profileRow
+    ? applyProfileDbFields(parsed, profileRow.display_name, profileRow.tagline)
+    : parsed;
 
   return NextResponse.json({ state, updatedAt: data.updated_at });
 }

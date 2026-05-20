@@ -17,6 +17,7 @@ import { getInitialState, defaultUserProfile } from "./storage";
 export type AppAction =
   | { type: "HYDRATE"; payload: AppState }
   | { type: "RESET_LIBRARY" }
+  | { type: "RESET_SESSION" }
   | { type: "ADD_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf; catalogBook?: Book }
   | { type: "MOVE_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf }
   | { type: "UPDATE_EXACT_PROGRESS"; bookId: BookId; currentPage: number }
@@ -142,6 +143,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "RESET_LIBRARY":
       // Clear shelves and cached catalog only; keep presenter profile for class demos.
       return { ...getInitialState(), profile: state.profile };
+
+    case "RESET_SESSION":
+      return getInitialState();
 
     case "UPDATE_PROFILE": {
       const d = defaultUserProfile();

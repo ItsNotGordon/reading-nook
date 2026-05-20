@@ -270,6 +270,25 @@ function parseProfile(value: unknown): UserProfile {
   return { displayName, tagline, theme };
 }
 
+/** Overlay `profiles` table name/tagline onto synced library state (server pull). */
+export function applyProfileDbFields(
+  state: AppState,
+  displayName: string | null | undefined,
+  tagline: string | null | undefined,
+): AppState {
+  const nameRaw = typeof displayName === "string" ? displayName.trim() : "";
+  const tagRaw = typeof tagline === "string" ? tagline.trim() : "";
+  if (!nameRaw && !tagRaw) return state;
+  return {
+    ...state,
+    profile: {
+      ...state.profile,
+      ...(nameRaw ? { displayName: nameRaw.slice(0, PROFILE_DISPLAY_MAX) } : {}),
+      ...(tagRaw ? { tagline: tagRaw.slice(0, PROFILE_TAGLINE_MAX) } : {}),
+    },
+  };
+}
+
 function parseDismissedRecIds(value: unknown): BookId[] {
   if (!Array.isArray(value)) return [];
   return value.filter((id): id is BookId => typeof id === "string" && id.trim() !== "");
