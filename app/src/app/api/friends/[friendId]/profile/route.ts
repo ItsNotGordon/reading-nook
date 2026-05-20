@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertAcceptedFriend } from "@/lib/friendAccess";
-import { listFriendShelfBooks } from "@/lib/friendLibrary";
-import { parseStoredState } from "@/lib/storage";
+import { buildFriendProfileSummary } from "@/lib/friendProfileSummary";
+import { getInitialState, parseStoredState } from "@/lib/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -30,11 +30,18 @@ export async function GET(
     return NextResponse.json({ error: friendship.error }, { status: friendship.status });
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("display_name")
+    .select("username, display_name")
     .eq("id", friendId)
     .maybeSingle();
+
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 500 });
+  }
+  if (!profile) {
+    return NextResponse.json({ error: "Profile not found." }, { status: 404 });
+  }
 
   const { data: lib, error: libError } = await supabase
     .from("libraries")
@@ -46,15 +53,16 @@ export async function GET(
     return NextResponse.json({ error: libError.message }, { status: 500 });
   }
 
-  let books: ReturnType<typeof listFriendShelfBooks> = [];
+  let friendState = getInitialState();
   if (lib?.state) {
     const raw = typeof lib.state === "string" ? lib.state : JSON.stringify(lib.state);
-    const friendState = parseStoredState(raw);
-    if (friendState) books = listFriendShelfBooks(friendState);
+    const parsed = parseStoredState(raw);
+    if (parsed) friendState = parsed;
   }
 
   return NextResponse.json({
-    displayName: profile?.display_name ?? "Reader",
-    books,
+    displayName: profile.display_name ?? "Reader",
+    username: profile.username ?? null,
+    ...buildFriendProfileSummary(friendState),
   });
 }

@@ -11,7 +11,6 @@ type FriendRow = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
-  shareShelves: boolean;
   status: "pending" | "accepted";
   direction: "incoming" | "outgoing";
 };
@@ -46,7 +45,7 @@ export async function GET() {
     const otherId = link.requester_id === user.id ? link.addressee_id : link.requester_id;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("username, display_name, tagline, share_shelves, avatar_url")
+      .select("username, display_name, tagline, avatar_url")
       .eq("id", otherId)
       .maybeSingle();
 
@@ -57,7 +56,6 @@ export async function GET() {
       displayName: profile?.display_name ?? "Reader",
       avatarUrl: profile?.avatar_url ?? null,
       tagline: profile?.tagline ?? "",
-      shareShelves: Boolean(profile?.share_shelves),
       status: link.status,
       direction: link.addressee_id === user.id && link.status === "pending" ? "incoming" : "outgoing",
     });

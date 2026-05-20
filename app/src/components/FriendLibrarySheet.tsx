@@ -22,7 +22,6 @@ export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [books, setBooks] = useState<FriendShelfBook[]>([]);
-  const [shareShelves, setShareShelves] = useState(true);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -38,7 +37,6 @@ export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibr
       const res = await fetch(`/api/friends/${friendId}/library`);
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
-        shareShelves?: boolean;
         books?: FriendShelfBook[];
       };
       if (cancelled) return;
@@ -47,7 +45,6 @@ export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibr
         setLoading(false);
         return;
       }
-      setShareShelves(Boolean(data.shareShelves));
       setBooks(data.books ?? []);
       setLoading(false);
     })();
@@ -89,10 +86,6 @@ export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibr
               <p className="text-sm text-foreground-muted">Loading…</p>
             ) : error ? (
               <p className="text-sm text-red-700">{error}</p>
-            ) : !shareShelves ? (
-              <p className="text-sm text-foreground-muted">
-                {friendName} has not enabled shelf sharing.
-              </p>
             ) : books.length === 0 ? (
               <p className="text-sm text-foreground-muted">No shelved books yet.</p>
             ) : (

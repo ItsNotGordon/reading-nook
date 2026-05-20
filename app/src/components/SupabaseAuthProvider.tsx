@@ -25,15 +25,12 @@ type SupabaseAuthContextValue = {
   configured: boolean;
   loading: boolean;
   user: User | null;
-  shareShelves: boolean;
   signInWithEmail: (
     email: string,
     redirectPath?: string,
   ) => Promise<{ ok: boolean; message: string }>;
   signInWithGoogle: (redirectPath?: string) => Promise<{ ok: boolean; message: string }>;
   signOut: () => Promise<void>;
-  setShareShelves: (value: boolean) => Promise<void>;
-  refreshShareShelves: () => Promise<void>; // re-fetch for current user
 };
 
 const SupabaseAuthContext = createContext<SupabaseAuthContextValue | null>(null);
@@ -50,26 +47,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured();
   const [loading, setLoading] = useState(configured);
   const [user, setUser] = useState<User | null>(null);
-  const [shareShelves, setShareShelvesState] = useState(false);
   const signOutSideEffectRef = useRef<SignOutSideEffect | null>(null);
 
   const registerSignOutSideEffect = useCallback((effect: SignOutSideEffect | null) => {
     signOutSideEffectRef.current = effect;
-  }, []);
-
-  const refreshShareShelves = useCallback(async (nextUser: User | null) => {
-    if (!nextUser) {
-      setShareShelvesState(false);
-      return;
-    }
-    try {
-      const res = await fetch("/api/profile/share");
-      if (!res.ok) return;
-      const data = (await res.json()) as { shareShelves?: boolean };
-      setShareShelvesState(Boolean(data.shareShelves));
-    } catch {
-      /* ignore */
-    }
   }, []);
 
   useEffect(() => {
@@ -83,17 +64,15 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       if (sessionUser) clearRequiresReauth();
       setUser(sessionUser);
       setLoading(false);
-      void refreshShareShelves(sessionUser);
     });
     const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
       const sessionUser = session?.user ?? null;
       if (sessionUser) clearRequiresReauth();
       setUser(sessionUser);
       setLoading(false);
-      void refreshShareShelves(sessionUser);
     });
     return () => sub.subscription.unsubscribe();
-  }, [configured, refreshShareShelves]);
+  }, [configured]);
 
   const signInWithEmail = useCallback(
     async (email: string, redirectPath = "/profile") => {
@@ -148,46 +127,19 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     const client = createSupabaseBrowserClient();
     await client.auth.signOut();
     setUser(null);
-    setShareShelvesState(false);
     window.location.href = "/login";
   }, [configured]);
-
-  const setShareShelves = useCallback(
-    async (value: boolean) => {
-      if (!user) return;
-      const res = await fetch("/api/profile/share", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shareShelves: value }),
-      });
-      if (res.ok) setShareShelvesState(value);
-    },
-    [user],
-  );
 
   const value = useMemo(
     () => ({
       configured,
       loading,
       user,
-      shareShelves,
       signInWithEmail,
       signInWithGoogle,
       signOut,
-      setShareShelves,
-      refreshShareShelves: () => refreshShareShelves(user),
     }),
-    [
-      configured,
-      loading,
-      user,
-      shareShelves,
-      signInWithEmail,
-      signInWithGoogle,
-      signOut,
-      setShareShelves,
-      refreshShareShelves,
-    ],
+    [configured, loading, user, signInWithEmail, signInWithGoogle, signOut],
   );
 
   return (

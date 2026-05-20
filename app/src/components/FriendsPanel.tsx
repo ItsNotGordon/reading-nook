@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { FriendLibrarySheet } from "./FriendLibrarySheet";
 import { FriendProfileSheet } from "./FriendProfileSheet";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 import { normalizeUsername } from "@/lib/username";
-import type { TasteComparison } from "@/lib/tasteComparison";
 
 type FriendRow = {
   friendshipId: string;
@@ -16,7 +14,6 @@ type FriendRow = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
-  shareShelves: boolean;
   status: "pending" | "accepted";
   direction: "incoming" | "outgoing";
 };
@@ -27,13 +24,6 @@ type SearchUser = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
-};
-
-type TasteResponse = {
-  displayName: string;
-  shareShelves: boolean;
-  shelfCounts: { reading: number; finished: number; want: number } | null;
-  comparison: TasteComparison | null;
 };
 
 async function patchFriendship(friendshipId: string, action: "accept" | "decline" | "cancel") {
@@ -55,8 +45,6 @@ export function FriendsPanel() {
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searchBusy, setSearchBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [tasteByFriend, setTasteByFriend] = useState<Record<string, TasteResponse | "loading">>({});
-  const [shelfFriend, setShelfFriend] = useState<{ id: string; name: string } | null>(null);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
 
   const loadUsername = useCallback(async () => {
@@ -98,21 +86,6 @@ export function FriendsPanel() {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchTerm, canSearch]);
-
-  const loadTaste = useCallback(async (friendId: string) => {
-    setTasteByFriend((prev) => ({ ...prev, [friendId]: "loading" }));
-    const res = await fetch(`/api/friends/${friendId}/taste`);
-    if (!res.ok) {
-      setTasteByFriend((prev) => {
-        const next = { ...prev };
-        delete next[friendId];
-        return next;
-      });
-      return;
-    }
-    const data = (await res.json()) as TasteResponse;
-    setTasteByFriend((prev) => ({ ...prev, [friendId]: data }));
-  }, []);
 
   const pendingIncoming = friends.filter((f) => f.status === "pending" && f.direction === "incoming");
   const pendingOutgoing = friends.filter((f) => f.status === "pending" && f.direction === "outgoing");
@@ -323,9 +296,7 @@ export function FriendsPanel() {
         <section>
           <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">Friends</p>
           <ul className="mt-2 space-y-3">
-            {accepted.map((f) => {
-              const taste = tasteByFriend[f.userId];
-              return (
+            {accepted.map((f) => (
                 <li
                   key={f.friendshipId}
                   className="rounded-2xl border border-border/80 bg-background px-4 py-3 shadow-sm"
@@ -345,45 +316,11 @@ export function FriendsPanel() {
                       ) : null}
                     </span>
                   </button>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void loadTaste(f.userId)}
-                      className="text-xs font-semibold text-accent underline-offset-2 hover:underline"
-                    >
-                      {taste ? "Refresh taste" : "Compare taste"}
-                    </button>
-                    {f.shareShelves ? (
-                      <button
-                        type="button"
-                        onClick={() => setShelfFriend({ id: f.userId, name: f.displayName })}
-                        className="text-xs font-semibold text-foreground underline-offset-2 hover:underline"
-                      >
-                        View shelves
-                      </button>
-                    ) : null}
-                  </div>
-                  {taste === "loading" ? (
-                    <p className="mt-2 text-xs text-foreground-muted">Loading…</p>
-                  ) : taste ? (
-                    <div className="mt-2 space-y-2 rounded-xl border border-border/60 bg-card-surface/50 p-3 text-xs text-foreground-muted">
-                      {taste.comparison?.sharedGenres.length ? (
-                        <p>
-                          <span className="font-semibold text-foreground">Shared genres:</span>{" "}
-                          {taste.comparison.sharedGenres.join(", ")}
-                        </p>
-                      ) : null}
-                      {taste.comparison?.sharedLikedTitles.length ? (
-                        <p>
-                          <span className="font-semibold text-foreground">Both liked:</span>{" "}
-                          {taste.comparison.sharedLikedTitles.join(" · ")}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </li>
-              );
-            })}
+                <p className="mt-2 text-xs text-foreground-muted">
+                  Tap to view library, ratings, and insights
+                </p>
+              </li>
+            ))}
           </ul>
         </section>
       ) : accepted.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
@@ -401,13 +338,6 @@ export function FriendsPanel() {
         />
       ) : null}
 
-      {shelfFriend ? (
-        <FriendLibrarySheet
-          friendId={shelfFriend.id}
-          friendName={shelfFriend.name}
-          onClose={() => setShelfFriend(null)}
-        />
-      ) : null}
     </div>
   );
 }

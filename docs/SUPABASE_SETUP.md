@@ -18,6 +18,8 @@ Then run [`supabase/migrations/002_profiles_username.sql`](../supabase/migration
 
 Then run [`supabase/migrations/003_profiles_avatar.sql`](../supabase/migrations/003_profiles_avatar.sql) for **profile photos** (Storage bucket `avatars`).
 
+Then run [`supabase/migrations/004_friends_always_share_library.sql`](../supabase/migrations/004_friends_always_share_library.sql) so **accepted friends** can always read each other's libraries (no shelf-sharing toggle).
+
 This creates `profiles`, `libraries`, `friendships`, and row-level security policies.
 
 **Env tip:** `NEXT_PUBLIC_SUPABASE_URL` must be the project root URL (e.g. `https://xxx.supabase.co`), not the REST path (`.../rest/v1`).

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertAcceptedFriend } from "@/lib/friendAccess";
 import type { AppState } from "@/lib/types";
 import { parseStoredState } from "@/lib/storage";
 import { buildTasteComparison, friendShelfCounts } from "@/lib/tasteComparison";
@@ -25,40 +26,16 @@ export async function GET(
   }
 
   const { friendId } = await context.params;
-
-  const { data: links, error: linkError } = await supabase
-    .from("friendships")
-    .select("id, requester_id, addressee_id, status")
-    .eq("status", "accepted")
-    .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`);
-
-  if (linkError) {
-    return NextResponse.json({ error: linkError.message }, { status: 500 });
-  }
-
-  const link = (links ?? []).find(
-    (row) =>
-      (row.requester_id === user.id && row.addressee_id === friendId) ||
-      (row.requester_id === friendId && row.addressee_id === user.id),
-  );
-  if (!link) {
-    return NextResponse.json({ error: "Not friends with this user." }, { status: 403 });
+  const friendship = await assertAcceptedFriend(supabase, user.id, friendId);
+  if (!friendship.ok) {
+    return NextResponse.json({ error: friendship.error }, { status: friendship.status });
   }
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, share_shelves")
+    .select("display_name")
     .eq("id", friendId)
     .maybeSingle();
-
-  if (!profile?.share_shelves) {
-    return NextResponse.json({
-      displayName: profile?.display_name ?? "Reader",
-      shareShelves: false,
-      shelfCounts: null,
-      comparison: null,
-    });
-  }
 
   const { data: lib, error: libError } = await supabase
     .from("libraries")
@@ -93,8 +70,7 @@ export async function GET(
     friendState && yourState ? buildTasteComparison(yourState, friendState) : null;
 
   return NextResponse.json({
-    displayName: profile.display_name ?? "Reader",
-    shareShelves: true,
+    displayName: profile?.display_name ?? "Reader",
     shelfCounts,
     comparison,
   });

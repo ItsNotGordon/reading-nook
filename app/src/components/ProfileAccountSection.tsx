@@ -6,7 +6,7 @@ import { SyncStatusLine } from "./SyncStatusLine";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 
 export function ProfileAccountSection() {
-  const { configured, loading, user, shareShelves, signOut, setShareShelves } = useSupabaseAuth();
+  const { configured, loading, user, signOut } = useSupabaseAuth();
   const [myUsername, setMyUsername] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,21 +58,9 @@ export function ProfileAccountSection() {
             </p>
           )}
           <SyncStatusLine />
-          <label className="flex items-start gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={shareShelves}
-              onChange={(e) => void setShareShelves(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-border"
-            />
-            <span>
-              Share shelves with accepted friends
-              <span className="mt-0.5 block text-xs text-foreground-muted">
-                Friends only see titles on your shelves when this is on. Taste comparison works
-                without sharing full shelves.
-              </span>
-            </span>
-          </label>
+          <p className="text-xs text-foreground-muted">
+            Accepted friends can view your library, ratings, and reading insights.
+          </p>
           <p className="text-xs text-foreground-muted">
             Signing out clears your library from this browser. Your cloud copy stays tied to this
             account — sign in again to restore it.
