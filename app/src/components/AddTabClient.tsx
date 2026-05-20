@@ -4,11 +4,13 @@ import { useState } from "react";
 import { AddBookScreen } from "@/components/AddBookScreen";
 import { RecsGenreFilterBar } from "@/components/RecsGenreFilterBar";
 import { RecsListPanel } from "@/components/RecsListPanel";
+import type { RecommendationEngine } from "@/lib/appNativeRecommendations";
 import { useRecommendationsPool } from "@/lib/useRecommendationsPool";
 
 export function AddTabClient() {
   const [searchQuery, setSearchQuery] = useState("");
-  const recs = useRecommendationsPool(searchQuery);
+  const [engine, setEngine] = useState<RecommendationEngine>("hybrid");
+  const recs = useRecommendationsPool(searchQuery, engine, setEngine);
 
   const genreBar =
     recs.status === "ready" && recs.sortedFilterGenres.length > 0 ? (

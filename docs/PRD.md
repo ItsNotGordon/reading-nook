@@ -23,6 +23,6 @@ Do not use these for current product decisions (navigation, types, routes, or ro
 | -------- | ----- |
 | [Reading_Nook_PRD.md](./Reading_Nook_PRD.md) | Original MVP spec; outdated tab names (`Leaderboard`, standalone `Recs`) and types (`currentlyReading`, `books` vs `catalog`) |
 | [Reading_Nook_Updated_PRD.md](./Reading_Nook_Updated_PRD.md) | Transition doc; e.g. Search \| Recs segment does not match the app |
-| [Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md) | The PRD made after STAT 280 was delivered. The first iteration of the full project and vision |
+| [Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md) | **Pointer** to the canonical [Reading_Nook_Product_PRD_Current.md](./Reading_Nook_Product_PRD_Current.md) (same spec; use `_Current` for the full document) |
 
 **Preserved assets (not deleted):** `notebook.ipynb`, `recommender/`, `git-forked-database/`.

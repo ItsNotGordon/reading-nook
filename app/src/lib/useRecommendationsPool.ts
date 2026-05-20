@@ -7,6 +7,7 @@ import {
   CATALOG_UNSHELVED_DISCOVER_THRESHOLD,
   countUnshelvedCatalog,
   discoverResultsToCandidates,
+  type RecommendationEngine,
 } from "@/lib/appNativeRecommendations";
 import { buildTasteSignals } from "@/lib/recPersonalization";
 import { getWeightedTopGenres } from "@/lib/recommender";
@@ -57,6 +58,8 @@ export type RecommendationsPoolModel = {
   personalizationActive: boolean;
   appNativeEmptyReason: string | null;
   discoverLoading: boolean;
+  engine: RecommendationEngine;
+  setEngine: (engine: RecommendationEngine) => void;
 };
 
 function isSearchBook(value: unknown): value is SearchBookResult {
@@ -92,7 +95,11 @@ async function fetchDiscoverBooks(genres: string[]): Promise<SearchBookResult[]>
   return books.filter(isSearchBook);
 }
 
-export function useRecommendationsPool(chipFilterQuery = ""): RecommendationsPoolModel {
+export function useRecommendationsPool(
+  chipFilterQuery = "",
+  engine: RecommendationEngine = "hybrid",
+  setEngine: (engine: RecommendationEngine) => void = () => undefined,
+): RecommendationsPoolModel {
   const { state } = useReadingNook();
   const [discoverCache, setDiscoverCache] = useState<{
     genreKey: string;
@@ -148,6 +155,7 @@ export function useRecommendationsPool(chipFilterQuery = ""): RecommendationsPoo
     const native = buildAppNativeRecommendations(state, {
       discoverCandidates,
       maxResults: RECS_POOL_MAX,
+      engine,
     });
     const normalized = native.recommendations.map((r) => ({
       ...r,
@@ -157,7 +165,7 @@ export function useRecommendationsPool(chipFilterQuery = ""): RecommendationsPoo
       rows: normalized as Recommendation[],
       appNativeEmptyReason: native.emptyReason,
     };
-  }, [state, discoverCandidates]);
+  }, [state, discoverCandidates, engine]);
 
   const notShelvedRecs = useMemo(
     () =>
@@ -280,5 +288,7 @@ export function useRecommendationsPool(chipFilterQuery = ""): RecommendationsPoo
     personalizationActive,
     appNativeEmptyReason,
     discoverLoading,
+    engine,
+    setEngine,
   };
 }

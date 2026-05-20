@@ -1,5 +1,5 @@
 import { buildTasteSignals, type RecPersonalRow } from "@/lib/recPersonalization";
-import { HYBRID_SOURCE, hybridAprioriKnnRecommend } from "@/lib/recommender";
+import { HYBRID_SOURCE, hybridAprioriKnnRecommend, tfidfRecommend } from "@/lib/recommender";
 import type { AppState, Book } from "@/lib/types";
 import type { SearchBookResult } from "@/lib/bookProviders/types";
 
@@ -7,6 +7,8 @@ export { HYBRID_SOURCE };
 
 export const APP_NATIVE_SOURCE_CATALOG = "app-native-catalog";
 export const APP_NATIVE_SOURCE_DISCOVER = "openlibrary-discover";
+export const RECOMMENDATION_ENGINES = ["hybrid", "tfidf"] as const;
+export type RecommendationEngine = (typeof RECOMMENDATION_ENGINES)[number];
 
 /** Fetch OL discover when unshelved catalog count is below this. */
 export const CATALOG_UNSHELVED_DISCOVER_THRESHOLD = 15;
@@ -18,12 +20,25 @@ export type AppNativeRecommendationsInput = {
   /** OL genre discovery rows (display-only until shelved). */
   discoverCandidates?: readonly RecPersonalRow[];
   maxResults?: number;
+  engine?: RecommendationEngine;
 };
 
 export type AppNativeRecommendationsResult = {
   recommendations: RecPersonalRow[];
   emptyReason: string | null;
 };
+
+function buildRecommendationsByEngine(
+  state: AppState,
+  candidates: readonly RecPersonalRow[],
+  maxResults: number,
+  engine: RecommendationEngine,
+): RecPersonalRow[] {
+  if (engine === "tfidf") {
+    return tfidfRecommend(state, candidates, { maxResults });
+  }
+  return hybridAprioriKnnRecommend(state, candidates, { maxResults });
+}
 
 export function isOpenLibraryBookId(bookId: string): boolean {
   return bookId.startsWith("openlibrary:");
@@ -105,6 +120,7 @@ export function buildAppNativeRecommendations(
   input: AppNativeRecommendationsInput = {},
 ): AppNativeRecommendationsResult {
   const maxResults = input.maxResults ?? DEFAULT_MAX_RESULTS;
+  const engine = input.engine ?? "hybrid";
   const signals = buildTasteSignals(state);
 
   if (!signals.active) {
@@ -125,7 +141,7 @@ export function buildAppNativeRecommendations(
     };
   }
 
-  let recommendations = hybridAprioriKnnRecommend(state, candidates, { maxResults });
+  let recommendations = buildRecommendationsByEngine(state, candidates, maxResults, engine);
 
   recommendations.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;

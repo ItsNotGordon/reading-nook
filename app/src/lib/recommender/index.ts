@@ -42,6 +42,12 @@ export {
 } from "./hybridAprioriKnn";
 
 export {
+  TFIDF_SOURCE,
+  tfidfRecommend,
+  type TfidfRecommendOptions,
+} from "./tfidfRecommend";
+
+export {
   DEFAULT_POPULARITY_SCORE,
   buildPopularityScoreMap,
   popularityBottomThreshold,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AppState, Book, UserBook } from "@/lib/types";
-import { HYBRID_SOURCE } from "@/lib/recommender";
+import { HYBRID_SOURCE, TFIDF_SOURCE } from "@/lib/recommender";
 import {
   buildAppNativeRecommendations,
   collectCandidates,
@@ -43,7 +43,8 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
     catalog: {},
     userBooks: {},
     bucketRankings: { liked: [], okay: [], disliked: [] },
-    profile: { displayName: "Test", tagline: "" },
+    profile: { displayName: "Test", tagline: "", theme: "plant" },
+    dismissedRecIds: [],
     ...overrides,
   };
 }
@@ -135,6 +136,25 @@ describe("buildAppNativeRecommendations", () => {
     assert.ok(row);
     assert.equal(row?.source, HYBRID_SOURCE);
     assert.ok(row?.reason.includes("Apriori") || row?.reason.includes("KNN"));
+  });
+
+  it("uses TF-IDF source when TF-IDF engine is selected", () => {
+    const likedId = "openlibrary:OL20W";
+    const candidateId = "openlibrary:OL21W";
+    const state = baseState({
+      catalog: {
+        [likedId]: book(likedId, ["Fantasy"], "A"),
+        [candidateId]: book(candidateId, ["Fantasy"], "B"),
+      },
+      userBooks: {
+        [likedId]: finishedUserBook(likedId, "liked"),
+      },
+    });
+    const result = buildAppNativeRecommendations(state, { engine: "tfidf" });
+    const row = result.recommendations.find((r) => r.bookId === candidateId);
+    assert.ok(row);
+    assert.equal(row?.source, TFIDF_SOURCE);
+    assert.ok(row?.reason.includes("TF-IDF"));
   });
 
   it("ranks sci-fi above romance after many liked sci-fi and one disliked romance", () => {

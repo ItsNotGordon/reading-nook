@@ -1,1022 +1,308 @@
-# PRD: Reading Nook Product
+# Reading Nook — Product PRD (current shipped app)
 
-**Status:** Current product spec for the shipped app and near-term direction  
+**Status:** Canonical product specification — aligned with the codebase in `app/`  
 **Project:** Reading Nook  
-**App location:** `app/`  
-**Primary platform:** Mobile-first web app  
+**Primary platform:** Mobile-first web  
 **Stack:** Next.js App Router, React, TypeScript, Tailwind CSS  
-**Persistence today:** localStorage-first, with optional Supabase sync paths where configured  
-**Canonical purpose:** Track books, rank finished reads, and discover what to read next in a cozy personal reading space.
-
----
-
-## 1. Product Overview
-
-Reading Nook is a small, mobile-first reading tracker for personal use and eventually a small circle of friends.
-
-It combines:
-
-```txt
-Goodreads-style shelves
-+
-Beli-style sentiment buckets and pairwise ranking
-+
-Open Library search and discovery
-+
-client-side taste-aware recommendations
-```
-
-The app is no longer a STAT 280 deliverable. The STAT notebook, Goodbooks CSVs, and legacy recommendation scripts remain as history/reference only. The product direction is now a for-fun, product-minded reading app that should be polished enough to deploy and share.
+**Backend:** **Supabase** is the active platform for auth, library sync, profiles (including `@username` and avatars), friendships, and Row Level Security — not a future-only option when the project is configured with valid env vars.  
+**Canonical purpose:** Track books, rank finished reads by taste (not stars), discover titles via Open Library, and optionally connect with a small circle of friends.
 
 Reading Nook should feel like a cozy reading companion, not a social feed and not a machine-learning demo.
 
 ---
 
-## 2. Product Philosophy
+## 1. Product Overview
 
-Reading Nook does not ask users to manually enter star ratings.
+Reading Nook is a small, mobile-first reading tracker for personal use and a **friends-scale** social layer backed by Supabase.
 
-Instead, it asks:
+It combines:
 
-```txt
-How did this book make you feel?
-Which book did you like more?
-```
+- **Goodreads-style shelves** (Want to Read, Currently Reading, Finished)  
+- **Beli-style sentiment** (`liked` / `okay` / `disliked`) and **pairwise ranking** inside buckets to derive numeric scores  
+- **Open Library** for live search, work enrichment, and recommendation candidates  
+- **Client-side, app-state recommendations** (“For You”) from catalog + Open Library discover — **not** the legacy Goodbooks JSON pool as the live source  
 
-Users choose a sentiment bucket:
+The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks CSVs, and offline Python recommenders remain **legacy/reference only** (see §13).
 
-```txt
-liked | okay | disliked
-```
+**Philosophy (ratings):** No star ratings. Users express **how a finished book felt** and **which book they liked more** in pairwise steps; numeric scores are derived from bucket + rank.
 
-Then finished books are ranked through pairwise comparisons inside each bucket. Numeric scores are derived from bucket and ranking position.
-
-This makes the rating experience:
-
-- more personal
-- less arbitrary than stars
-- easy to update
-- useful for recommendations and future taste comparison
-
-No star-rating UI should be introduced.
+**Philosophy (social):** Friends are lightweight — no public feed, followers, or viral mechanics. Friend libraries are visible only in the context of accepted friendships and server-enforced policies.
 
 ---
 
-## 3. Product Direction
+## 2. Current Architecture
 
-### Current direction
+### Repository layout
 
-Reading Nook is:
+| Area | Role |
+| --- | --- |
+| `app/` | **Next.js product app** — all shipped UI, API routes, and client state |
+| `supabase/migrations/` | SQL migrations applied to the hosted Supabase project (**four** migration files: `001`–`004`) |
+| `docs/` | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD) |
+| `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §13) |
 
-- Open Library-first for live book search and discovery
-- local-first by default
-- mobile-first in UI decisions
-- cozy and personal in tone
-- scoped for personal/friends-scale use
-- deployable before it needs a full backend
+### Runtime model
 
-### Not the current direction
+- **Client app state** lives in React (`ReadingNookProvider` + reducer). Canonical TypeScript types are in `app/src/lib/types.ts`.  
+- **Persistence:** `localStorage` key **`reading-nook-v1`** — load on startup, save after changes. Each browser profile holds a copy until sync merges.  
+- **Cloud:** When Supabase env vars are present and the user signs in, **`/api/sync`** reads/writes a per-user JSON **`libraries.state`** row and merges **`profiles`** fields (`display_name`, `tagline`; username and avatar via dedicated APIs). Sync UX is driven by `SyncStatusProvider` / `SyncStatusLine`.  
+- **Friends:** Friendship rows in **`public.friendships`**; profile discovery and friend library/taste via **`/api/friends`**, **`/api/users/*`**, and related routes under `app/src/app/api/`.
 
-Reading Nook is not currently trying to be:
-
-- a large social network
-- a viral book platform
-- a full Goodreads clone
-- a heavy ML showcase
-- a backend-first app
-- a star-rating app
-
-Backend, auth, sync, and friend features should only be added when the product flow is stable enough to justify them.
-
----
-
-## 4. Current App Structure
-
-The Next.js app lives in:
-
-```txt
-app/
-```
-
-Main app areas:
-
-```txt
-Library
-Ratings
-Add
-Friends
-Profile
-```
-
-Current bottom navigation:
+### Main navigation (bottom tabs)
 
 ```txt
 Library | Ratings | Add | Friends | Profile
 ```
 
-Route behavior:
+**Nested highlighting:** `BottomNav` treats a tab as active when `pathname === href` **or** `pathname.startsWith(href + "/")`, so e.g. `/friends/alice` highlights **Friends**, and `/profile/settings` highlights **Profile**.
+
+### Routes (shipped)
 
 | Path | Behavior |
-| ---- | -------- |
+| --- | --- |
 | `/` | Redirects to `/library` |
 | `/library` | Library shelves |
-| `/ratings` | Finished/ranked books and filters |
-| `/add` | Open Library search and recommendations |
-| `/friends` | Friend-related placeholder or optional Supabase-backed flows |
-| `/profile` | Profile, stats, backup, and account |
-| `/recs` | Legacy redirect to Add if present |
-| `/leaderboard` | Legacy redirect to Ratings |
+| `/ratings` | Finished books, filters, derived scores, detail sheets |
+| `/add` | **Unified** Open Library search + “For You” recommendations + shelf picker + finish flow |
+| `/friends` | Friends list, requests, discovery (Supabase-backed when configured) |
+| `/friends/[username]` | **Route-based friend profile** (not a modal sheet); invalid usernames show a minimal error state |
+| `/profile` | Profile stats, hero, insights — **not** the primary home for account backup or full account UI |
+| `/profile/settings` | **Settings** shell: account-oriented actions and **library backup** import/export where implemented |
+| `/login` | Sign-in entry (Supabase auth UI) |
+| `/auth/callback` | OAuth / auth callback handler |
+| `/recs` | **Not a product surface** — immediately **`redirect("/add")`** |
+| `/leaderboard` | Client **`router.replace("/ratings")`** — legacy path only |
 
-There is no standalone Recs tab in the current product direction. Search and recommendations live together on the Add screen.
-
----
-
-## 5. Core User Loops
-
-### Add a book
-
-1. User opens Add.
-2. User searches Open Library by title, author, or genre.
-3. Results appear from Open Library.
-4. User chooses a shelf:
-   - Want to Read
-   - Currently Reading
-   - Finished
-5. If Finished is chosen, finish flow begins.
-
-### Track reading
-
-1. User opens Library.
-2. User sees:
-   - Currently Reading
-   - Finished
-   - Want to Read
-3. User updates progress for Currently Reading books.
-4. Progress can be exact or estimated.
-
-### Finish and rank a book
-
-1. User marks a book as Finished.
-2. User picks sentiment:
-   - liked
-   - okay
-   - disliked
-3. If needed, app opens pairwise comparison.
-4. Book is inserted into the correct bucket ranking.
-5. Derived scores are recomputed.
-
-### Review ratings
-
-1. User opens Ratings.
-2. User sees finished books with derived scores.
-3. User can filter/search.
-4. User can open book detail, edit notes/genres/sentiment, and rerank where supported.
-
-### Use Profile
-
-Profile summarizes:
-
-- stats
-- favorite book
-- top genres
-- favorite authors
-- sentiment insights
-- shelf snapshot
-- profile/account settings
-- backup import/export
-
-Profile also supports decorative background themes.
+API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `books/work`, `books/discover`, `friends`, `friends/[friendId]/library`, `friends/[friendId]/profile`, `friends/[friendId]/taste`, `profile/username`, `profile/avatar`, `users/[username]`, `users/search`.
 
 ---
 
-## 6. Data Model
+## 3. Auth + Supabase Sync
 
-Types live in:
+### Supabase status
 
-```txt
-app/src/lib/types.ts
-```
+Supabase is **first-class** for this product: profiles, library JSON sync, friendships, storage (avatars), and RLS policies are defined in migrations **`001_reading_nook.sql`** through **`004_friends_always_share_library.sql`**.
 
-### Book
+### Sign-in
 
-```ts
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  coverUrl: string;
-  totalPages: number;
-  genres: string[];
-  description: string;
-  publishedYear?: number;
-  averageRating?: number;
-  ratingsCount?: number;
-  readinglogCount?: number;
-  wantToReadCount?: number;
-  currentlyReadingCount?: number;
-  alreadyReadCount?: number;
-};
-```
+- **Google OAuth** (`signInWithOAuth` with Google provider) is the **preferred** sign-in path in the UI (`MagicLinkAuthForm` leads with “Continue with Google”).  
+- **Email magic link** (`signInWithOtp`) remains in code for flexibility but is **de-emphasized in product direction**: Supabase’s built-in email quotas and deliverability limits make email OTP a poor primary growth or onboarding strategy. Product copy and future UX should steer users toward **Google**; treat magic link as ancillary or removable later.
 
-Book IDs for Open Library entries use an `openlibrary:` prefix.
+### Sync behavior (high level)
 
-### Shelf
+- **GET `/api/sync`:** Returns merged library `AppState` (and `updated_at`) for the signed-in user, overlaying profile name/tagline from `profiles` when needed.  
+- **POST `/api/sync`:** Persists updated library JSON for the user.  
+- When Supabase is **not** configured, sync routes return **503** and the app behaves **local-only** (still valid for forks and local dev).
 
-```ts
-type Shelf = "want_to_read" | "reading" | "finished";
-```
+Details: `docs/SUPABASE_SETUP.md`, `app/src/components/SyncStatusProvider.tsx`, `app/src/lib/storage.ts` (merge helpers).
 
-Display labels:
+---
 
-| Value | Label |
-| ----- | ----- |
-| `reading` | Currently Reading |
-| `finished` | Finished |
-| `want_to_read` | Want to Read |
+## 4. Core Data Model
 
-Shelf display order:
+Authoritative definitions: **`app/src/lib/types.ts`**. Summaries below are descriptive; if this PRD and code disagree, **code wins**.
 
-```txt
-Currently Reading
-Finished
-Want to Read
-```
+### `Book`
 
-### UserBook
+Catalog metadata: `id`, `title`, `author`, `coverUrl`, `totalPages` (**`0` means unknown**), `genres`, `description`, optional OL-derived fields (`publishedYear`, `averageRating`, `ratingsCount`, `readinglogCount`). Open Library IDs use an `openlibrary:` prefix.
+
+### `Shelf`
+
+`"want_to_read" | "reading" | "finished"` — UI labels: **Want to Read**, **Currently Reading**, **Finished**.
+
+### `UserBook`
+
+Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `estimatedRange`, finish timestamps (`finishedAt`, `finishedSortAt`), sentiment `sentimentBucket`, `derivedScore`, `addedAt`, `notes`.
+
+### `BucketRankings`
+
+`Record<SentimentBucket, BookId[]>` — ordered IDs per bucket; **pairwise insertion** (`PairwiseComparisonSheet`) updates these orders.
+
+### `UserProfile` (local state)
+
+`displayName`, `tagline`, `theme` (`plant` | `coffee` | `matcha` | `cats`). Cloud `profiles` row adds **`username`** and **`avatar_url`** (not duplicated inside `AppState` JSON — fetched via `/api/profile/username` and `/api/profile/avatar`).
+
+### `AppState`
 
 ```ts
-type UserBook = {
-  bookId: string;
-  shelf: Shelf;
-
-  progressMode: "exact" | "estimated";
-  currentPage: number | null;
-  estimatedRange: [number, number] | null;
-
-  finishedAt: string | null;
-  finishedSortAt: string | null;
-
-  sentimentBucket: "liked" | "okay" | "disliked" | null;
-  derivedScore: number | null;
-
-  addedAt: string;
-  notes: string;
-};
-```
-
-Important distinction:
-
-```txt
-finishedAt = user-facing finish date
-finishedSortAt = latest finish/rerate action timestamp used for Finished shelf order
-```
-
-### Bucket rankings
-
-```ts
-type BucketRankings = {
-  liked: string[];
-  okay: string[];
-  disliked: string[];
-};
-```
-
-These arrays are the source of truth for ranking order.
-
-### Profile
-
-Current profile state includes display identity and profile theme/background settings.
-
-Conceptually:
-
-```ts
-type UserProfile = {
-  displayName: string;
-  tagline: string;
-  theme?: "plant" | "matcha" | "coffee" | "cats";
-};
-```
-
-Check `app/src/lib/types.ts` for the exact current shape before editing code.
-
-### App state
-
-```ts
-type AppState = {
+{
   version: 1;
-  catalog: Record<string, Book>;
-  userBooks: Partial<Record<string, UserBook>>;
+  catalog: Record<BookId, Book>;
+  userBooks: Partial<Record<BookId, UserBook>>;
   bucketRankings: BucketRankings;
   profile: UserProfile;
-};
+  dismissedRecIds: BookId[];
+}
 ```
 
-State persists under:
+### Supabase tables (migrations)
 
-```txt
-reading-nook-v1
-```
+- **`profiles`:** `id` (auth user), `display_name`, `tagline`, `username`, `avatar_url`, `share_shelves` (see §9 — policy evolution)  
+- **`libraries`:** `user_id`, `state` (jsonb app snapshot), `updated_at`  
+- **`friendships`:** `requester_id`, `addressee_id`, `status` (`pending` | `accepted`)  
+- **Storage bucket `avatars`:** public read, user-scoped write policies (`003_profiles_avatar.sql`)
 
 ---
 
-## 7. Persistence
+## 5. Library
 
-Today, Reading Nook is local-first.
-
-Primary persistence:
-
-```txt
-localStorage key: reading-nook-v1
-```
-
-Behavior:
-
-- load state on startup
-- save after state changes
-- tolerate missing/corrupt data where migration helpers exist
-- each browser/device has separate data unless sync is configured
-
-Important limitation:
-
-```txt
-A deployed URL does not automatically mean shared accounts or synced libraries.
-```
-
-Each user/browser has separate data until auth and database sync are implemented.
-
-Backup import/export remains important because localStorage can be cleared.
+- **Sections:** Currently Reading → Finished → Want to Read (display order).  
+- **Cards:** Cover, title, author; reading progress for active reads; derived score / sentiment styling for finished items when present.  
+- **Sorting:** Finished by `finishedSortAt` / `finishedAt` / `addedAt`; other shelves newest `addedAt` first (see shelf helpers in codebase).  
+- **Actions:** Move shelves, open progress update for **Currently Reading**, start finish + pairwise flows from Library where wired (`LibraryShelves`, `FinishBookSheet`, `PairwiseComparisonSheet`).  
+- **Deep link:** `/library?shelf=…` is used from profile shelf snapshots.
 
 ---
 
-## 8. Open Library Search and Metadata
+## 6. Add + Recommendations
 
-Live Add search uses Open Library.
+### Add tab (`/add`)
 
-Important files include:
+Single surface: **one search field**, Open Library results (via internal API routes), **recommendation list**, genre chip filtering where implemented, shelf picker, and finish flow when **Finished** is chosen.
 
-```txt
-app/src/app/api/books/search/route.ts
-app/src/app/api/books/work/route.ts
-app/src/lib/bookProviders/openLibrary.ts
-app/src/lib/enrichOpenLibraryBook.ts
-```
+Search is **Open Library–first** (`app/src/app/api/books/search/route.ts`, `openLibrary.ts`, enrichment pipeline). Results exclude books already in `userBooks` where implemented.
 
-Search behavior:
+### “For You” recommendations (live)
 
-- search by title, author, or genre
-- queries use Open Library through internal API routes
-- language/English-title heuristics are used where possible
-- search results exclude books already in the user's library
-- selecting a result opens shelf picker
-- choosing Finished opens the finish flow
+Built from **`app/src/lib/appNativeRecommendations.ts`** using **`hybridAprioriKnnRecommend`** (`app/src/lib/recommender/`) plus taste signals from finished books — candidates from **unshelved catalog** and **Open Library discover** when the catalog pool is small (`APP_NATIVE_SOURCE_DISCOVER`, threshold in `appNativeRecommendations.ts`).
 
-Open Library work enrichment:
+**Rules:** Hide shelved books and dismissed IDs (`dismissedRecIds`); do **not** depend on Goodbooks JSON for live UI.
 
-```txt
-Search result
--> user adds to shelf
--> enrich Open Library work metadata
--> merge description, subjects, title improvements, genres
--> add to catalog/userBooks
-```
+### `/recs`
 
-Open Library data can be uneven. Some works have rich descriptions and subjects; others have little or none. The app should handle sparse metadata gracefully.
+**Not a product route** — exists only as a **redirect to `/add`** (`app/src/app/(tabs)/recs/page.tsx`). Do not document a standalone Recs tab.
 
 ---
 
-## 9. Genres
+## 7. Ratings
 
-Genres shown in the UI should be clean canonical chips, not raw Open Library subjects.
+`/ratings` is the personal finished-book view (not a public leaderboard): ranked lists, derived scores, sentiment styling, text search, genre/author filters, URL query params **`genre`**, **`author`**, **`q`**, **`bucket`** (`RatingsPageClient`), editable detail flows where implemented.
 
-Current genre direction:
-
-- use a medium-size canonical vocabulary
-- map BISAC and LOC subject patterns into readable labels
-- cap displayed genres
-- avoid raw slash paths and noisy metadata
-- allow manual genre edits from the canonical list
-- no free-text genre entry for now
-
-Manual genre picker:
-
-- canonical genres only
-- optional
-- max 6 genres per book
-- used when Open Library metadata is missing or incomplete
-- available during add/shelving and in finished book detail where implemented
-
-Important files include:
-
-```txt
-app/src/lib/genreVocabulary.ts
-app/src/lib/bookProviders/openLibraryBisac.ts
-app/src/lib/bookProviders/openLibrarySubjects.ts
-app/src/lib/genreNormalize.ts
-app/src/components/GenreChipPicker.tsx
-app/src/lib/mergeCatalogGenres.ts
-```
+**Legacy:** `/leaderboard` replaces to `/ratings`; avoid “Leaderboard” in primary nav copy.
 
 ---
 
-## 10. Library Tab
+## 8. Profile + Settings
 
-Library shows three shelf sections:
+### Profile (`/profile`)
 
-```txt
-Currently Reading
-Finished
-Want to Read
-```
+- **Hero (`ProfileHeroCard`):** **Display name** in the **upper corner**; when signed in with a username set, the **main heading** shows the **username without a literal `@` prefix**; otherwise prompts to set username or falls back to display name. Tagline, avatar (when signed in), **Edit profile** and **Settings** links.  
+- **Body:** Stats, favorite book, genres, authors, sentiment insights, shelf snapshot links, etc. — **without** pushing account management and **library backup** into the main scroll (those live under **Settings**).  
+- **Theming:** Profile page uses **`PageShell`** plus inline **`ProfileDecorationBackdrop`** for the same decorative themes as other tabs (see §10 — implementation detail differs from `ThemedPageShell` import but visuals align).
 
-Cards show:
+### Settings (`/profile/settings`)
 
-- cover
-- title
-- author
-- progress for Currently Reading
-- derived score/sentiment for Finished where available
-- basic metadata for Want to Read
+Wrapped in **`ThemedPageShell`** with title **Settings**. Hosts **account** controls and **library backup** import/export (`LibraryBackupSection` and related), isolated from the main profile marketing/stats experience.
 
-Sorting:
+### Edit Profile sheet
 
-```txt
-Finished:
-  newest finishedSortAt
-  then finishedAt
-  then addedAt
-  then deterministic tie-breakers
+Owns display name, tagline, theme picker, cloud `@username`, avatar upload, and destructive local resets as implemented (`EditProfileSheet`, profile API routes).
 
-Currently Reading / Want to Read:
-  newest addedAt first
-```
+---
 
-Finished cards should open the rated-book detail experience where implemented, not restart the finish flow as if the book had never been rated.
+## 9. Friends
+
+### Data + access
+
+- Friend relationships are stored in **`friendships`** with RLS limited to participants.  
+- **Migration `004`:** Accepted friends may **always** read each other’s **`libraries`** row (library JSON) — the earlier `share_shelves`-gated friend read on libraries was **dropped**; `share_shelves` default was set to **true** for backward compatibility but **friend library visibility is not product-gated on that flag anymore** for accepted pairs.
+
+### UX
+
+- **`/friends`:** Pending/accepted lists, send requests, search users by username (`/api/users/search`, `/api/users/[username]`).  
+- **`/friends/[username]`:** **Full-page friend profile** via `FriendProfileView` — **not** a modal sheet.  
+- **Insights (`FriendProfileInsights`):** When the friend has **ratings rows**, the **Finished** shelf subsection is **omitted** from the library area to avoid duplicating finished content already shown in ratings; the library section hides entirely if it would be empty.
+
+### APIs
+
+`GET`/`POST` `/api/friends`, friend-scoped `library`, `profile`, `taste` routes — all require Supabase + auth as implemented.
+
+---
+
+## 10. Theming
+
+- User-selectable **`AppTheme`:** `plant`, `coffee`, `matcha`, `cats`.  
+- **Library, Ratings, Add, Friends list, Friend profile, and Settings** use **`ThemedPageShell`**, which applies **`ProfileDecorationBackdrop`** using `state.profile.theme`.  
+- **Profile tab** applies the same **`ProfileDecorationBackdrop`** inside **`PageShell`** (no `ThemedPageShell` import on that page — intentional layout for hero + scroll).  
+- **Bottom nav** accent tokens (`--nav-accent`, etc.) follow the active profile theme via CSS variables (`ProfileThemeApplier` / related).  
+- **Intent:** Decorative motifs are tied to the user’s profile theme and appear across primary tabs for a cohesive “nook” — not arbitrary global app skins.
+
+Key files: `ThemedPageShell.tsx`, `ProfileDecorationBackdrop.tsx`, `ProfileThemeApplier.tsx`, `profileTheme.ts`, `BottomNav.tsx`.
 
 ---
 
 ## 11. Progress Tracking
 
-Progress applies mainly to Currently Reading books.
-
-Modes:
-
-### Exact
-
-User enters current page.
-
-```txt
-progress = currentPage / totalPages
-```
-
-Clamp between 0 and 1.
-
-If total pages are unknown, exact page mode should be unavailable or explained.
+Applies to **Currently Reading** (`shelf === "reading"`).
 
 ### Estimated
 
-User chooses a range such as:
+User picks one of four canonical fraction bands (e.g. 0–25%, …). Stored as `estimatedRange: [lo, hi]`. **UI:** compact **2×2 grid of rectangular tiles** (percent label + short qualitative label) in **`ProgressUpdateSheet`**.
 
-```txt
-0-25%
-25-50%
-50-75%
-75-100%
-```
+### Exact
 
-Stored as:
+**Always available** in the sheet: user may enter **Current page** (left) and **Total pages** (right) even when catalog `totalPages === 0` (common for Open Library–sourced books). Saving calls **`updateReadingExactProgress`**, which updates **both** the catalog copy’s `totalPages` and the `UserBook` exact progress fields (`UPDATE_READING_EXACT_PROGRESS` in `app-reducer.ts`).
 
-```ts
-estimatedRange: [number, number]
-```
-
-Progress UI:
-
-- exact progress uses confirmed filled section
-- estimated progress uses lower-bound fill plus estimated band
-- unread remainder remains visible
-- treatment should remain cozy and legible on mobile
+Progress bars elsewhere should remain readable on small screens (exact fill vs estimated band treatment in shelf cards — see components under `LibraryShelves` / book cards).
 
 ---
 
-## 12. Finish Flow and Pairwise Ranking
+## 12. Deployment / Env
 
-When a book is finished:
-
-1. Set shelf to `finished`.
-2. Set/update `finishedAt`.
-3. Set/update `finishedSortAt`.
-4. User chooses sentiment bucket:
-   - liked
-   - okay
-   - disliked
-5. App inserts the book into the matching bucket ranking.
-6. Derived scores are recomputed.
-
-Pairwise insertion uses a binary-search-style flow:
-
-```txt
-low = 0
-high = bucket.length
-mid = floor((low + high) / 2)
-
-Ask: which book did you like more?
-
-If new book is preferred:
-  high = mid
-Else:
-  low = mid + 1
-
-Insert at low
-```
-
-Rerating behavior:
-
-- remove from old bucket
-- recompute old bucket
-- insert into new bucket
-- recompute new bucket
+- **Vercel (or similar):** Project **root directory = `app/`** (see `docs/DEPLOY.md`, `app/vercel.json`).  
+- **Build / verify (from `app/`):** `npm run dev`, `npm test`, `npm run lint`, `npm run build`.  
+- **Environment:** Copy `app/.env.example` → `app/.env.local` and set **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** for cloud features; optional **`SUPABASE_SERVICE_ROLE_KEY`** server-only as documented.  
+- **Without Supabase env:** App runs **localStorage-only** — fine for demos, bad for multi-device continuity.  
+- **LAN testing:** `npm run dev -- --hostname 0.0.0.0 --port 3000` then open the host machine’s IP on a phone.
 
 ---
 
-## 13. Derived Scores
+## 13. Legacy / Reference Systems
 
-Users do not enter numeric scores manually.
+Treat as **non-product sources** for live behavior:
 
-Score ranges:
+| Asset | Notes |
+| --- | --- |
+| `git-forked-database/` (Goodbooks CSVs) | Historical corpus — **not** the live recommendation pool in the Next app |
+| `recommender/` (Python) | Offline / experiments |
+| `notebook.ipynb` | STAT course artifact |
+| `/recs` route | Redirect stub only |
+| `/leaderboard` | Redirect-only legacy |
 
-| Bucket | Range |
-| ------ | ----- |
-| liked | 7.0-10.0 |
-| okay | 3.6-6.9 |
-| disliked | 1.0-3.5 |
-
-Formula:
-
-```ts
-if (totalBooks === 1) return bucketMax;
-
-const p = 1 - rankIndex / (totalBooks - 1);
-const curved = Math.pow(p, 0.6);
-const score = bucketMin + curved * (bucketMax - bucketMin);
-
-return Number(score.toFixed(1));
-```
-
-Scores must not overlap between buckets.
-
-Important file:
-
-```txt
-app/src/lib/ranking.ts
-```
+Do not delete without explicit request; do not wire these back in as the primary user-facing recommendation source.
 
 ---
 
-## 14. Ratings Tab
+## 14. Next Roadmap
 
-Ratings is the user's personal finished-book ranking, not a public leaderboard.
+Suggested ordering (product, not commitments):
 
-Current behavior includes:
-
-- finished/ranked books
-- derived score display
-- sentiment styling
-- text search
-- genre/author filters
-- bucket filter via URL param
-- editable detail sheet
-- move up/down or rerank behavior where implemented
-
-Current URL filters include:
-
-```txt
-?genre=
-?author=
-?q=
-?bucket=
-```
-
-Search should match:
-
-- title
-- author
-- genre
-- notes where implemented
-
-Clear filters should be easy to see and use.
-
-Legacy route:
-
-```txt
-/leaderboard -> /ratings
-```
-
-Avoid "Leaderboard" in primary navigation.
+1. **Hardening:** Broader device testing, sync conflict UX polish, empty/error states for friends without usernames.  
+2. **Recommendations:** Tune discover thresholds and copy; optional future **recommendation “lenses”** (e.g. more discovery vs more comfort) **without** prescribing implementation algorithms in this PRD.  
+3. **Account hygiene:** Clarify magic-link positioning (remove UI vs keep hidden); optional additional OAuth providers if demand exists.  
+4. **Deploy + onboarding docs:** Ensure shared deploy URL users understand Google sign-in + sync.  
+5. **Small social:** Taste summaries, mutual books, notifications **only** if explicitly scoped — default remains calm and opt-in.
 
 ---
 
-## 15. Add Tab
+## 15. Cursor / Agent Rules
 
-Add is the unified search and recommendation screen.
+When editing Reading Nook:
 
-It includes:
-
-1. One search field
-2. Open Library search results
-3. Recommendation area
-4. Genre chip/filter behavior where recommendation rows exist
-5. Shelf picker
-6. Finish flow when Finished is chosen
-
-The Add tab should remain a single unified screen. Do not split recommendations into a standalone Recs tab unless the product direction changes.
-
-Recent/current behavior:
-
-- search placeholder should support title, author, or genre
-- genre-aware Open Library search can merge general search and genre discovery results
-- result chips can narrow/filter recommendation visibility
-- typing in the unified search field affects the visible search/recommendation context
-- recommendations hide dismissed and already-shelved books
+1. **Open Library first** for search and enrichment.  
+2. **Goodbooks / notebook / Python recommender** = reference only — never the live UI recommendation source.  
+3. **No star ratings** in UI or product direction.  
+4. **Add stays unified** — no standalone Recs product tab; `/recs` stays a redirect.  
+5. **Recommendations** = app state + Open Library discover — see `appNativeRecommendations.ts`.  
+6. **Supabase** = active backend when env is set; document and test both local-only and cloud modes.  
+7. **Profile themes** = user motifs via `ProfileDecorationBackdrop` / `ThemedPageShell` patterns — do not reintroduce unrelated global theme systems.  
+8. **Canonical genres only** in chips; manual genres optional, capped (see `genreVocabulary.ts` and pickers).  
+9. **Shelf labels** exactly: Currently Reading, Finished, Want to Read.  
+10. Prefer **small, incremental** diffs; match existing code style.  
+11. **Do not edit** `.cursor/plans/` unless the user explicitly asks.  
+12. **Do not commit** unless the user explicitly asks.  
+13. After **substantive code** changes: run `npm run lint`, `npm test`, and `npm run build` from `app/`. **Markdown-only doc edits** do not require those commands.
 
 ---
 
-## 16. Recommendations
-
-Current live recommendations are app-state and Open-Library-aware.
-
-They are not powered by the legacy Goodbooks JSON pool in the UI.
-
-Important files include:
-
-```txt
-app/src/lib/useRecommendationsPool.ts
-app/src/lib/appNativeRecommendations.ts
-app/src/lib/recommender/
-app/src/components/RecsListPanel.tsx
-```
-
-Current default recommendation concept:
-
-```txt
-weighted Apriori + sentiment KNN + popularity blend
-```
-
-Product-facing label:
-
-```txt
-For You
-```
-
-Conceptual behavior:
-
-- use the user's finished books and sentiment buckets as taste signals
-- use liked/okay/disliked genres with different weights
-- use genre co-occurrence patterns
-- use similarity to finished books
-- apply disliked genre/author penalties
-- include a popularity/familiarity nudge from Open Library metadata
-- reserve some room for less obvious but still relevant picks
-
-Candidate sources:
-
-- unshelved app catalog books
-- Open Library discover results when the catalog pool is small
-
-Important rules:
-
-- hide books already in `userBooks`
-- preserve dismissed recommendation behavior
-- do not require Goodbooks CSVs or `recommendations.json` for live UI recommendations
-- do not reintroduce the legacy static recommendation pool as the product future
-
-User-facing recommendation copy should emphasize reading taste, similar books, familiar picks, and discovery. It should not over-explain algorithms.
-
----
-
-## 17. Profile Tab
-
-Profile is both a stats page and a cozy personal space.
-
-It includes:
-
-- name (display name in data)
-- @username (when signed in, for Friends)
-- tagline
-- account section
-- library stats
-- favorite book
-- top genres
-- favorite authors
-- sentiment insights
-- shelf snapshot
-- library backup import/export
-- edit profile sheet
-
-### Profile decoration themes
-
-Profile has decorative background themes using PNG motifs.
-
-Current themes:
-
-```txt
-plant
-matcha
-coffee
-cats
-```
-
-Intent:
-
-- decorations are Profile-only
-- they are not global app recoloring
-- background picker lives in Edit Profile
-- bottom nav accent colors may reflect selected profile theme through CSS variables
-- other tabs keep the default sage/warm-neutral app palette
-
-Important files include:
-
-```txt
-app/src/lib/profileTheme.ts
-app/src/components/ProfileDecorationBackdrop.tsx
-app/src/components/ProfileThemeApplier.tsx
-app/src/components/BottomNav.tsx
-app/src/components/EditProfileSheet.tsx
-```
-
-Old global palette switching via `ThemeApplier` should not be reintroduced.
-
-### Edit Profile
-
-Edit Profile currently owns:
-
-- name
-- @username (cloud)
-- tagline
-- profile background picker
-- danger zone / clear library data
-
-Library backup import/export currently remains on main Profile unless intentionally moved later.
-
----
-
-## 18. Friends
-
-Friends is a small-scope future direction, not the core app today.
-
-Current direction:
-
-- optional placeholder or Supabase-aware functionality may exist
-- do not overbuild social features
-- do not turn the app into a feed
-- friend features should be opt-in and small-group oriented
-
-Possible future friend features:
-
-- friend invites
-- view a friend's shelves
-- compare taste overlap
-- shared favorite genres
-- lightweight compatibility insights
-
-Avoid:
-
-- followers
-- public feeds
-- comments
-- notifications
-- viral growth mechanics
-
----
-
-## 19. Design Requirements
-
-Reading Nook should feel:
-
-- cozy
-- soft
-- bookish
-- mobile-first
-- warm
-- personal
-- calm
-
-Visual direction:
-
-- warm neutral backgrounds
-- sage green primary
-- honey/amber accents
-- rounded cards
-- soft shadows
-- readable mobile spacing
-- decorative profile motifs
-- no star ratings
-
-Known colors:
-
-```txt
-sage green: #426447
-okay/amber: #a27f00
-disliked/red: #b13d34
-```
-
-Fonts:
-
-```txt
-Literata for brand/headings
-DM Sans for UI
-```
-
----
-
-## 20. Deployment Direction
-
-Near-term deployment goal:
-
-```txt
-Deploy the current local-first app to Vercel.
-```
-
-Important deployment notes:
-
-- Vercel root directory should be `app`
-- app can deploy before backend/auth exists
-- each user/browser has separate local data until sync exists
-- backup import/export is important before relying on the app long-term
-
-Run from `app/`:
-
-```bash
-npm run dev
-npm test
-npm run lint
-npm run build
-```
-
-For LAN/mobile testing:
-
-```bash
-npm run dev -- --hostname 0.0.0.0 --port 3000
-```
-
-Then open the laptop LAN IP on the phone.
-
----
-
-## 21. Future Roadmap
-
-### Phase 1: Stabilize local-first v0.1
-
-- keep Add/Library/Ratings/Profile loops stable
-- polish mobile UX
-- preserve current recommendation behavior
-- run test/lint/build before deploy
-- deploy to Vercel
-
-### Phase 2: Data safety
-
-- keep or improve JSON export/import
-- clarify localStorage limitations
-- prepare clean migration path for future backend
-
-### Phase 3: Recommendation polish
-
-- improve explanations
-- tune popularity/taste balance
-- improve Open Library discover candidates
-- preserve the current Open Library-first direction
-- avoid Goodbooks dependency in live UI
-
-### Phase 4: Optional auth and sync
-
-Add only when needed:
-
-- Supabase auth
-- hosted user libraries
-- bucket rankings
-- profile sync
-- same account across devices
-
-### Phase 5: Small friend features
-
-After auth/sync:
-
-- friend invites
-- taste comparison
-- opt-in shelf visibility
-- shared genre overlap
-
----
-
-## 22. Out of Scope Unless Explicitly Requested
-
-Do not add these by default:
-
-```txt
-star ratings
-manual 1-10 score entry
-large social network features
-public feed
-comments/reviews as a social system
-notifications
-backend/auth migration
-database schema implementation
-Goodbooks dependency for live recommendations
-editing notebook.ipynb in place
-deleting legacy Goodbooks files
-standalone Recs tab
-global app recoloring themes
-```
-
----
-
-## 23. Repository Guidance
-
-Important repo areas:
-
-```txt
-app/
-  Next.js product app
-
-docs/
-  product/design docs
-
-git-forked-database/
-  legacy Goodbooks CSVs
-
-recommender/
-  legacy/offline Python recommender
-
-notebook.ipynb
-  STAT 280 historical reference
-```
-
-Do not edit `.cursor/plans/` unless explicitly asked.
-
-Do not commit unless explicitly asked.
-
-Use small incremental diffs.
-
-Match existing code style.
-
-Run verification commands after substantive code changes:
-
-```bash
-npm run lint
-npm test
-npm run build
-```
-
----
-
-## 24. Success Criteria
-
-### Current local-first product
-
-Reading Nook is successful at this stage if:
-
-1. User can open the app on mobile.
-2. User can search Open Library and add books.
-3. User can organize books into shelves.
-4. User can track reading progress.
-5. User can finish a book and choose sentiment.
-6. User can rank books through pairwise comparison.
-7. Ratings reflects ranking and derived scores.
-8. Profile gives useful personal stats and cozy identity.
-9. Recommendations feel relevant enough to help the user pick another book.
-10. Data persists in the same browser.
-11. App builds cleanly for deployment.
-
-### Friends-scale future
-
-Reading Nook is successful later if:
-
-1. Friends can open the same deployed URL.
-2. Each person can keep their own library.
-3. Sync works across a user's devices.
-4. Friend features remain lightweight and opt-in.
-5. The app still feels like a personal reading nook, not a social feed.
-
----
-
-## 25. Agent Rules
-
-When working on Reading Nook:
-
-1. Treat this product as Open Library-first.
-2. Treat Goodbooks, notebook, and Python recommender files as legacy/reference.
-3. Do not reintroduce star ratings.
-4. Keep Add as the unified search and recommendations screen.
-5. Keep recommendations app-state/Open-Library-aware.
-6. Keep the app local-first unless backend/auth is explicitly requested.
-7. Preserve profile decorations as Profile-only motifs.
-8. Do not reintroduce global theme recoloring.
-9. Use canonical genres only in UI chips.
-10. Keep manual genres optional, canonical, and capped.
-11. Preserve shelf labels exactly:
-    - Currently Reading
-    - Finished
-    - Want to Read
-12. Prefer small product-quality improvements over large rewrites.
-13. Run lint/test/build after substantive changes.
-14. Do not edit `.cursor/plans/` unless asked.
-15. Do not commit unless asked.
+**Document maintenance:** This file is the single canonical PRD for the shipped app. `Reading_Nook_Product_PRD.md` in `docs/` points here so older links stay valid.
