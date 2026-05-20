@@ -1,10 +1,10 @@
-import { PageShell } from "@/components/PageShell";
+import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { AddTabClient } from "@/components/AddTabClient";
 
 export default function AddPage() {
   return (
-    <PageShell title="Add">
+    <ThemedPageShell title="Add">
       <AddTabClient />
-    </PageShell>
+    </ThemedPageShell>
   );
 }

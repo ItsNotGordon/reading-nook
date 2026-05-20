@@ -1,10 +1,10 @@
 import { FriendsPanel } from "@/components/FriendsPanel";
-import { PageShell } from "@/components/PageShell";
+import { ThemedPageShell } from "@/components/ThemedPageShell";
 
 export default function FriendsPage() {
   return (
-    <PageShell title="Friends">
+    <ThemedPageShell title="Friends">
       <FriendsPanel />
-    </PageShell>
+    </ThemedPageShell>
   );
 }

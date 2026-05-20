@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { LibraryShelves } from "@/components/LibraryShelves";
-import { PageShell } from "@/components/PageShell";
+import { ThemedPageShell } from "@/components/ThemedPageShell";
 
 export default function LibraryPage() {
   return (
-    <PageShell title="Library">
+    <ThemedPageShell title="Library">
       <Suspense fallback={null}>
         <LibraryShelves />
       </Suspense>
-    </PageShell>
+    </ThemedPageShell>
   );
 }

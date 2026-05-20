@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { FriendRelationship } from "@/lib/friendshipStatus";
 import type { FriendProfileSummary } from "@/lib/friendProfileSummary";
+import { FriendCompareTaste } from "@/components/FriendCompareTaste";
 import { FriendProfileInsights } from "@/components/FriendProfileInsights";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { TasteComparison } from "@/lib/tasteComparison";
@@ -50,9 +51,14 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tasteOpen, setTasteOpen] = useState(false);
+  const [tasteOpen, setTasteOpen] = useState(true);
   const [taste, setTaste] = useState<TasteResponse | "loading" | null>(null);
   const [insights, setInsights] = useState<FriendProfileSummaryResponse | "loading" | null>(null);
+
+  const dismiss = useCallback(() => {
+    dialogRef.current?.close();
+    onClose();
+  }, [onClose]);
 
   const loadProfile = useCallback(async () => {
     setError(null);
@@ -61,6 +67,7 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
     if (!res.ok) {
       setProfile(null);
       setInsights(null);
+      setTaste(null);
       setError(data.error ?? "Could not load profile.");
       return;
     }
@@ -68,10 +75,22 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
     setTaste(null);
     setProfile(data);
     if (data.relationship === "accepted") {
+      setTasteOpen(true);
+      setTaste("loading");
       setInsights("loading");
-      const insightsRes = await fetch(`/api/friends/${data.id}/profile`);
+      const [insightsRes, tasteRes] = await Promise.all([
+        fetch(`/api/friends/${data.id}/profile`),
+        fetch(`/api/friends/${data.id}/taste`),
+      ]);
       if (insightsRes.ok) {
         setInsights((await insightsRes.json()) as FriendProfileSummaryResponse);
+      } else {
+        setInsights(null);
+      }
+      if (tasteRes.ok) {
+        setTaste((await tasteRes.json()) as TasteResponse);
+      } else {
+        setTaste(null);
       }
     }
   }, [username]);
@@ -88,16 +107,6 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
     });
     return () => cancelAnimationFrame(frame);
   }, [loadProfile]);
-
-  const loadTaste = useCallback(async (friendId: string) => {
-    setTaste("loading");
-    const res = await fetch(`/api/friends/${friendId}/taste`);
-    if (!res.ok) {
-      setTaste(null);
-      return;
-    }
-    setTaste((await res.json()) as TasteResponse);
-  }, []);
 
   async function sendFriendRequest() {
     if (!profile) return;
@@ -142,10 +151,10 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
       ref={dialogRef}
       className="fixed inset-0 z-[115] m-0 max-h-none max-w-none border-0 bg-transparent p-0 backdrop:bg-black/35 [&::backdrop]:bg-black/35"
       aria-labelledby={headingId}
-      onClose={() => onClose()}
+      onClose={() => dismiss()}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        dismiss();
       }}
     >
       <div className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4">
@@ -154,7 +163,7 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
           className="absolute inset-0 cursor-default border-0 bg-black/35 p-0"
           aria-label="Dismiss"
           tabIndex={-1}
-          onClick={() => onClose()}
+          onClick={() => dismiss()}
         />
         <div className="relative z-10 flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-border bg-background shadow-2xl sm:rounded-2xl">
           <div className="shrink-0 border-b border-border px-4 py-3">
@@ -165,7 +174,7 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
               <button
                 type="button"
                 aria-label="Close"
-                onClick={() => onClose()}
+                onClick={() => dismiss()}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted"
               >
                 ×
@@ -245,40 +254,23 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
                     <section className="rounded-xl border border-border/60 bg-card-surface/50 p-3">
                       <button
                         type="button"
-                        onClick={() => {
-                          setTasteOpen((v) => !v);
-                          if (!tasteOpen && !taste) void loadTaste(profile.id);
-                        }}
+                        onClick={() => setTasteOpen((v) => !v)}
                         className="flex w-full items-center justify-between text-left text-sm font-semibold text-foreground"
                       >
                         Compare taste with you
                         <span className="text-foreground-muted">{tasteOpen ? "−" : "+"}</span>
                       </button>
                       {tasteOpen ? (
-                        <div className="mt-2 text-xs text-foreground-muted">
+                        <div className="mt-2">
                           {taste === "loading" ? (
-                            <p>Loading taste…</p>
+                            <p className="text-xs text-foreground-muted">Loading taste…</p>
                           ) : taste?.comparison ? (
-                            <div className="space-y-1">
-                              {taste.comparison.sharedGenres.length > 0 ? (
-                                <p>
-                                  <span className="font-semibold text-foreground">Shared genres:</span>{" "}
-                                  {taste.comparison.sharedGenres.join(", ")}
-                                </p>
-                              ) : null}
-                              {taste.comparison.sharedLikedTitles.length > 0 ? (
-                                <p>
-                                  <span className="font-semibold text-foreground">Both liked:</span>{" "}
-                                  {taste.comparison.sharedLikedTitles.join(" · ")}
-                                </p>
-                              ) : null}
-                              {!taste.comparison.sharedGenres.length &&
-                              !taste.comparison.sharedLikedTitles.length ? (
-                                <p>No overlap yet — finish and rate a few books to compare.</p>
-                              ) : null}
-                            </div>
+                            <FriendCompareTaste
+                              comparison={taste.comparison}
+                              friendName={profile.displayName}
+                            />
                           ) : (
-                            <p>Could not load taste comparison.</p>
+                            <p className="text-xs text-foreground-muted">Could not load taste comparison.</p>
                           )}
                         </div>
                       ) : null}
@@ -297,6 +289,16 @@ export function FriendProfileSheet({ username, onClose, onFriendsChange }: Frien
                 {error ? <p className="text-xs text-red-700">{error}</p> : null}
               </div>
             ) : null}
+          </div>
+
+          <div className="shrink-0 border-t border-border px-4 py-3">
+            <button
+              type="button"
+              onClick={() => dismiss()}
+              className="min-h-11 w-full rounded-xl border border-border bg-background text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+            >
+              Close
+            </button>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
-import { PageShell } from "@/components/PageShell";
+import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { useReadingNook } from "@/lib/app-state";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import { SENTIMENT_BUCKETS, type BookId, type SentimentBucket } from "@/lib/types";
@@ -170,7 +170,7 @@ export function RatingsPageClient() {
   }, [state, genreFilter, authorFilter, qFilter, bucketFilter]);
 
   return (
-    <PageShell title="Ratings">
+    <ThemedPageShell title="Ratings">
       {openDetailBookId ? (
         <RatedBookDetailSheet
           bookId={openDetailBookId}
@@ -383,6 +383,6 @@ export function RatingsPageClient() {
           </div>
         </div>
       )}
-    </PageShell>
+    </ThemedPageShell>
   );
 }
