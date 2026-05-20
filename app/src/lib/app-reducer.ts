@@ -21,6 +21,12 @@ export type AppAction =
   | { type: "ADD_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf; catalogBook?: Book }
   | { type: "MOVE_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf }
   | { type: "UPDATE_EXACT_PROGRESS"; bookId: BookId; currentPage: number }
+  | {
+      type: "UPDATE_READING_EXACT_PROGRESS";
+      bookId: BookId;
+      totalPages: number;
+      currentPage: number;
+    }
   | { type: "UPDATE_ESTIMATED_PROGRESS"; bookId: BookId; estimatedRange: [number, number] }
   | { type: "MARK_FINISHED"; bookId: BookId }
   | { type: "REMOVE_USER_BOOK"; bookId: BookId }
@@ -39,6 +45,35 @@ export type AppAction =
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
+}
+
+function applyReadingExactProgress(
+  state: AppState,
+  bookId: BookId,
+  totalPages: number,
+  currentPage: number,
+): AppState {
+  const ub = state.userBooks[bookId];
+  const book = state.catalog[bookId];
+  if (!ub || !book || ub.shelf !== "reading") return state;
+  const tp = Math.max(1, Math.floor(totalPages));
+  const page = clamp(Math.floor(currentPage), 0, tp);
+  return {
+    ...state,
+    catalog: {
+      ...state.catalog,
+      [bookId]: { ...book, totalPages: tp },
+    },
+    userBooks: {
+      ...state.userBooks,
+      [bookId]: {
+        ...ub,
+        progressMode: "exact",
+        currentPage: page,
+        estimatedRange: null,
+      },
+    },
+  };
 }
 
 function defaultUserBook(bookId: BookId, shelf: Shelf, totalPages: number): UserBook {
@@ -265,24 +300,23 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case "UPDATE_EXACT_PROGRESS": {
-      const ub = state.userBooks[action.bookId];
       const book = state.catalog[action.bookId];
-      if (!ub || !book || ub.shelf !== "reading") return state;
-      if (book.totalPages <= 0) return state;
-      const max = Math.max(0, book.totalPages);
-      const currentPage = clamp(Math.floor(action.currentPage), 0, max);
-      return {
-        ...state,
-        userBooks: {
-          ...state.userBooks,
-          [action.bookId]: {
-            ...ub,
-            progressMode: "exact",
-            currentPage,
-            estimatedRange: null,
-          },
-        },
-      };
+      if (!book || book.totalPages <= 0) return state;
+      return applyReadingExactProgress(
+        state,
+        action.bookId,
+        book.totalPages,
+        action.currentPage,
+      );
+    }
+
+    case "UPDATE_READING_EXACT_PROGRESS": {
+      return applyReadingExactProgress(
+        state,
+        action.bookId,
+        action.totalPages,
+        action.currentPage,
+      );
     }
 
     case "UPDATE_ESTIMATED_PROGRESS": {

@@ -17,6 +17,11 @@ export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
   moveBookToShelf: (bookId: BookId, shelf: Shelf) => void;
   updateExactProgress: (bookId: BookId, currentPage: number) => void;
+  updateReadingExactProgress: (
+    bookId: BookId,
+    totalPages: number,
+    currentPage: number,
+  ) => void;
   updateEstimatedProgress: (bookId: BookId, estimatedRange: [number, number]) => void;
   markFinished: (bookId: BookId) => void;
   removeUserBook: (bookId: BookId) => void;
@@ -70,6 +75,8 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf }),
       updateExactProgress: (bookId, currentPage) =>
         dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage }),
+      updateReadingExactProgress: (bookId, totalPages, currentPage) =>
+        dispatch({ type: "UPDATE_READING_EXACT_PROGRESS", bookId, totalPages, currentPage }),
       updateEstimatedProgress: (bookId, estimatedRange) =>
         dispatch({ type: "UPDATE_ESTIMATED_PROGRESS", bookId, estimatedRange }),
       markFinished: (bookId) => dispatch({ type: "MARK_FINISHED", bookId }),
