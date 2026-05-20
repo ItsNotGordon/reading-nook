@@ -88,7 +88,7 @@ export function ProfileHeroCard({
         {profileEditGated ? (
           <Link
             href="/login?next=/profile"
-            className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+            className="inline-flex min-h-9 items-center justify-center rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
           >
             Sign in to customize
           </Link>
@@ -96,19 +96,17 @@ export function ProfileHeroCard({
           <button
             type="button"
             onClick={onEditProfile}
-            className="min-h-9 rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
+            className="inline-flex min-h-9 items-center justify-center rounded-full border border-border bg-accent px-4 py-1.5 text-xs font-semibold text-white shadow-sm active:opacity-90"
           >
             Edit profile
           </button>
         )}
-        <button
-          type="button"
-          disabled
-          title="Not in this preview"
-          className="min-h-9 cursor-not-allowed rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground-muted opacity-70"
+        <Link
+          href="/profile/settings"
+          className="inline-flex min-h-9 items-center justify-center rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground shadow-sm active:bg-accent-soft/40"
         >
-          Share library
-        </button>
+          Settings
+        </Link>
       </div>
     </section>
   );

@@ -34,6 +34,11 @@ export function FriendProfileInsights({ summary }: FriendProfileInsightsProps) {
     bucket,
     rows: summary.ratings.filter((r) => r.sentimentBucket === bucket),
   }));
+  const hasRatings = summary.ratings.length > 0;
+  const libraryShelves = (["reading", "finished", "want_to_read"] as const).filter(
+    (shelf) => shelf !== "finished" || !hasRatings,
+  );
+  const hasLibraryContent = libraryShelves.some((shelf) => grouped[shelf].length > 0);
 
   if (summary.totalCount === 0) {
     return (
@@ -134,7 +139,7 @@ export function FriendProfileInsights({ summary }: FriendProfileInsightsProps) {
         </section>
       ) : null}
 
-      {summary.ratings.length > 0 ? (
+      {hasRatings ? (
         <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm">
           <p className="text-sm font-semibold text-foreground">Ratings</p>
           <div className="mt-3 space-y-4">
@@ -176,13 +181,11 @@ export function FriendProfileInsights({ summary }: FriendProfileInsightsProps) {
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm">
-        <p className="text-sm font-semibold text-foreground">Library</p>
-        {summary.books.length === 0 ? (
-          <p className="mt-2 text-sm text-foreground-muted">No shelved books.</p>
-        ) : (
+      {hasLibraryContent ? (
+        <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm">
+          <p className="text-sm font-semibold text-foreground">Library</p>
           <div className="mt-3 space-y-4">
-            {(["reading", "finished", "want_to_read"] as const).map((shelf) => {
+            {libraryShelves.map((shelf) => {
               const items = grouped[shelf];
               if (items.length === 0) return null;
               return (
@@ -211,8 +214,8 @@ export function FriendProfileInsights({ summary }: FriendProfileInsightsProps) {
               );
             })}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

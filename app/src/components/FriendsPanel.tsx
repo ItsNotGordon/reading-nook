@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { FriendProfileSheet } from "./FriendProfileSheet";
 import { ProfileAvatar } from "./ProfileAvatar";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 import { normalizeUsername } from "@/lib/username";
@@ -37,6 +37,7 @@ async function patchFriendship(friendshipId: string, action: "accept" | "decline
 }
 
 export function FriendsPanel() {
+  const router = useRouter();
   const { configured, loading, user } = useSupabaseAuth();
   const [friends, setFriends] = useState<FriendRow[]>([]);
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
@@ -45,7 +46,13 @@ export function FriendsPanel() {
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searchBusy, setSearchBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [profileUsername, setProfileUsername] = useState<string | null>(null);
+
+  const openProfile = useCallback(
+    (username: string) => {
+      router.push(`/friends/${encodeURIComponent(normalizeUsername(username))}`);
+    },
+    [router],
+  );
 
   const loadUsername = useCallback(async () => {
     const res = await fetch("/api/profile/username");
@@ -176,7 +183,7 @@ export function FriendsPanel() {
               <li key={u.id}>
                 <button
                   type="button"
-                  onClick={() => setProfileUsername(u.username)}
+                  onClick={() => openProfile(u.username)}
                   className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-accent-soft/25"
                 >
                   <ProfileAvatar name={u.displayName} avatarUrl={u.avatarUrl} size="sm" />
@@ -206,7 +213,7 @@ export function FriendsPanel() {
               >
                 <button
                   type="button"
-                  onClick={() => f.username && setProfileUsername(f.username)}
+                  onClick={() => f.username && openProfile(f.username)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
@@ -262,7 +269,7 @@ export function FriendsPanel() {
               >
                 <button
                   type="button"
-                  onClick={() => f.username && setProfileUsername(f.username)}
+                  onClick={() => f.username && openProfile(f.username)}
                   className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 >
                   <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
@@ -303,7 +310,7 @@ export function FriendsPanel() {
                 >
                   <button
                     type="button"
-                    onClick={() => f.username && setProfileUsername(f.username)}
+                    onClick={() => f.username && openProfile(f.username)}
                     className="flex w-full items-center gap-3 text-left"
                   >
                     <ProfileAvatar name={f.displayName} avatarUrl={f.avatarUrl} size="sm" />
@@ -325,17 +332,6 @@ export function FriendsPanel() {
         </section>
       ) : accepted.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
         <p className="text-sm text-foreground-muted">No friends yet — search for someone above.</p>
-      ) : null}
-
-      {profileUsername ? (
-        <FriendProfileSheet
-          username={profileUsername}
-          onClose={() => setProfileUsername(null)}
-          onFriendsChange={() => {
-            void loadFriends();
-            setProfileUsername(null);
-          }}
-        />
       ) : null}
 
     </div>

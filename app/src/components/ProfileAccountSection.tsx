@@ -48,15 +48,11 @@ export function ProfileAccountSection() {
             Signed in as <span className="font-medium text-foreground">{user.email}</span>. Changes
             sync to the cloud after a short pause (~2 seconds).
           </p>
-          {myUsername ? (
-            <p className="text-sm text-foreground-muted">
-              Username: <span className="font-semibold text-foreground">@{myUsername}</span>
-            </p>
-          ) : (
+          {!myUsername ? (
             <p className="text-sm text-amber-900/80">
               Set your @username in Edit profile to use Friends search.
             </p>
-          )}
+          ) : null}
           <SyncStatusLine />
           <p className="text-xs text-foreground-muted">
             Accepted friends can view your library, ratings, and reading insights.

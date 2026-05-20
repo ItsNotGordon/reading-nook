@@ -117,7 +117,7 @@ export function BottomNav() {
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       >
         {tabs.map(({ href, label, Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
           return (
             <Link
               key={href}
