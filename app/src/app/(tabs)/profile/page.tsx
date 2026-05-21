@@ -2,68 +2,30 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { CoverThumb } from "@/components/CoverThumb";
 import { EditProfileSheet } from "@/components/EditProfileSheet";
+import { ProfileFavoritesSection } from "@/components/ProfileFavoritesSection";
 import { ProfileHeroCard } from "@/components/ProfileHeroCard";
+import { ProfileRecentInsights } from "@/components/ProfileRecentInsights";
+import { ProfileShelfBars, profileShelfBarRows } from "@/components/ProfileShelfBars";
+import { ProfileSocialTallies } from "@/components/ProfileSocialTallies";
 import { PageShell } from "@/components/PageShell";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
 import { ProfileDecorationBackdrop } from "@/components/ProfileDecorationBackdrop";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { useReadingNook } from "@/lib/app-state";
-import { itemsForShelf } from "@/lib/shelfItems";
-import { getUserTopGenreRows, topCounts } from "@/lib/userTopGenres";
 import {
-  sentimentInsightSurface,
-  sentimentLabel,
-  sentimentTextColor,
-} from "@/lib/sentiment-display";
-import type { Book, BookId, SentimentBucket, Shelf, UserBook } from "@/lib/types";
-
-type BookWithMeta = { book: Book; userBook: UserBook };
-
-const INSIGHT_BUCKETS: SentimentBucket[] = ["liked", "okay", "disliked"];
-const SHELF_SNAPSHOT_COVER_LIMIT = 3;
-
-function shelfSnapshotDetail(label: string, count: number): string {
-  const books = count === 1 ? "book" : "books";
-  if (label === "Want to Read") return `${count} ${books} on deck`;
-  if (label === "Currently Reading") return `${count} ${books} in progress`;
-  return `${count} ${books} completed`;
-}
-
-function shelfSnapshotHref(shelf: Shelf): string {
-  if (shelf === "finished") return "/ratings";
-  return `/library?shelf=${shelf}`;
-}
-
-function shelfSnapshotDestination(shelf: Shelf): string {
-  return shelf === "finished" ? "Ratings" : "Library";
-}
-
-function sentimentCount(
-  items: BookWithMeta[],
-  bucket: SentimentBucket,
-): number {
-  return items.filter((entry) => entry.userBook.sentimentBucket === bucket).length;
-}
-
-function recentTitlesForBucket(
-  catalog: Record<BookId, Book>,
-  orderedIds: readonly BookId[],
-  maxTitles: number,
-): string[] {
-  const out: string[] = [];
-  for (const id of orderedIds) {
-    if (out.length >= maxTitles) break;
-    const title = catalog[id]?.title?.trim();
-    if (title) out.push(title);
-  }
-  return out;
-}
+  buildSentimentInsights,
+  getFavoriteAuthors,
+  getFavoriteBook,
+  getFavoriteGenres,
+  getShelfCounts,
+  ratedFinishedCount,
+} from "@/lib/profileStats";
+import type { BookId, SentimentBucket } from "@/lib/types";
 
 export default function ProfilePage() {
-  const { state, actions } = useReadingNook();
+  const { state } = useReadingNook();
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
@@ -74,6 +36,7 @@ export default function ProfilePage() {
   }>({ open: false, bookId: null, bucket: null });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [usernameRefreshKey, setUsernameRefreshKey] = useState(0);
+  const [friendCount, setFriendCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!cloudConfigured || !cloudUser) return;
@@ -83,81 +46,31 @@ export default function ProfilePage() {
       .catch(() => undefined);
   }, [cloudConfigured, cloudUser]);
 
-  const userEntries = useMemo<BookWithMeta[]>(() => {
-    const out: BookWithMeta[] = [];
-    for (const ub of Object.values(state.userBooks)) {
-      if (!ub) continue;
-      const book = state.catalog[ub.bookId];
-      if (!book) continue;
-      out.push({ book, userBook: ub });
-    }
-    return out;
-  }, [state.userBooks, state.catalog]);
+  const canLoadSocial = cloudConfigured && Boolean(cloudUser);
+  const socialFriendCount = canLoadSocial ? friendCount : null;
 
-  const readingCount = userEntries.filter((e) => e.userBook.shelf === "reading").length;
-  const finishedEntries = userEntries.filter((e) => e.userBook.shelf === "finished");
-  const finishedCount = finishedEntries.length;
-  const wantCount = userEntries.filter((e) => e.userBook.shelf === "want_to_read").length;
-  const totalCount = userEntries.length;
+  useEffect(() => {
+    if (!canLoadSocial) return;
+    void fetch("/api/friends")
+      .then((res) => res.json())
+      .then((data: { friends?: Array<{ status: string }> }) => {
+        const n = (data.friends ?? []).filter((f) => f.status === "accepted").length;
+        setFriendCount(n);
+      })
+      .catch(() => setFriendCount(null));
+  }, [canLoadSocial]);
 
-  const shelfSnapshotRows = useMemo(
-    () =>
-      (
-        [
-          { label: "Currently Reading", shelf: "reading" as const, count: readingCount },
-          { label: "Finished", shelf: "finished" as const, count: finishedCount },
-          { label: "Want to Read", shelf: "want_to_read" as const, count: wantCount },
-        ] as const
-      ).map((row) => ({
-        ...row,
-        covers:
-          row.count > 0
-            ? itemsForShelf(state.userBooks, state.catalog, row.shelf)
-                .slice(0, SHELF_SNAPSHOT_COVER_LIMIT)
-                .map((e) => e.book)
-            : [],
-      })),
-    [readingCount, finishedCount, wantCount, state.userBooks, state.catalog],
-  );
+  const shelfCounts = useMemo(() => getShelfCounts(state), [state]);
+  const shelfRows = useMemo(() => profileShelfBarRows(shelfCounts), [shelfCounts]);
+  const favoriteBook = useMemo(() => getFavoriteBook(state), [state]);
+  const topGenres = useMemo(() => getFavoriteGenres(state, 5), [state]);
+  const topAuthors = useMemo(() => getFavoriteAuthors(state, 3), [state]);
+  const sentimentInsights = useMemo(() => buildSentimentInsights(state), [state]);
+  const ratedCount = useMemo(() => ratedFinishedCount(state), [state]);
 
-  const scoredFinished = finishedEntries.filter((e) => e.userBook.derivedScore != null);
-  const averageDerivedScore =
-    scoredFinished.length > 0
-      ? scoredFinished.reduce((sum, e) => sum + (e.userBook.derivedScore ?? 0), 0) /
-        scoredFinished.length
-      : null;
-
-  const likedCount = sentimentCount(finishedEntries, "liked");
-  const okayCount = sentimentCount(finishedEntries, "okay");
-  const dislikedCount = sentimentCount(finishedEntries, "disliked");
-  const ratedFinishedCount = likedCount + okayCount + dislikedCount;
-
-  const sentimentInsights = INSIGHT_BUCKETS.map((bucket) => {
-    const count = sentimentCount(finishedEntries, bucket);
-    const share =
-      ratedFinishedCount > 0 ? Math.round((count / ratedFinishedCount) * 100) : 0;
-    const highlights = recentTitlesForBucket(state.catalog, state.bucketRankings[bucket], 2);
-    return { bucket, count, share, highlights };
-  });
-
-  const topGenres = getUserTopGenreRows(state, 5);
-
-  const likedFinishedEntries = finishedEntries.filter((e) => e.userBook.sentimentBucket === "liked");
-  const authorSource = likedFinishedEntries.length > 0 ? likedFinishedEntries : finishedEntries;
-  const topAuthors = topCounts(
-    authorSource.map((e) => e.book.author),
-    3,
-  );
-
-  const favoriteBookId =
-    state.bucketRankings.liked[0] ??
-    state.bucketRankings.okay[0] ??
-    state.bucketRankings.disliked[0] ??
-    null;
-  const favoriteBook = favoriteBookId ? state.catalog[favoriteBookId] : null;
-  const favoriteUserBook = favoriteBookId ? state.userBooks[favoriteBookId] : null;
   const profileTheme = state.profile.theme ?? "plant";
   const profileEditGated = cloudConfigured && !cloudUser;
+  const socialGated = cloudConfigured && !cloudUser;
 
   return (
     <PageShell>
@@ -178,236 +91,83 @@ export default function ProfilePage() {
           {profileEditGated ? (
             <p className="rounded-xl border border-border/80 bg-card-surface/90 px-3 py-2.5 text-center text-xs text-foreground-muted backdrop-blur-[1px]">
               Profile name, tagline, and themes sync when you{" "}
-              <Link href="/login?next=/profile" className="font-semibold text-accent underline-offset-2 hover:underline">
+              <Link
+                href="/login?next=/profile"
+                className="font-semibold text-accent underline-offset-2 hover:underline"
+              >
                 sign in
               </Link>
               .
             </p>
           ) : null}
-          {totalCount === 0 ? (
-        <>
-          <ProfileHeroCard
-            displayName={state.profile.displayName}
-            tagline={state.profile.tagline}
-            avatarUrl={avatarUrl}
-            cloudConfigured={cloudConfigured}
-            cloudUser={Boolean(cloudUser)}
-            profileEditGated={profileEditGated}
-            usernameRefreshKey={usernameRefreshKey}
-            onEditProfile={() => setEditProfileOpen(true)}
-          />
-          <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
-            <p className="font-medium text-foreground">Your nook is empty</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
-              Add a few books to start tracking your reading and taste.
-            </p>
-            <Link
-              href="/add"
-              className="mt-4 inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
-            >
-              Go to Add
-            </Link>
-          </div>
-        </>
-      ) : (
-        <>
-          <ProfileHeroCard
-            displayName={state.profile.displayName}
-            tagline={state.profile.tagline}
-            avatarUrl={avatarUrl}
-            cloudConfigured={cloudConfigured}
-            cloudUser={Boolean(cloudUser)}
-            profileEditGated={profileEditGated}
-            usernameRefreshKey={usernameRefreshKey}
-            onEditProfile={() => setEditProfileOpen(true)}
-          />
 
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
-                <p className="text-3xl font-semibold text-[#426447]">{totalCount}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Total books</p>
-              </div>
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
-                <p className="text-3xl font-semibold text-foreground">{readingCount}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Currently Reading</p>
-              </div>
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
-                <p className="text-3xl font-semibold text-foreground">{finishedCount}</p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Finished</p>
-              </div>
-              <div className="rounded-xl border border-border/80 bg-background px-3 py-3 text-center">
-                <p className="text-3xl font-semibold text-[#a27f00]">
-                  {averageDerivedScore == null ? "—" : averageDerivedScore.toFixed(1)}
+          {shelfCounts.total === 0 ? (
+            <>
+              <ProfileHeroCard
+                displayName={state.profile.displayName}
+                tagline={state.profile.tagline}
+                avatarUrl={avatarUrl}
+                cloudConfigured={cloudConfigured}
+                cloudUser={Boolean(cloudUser)}
+                profileEditGated={profileEditGated}
+                usernameRefreshKey={usernameRefreshKey}
+                onEditProfile={() => setEditProfileOpen(true)}
+              />
+              <ProfileSocialTallies
+                followingCount={socialFriendCount}
+                followersCount={socialFriendCount}
+                gated={socialGated}
+              />
+              <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
+                <p className="font-medium text-foreground">Your nook is empty</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
+                  Add a few books to start tracking your reading and taste.
                 </p>
-                <p className="mt-1 text-[10px] uppercase tracking-wider text-foreground-muted">Avg score</p>
+                <Link
+                  href="/add"
+                  className="mt-4 inline-flex min-h-11 min-w-[8.5rem] items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+                >
+                  Go to Add
+                </Link>
               </div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-sm font-semibold text-foreground">Favorite book</p>
-            {favoriteBook && favoriteUserBook && favoriteBookId ? (
-              <button
-                type="button"
-                onClick={() => setDetailBookId(favoriteBookId)}
-                aria-label={`View details for ${favoriteBook.title}`}
-                className="mt-3 flex w-full items-center gap-3 rounded-xl border border-border/80 bg-background p-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
-              >
-                <CoverThumb
-                  src={favoriteBook.coverUrl}
-                  alt=""
-                  sizes="56px"
-                  fallbackLetter={favoriteBook.title}
-                  className="relative h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-border"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">{favoriteBook.title}</p>
-                  <p className="truncate text-xs text-foreground-muted">{favoriteBook.author}</p>
-                </div>
-              </button>
-            ) : (
-              <p className="mt-3 text-sm text-foreground-muted">
-                Finish and rank a few books to reveal your favorite.
-              </p>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-sm font-semibold text-foreground">
-              &#10023; Your Top Genres
-            </p>
-            {topGenres.length > 0 ? (
-              <ul className="mt-3 grid grid-cols-2 gap-2">
-                {topGenres.map((g, idx) => (
-                  <li key={g.label}>
-                    <Link
-                      href={`/ratings?genre=${encodeURIComponent(g.label)}`}
-                      className="block rounded-xl border border-border/80 bg-background px-3 py-2 text-xs text-foreground transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
-                    >
-                      <p className="text-[10px] uppercase tracking-wider text-foreground-muted">
-                        {String(idx + 1).padStart(2, "0")}
-                      </p>
-                      <p className="mt-0.5 line-clamp-1 font-medium">{g.label}</p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-foreground-muted">No genre data yet.</p>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-sm font-semibold text-foreground">Favorite authors</p>
-            {topAuthors.length > 0 ? (
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {topAuthors.map((a) => (
-                  <li key={a.label}>
-                    <Link
-                      href={`/ratings?author=${encodeURIComponent(a.label)}`}
-                      className="inline-flex rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40"
-                    >
-                      {a.label} <span className="text-foreground-muted">({a.count})</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-3 text-sm text-foreground-muted">Finish a few books to surface favorites.</p>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-sm font-semibold text-foreground">Recent insights</p>
-            {ratedFinishedCount > 0 ? (
-              <p className="mt-1 text-xs text-foreground-muted">
-                From {ratedFinishedCount} finished book{ratedFinishedCount === 1 ? "" : "s"} you&apos;ve
-                rated
-              </p>
-            ) : null}
-            <div className="mt-3 space-y-2">
-              {sentimentInsights.map(({ bucket, count, share, highlights }) => (
-                <Link
-                  key={bucket}
-                  href={`/ratings?bucket=${bucket}`}
-                  aria-label={`View ${sentimentLabel(bucket)} books in Ratings`}
-                  className={`block rounded-xl border px-3 py-2.5 transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/40 ${sentimentInsightSurface(bucket)}`}
-                >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className={`text-sm font-semibold ${sentimentTextColor(bucket)}`}>
-                      {sentimentLabel(bucket)}
-                    </p>
-                    <p className={`text-sm font-semibold tabular-nums ${sentimentTextColor(bucket)}`}>
-                      {count}
-                      {ratedFinishedCount > 0 ? (
-                        <span className="ml-1 text-xs font-medium opacity-80">({share}%)</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  {highlights.length > 0 ? (
-                    <p className="mt-1.5 text-xs leading-relaxed text-foreground-muted">
-                      Top picks:{" "}
-                      <span className="text-foreground">{highlights.join(" · ")}</span>
-                    </p>
-                  ) : count > 0 ? (
-                    <p className="mt-1.5 text-xs text-foreground-muted">
-                      Rank books in Ratings to highlight favorites here.
-                    </p>
-                  ) : null}
-                </Link>
-              ))}
-            </div>
-            {finishedCount === 0 ? (
-              <p className="mt-3 text-sm leading-relaxed text-foreground-muted">
-                Taste insights will appear after you finish and rank a few books.
-              </p>
-            ) : null}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-            <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-              Shelf snapshot
-            </p>
-            <div className="mt-3 space-y-2">
-              {shelfSnapshotRows.map(({ label, shelf, count, covers }) => (
-                <Link
-                  key={label}
-                  href={shelfSnapshotHref(shelf)}
-                  className="block rounded-xl border border-border/80 bg-background px-3 py-2.5 transition-colors hover:bg-accent-soft/20 active:bg-accent-soft/40"
-                  aria-label={`${label}, ${shelfSnapshotDetail(label, count)}. Open in ${shelfSnapshotDestination(shelf)}.`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs text-foreground-muted">{label}</p>
-                      <p className="mt-0.5 text-sm font-medium text-foreground">
-                        {shelfSnapshotDetail(label, count)}
-                      </p>
-                    </div>
-                    {covers.length > 0 ? (
-                      <div className="flex shrink-0 gap-1">
-                        {covers.map((book) => (
-                          <CoverThumb
-                            key={book.id}
-                            src={book.coverUrl}
-                            alt=""
-                            sizes="32px"
-                            fallbackLetter={book.title}
-                            className="relative h-12 w-9 shrink-0 overflow-hidden rounded-md bg-border shadow-sm"
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        </>
+            </>
+          ) : (
+            <>
+              <ProfileHeroCard
+                displayName={state.profile.displayName}
+                tagline={state.profile.tagline}
+                avatarUrl={avatarUrl}
+                cloudConfigured={cloudConfigured}
+                cloudUser={Boolean(cloudUser)}
+                profileEditGated={profileEditGated}
+                usernameRefreshKey={usernameRefreshKey}
+                onEditProfile={() => setEditProfileOpen(true)}
+              />
+              <ProfileSocialTallies
+                followingCount={socialFriendCount}
+                followersCount={socialFriendCount}
+                gated={socialGated}
+              />
+              <ProfileShelfBars rows={shelfRows} mode="self" />
+              <ProfileFavoritesSection
+                title="Your Favorites"
+                favoriteBook={favoriteBook}
+                topGenres={topGenres}
+                topAuthors={topAuthors}
+                onFavoriteBookClick={
+                  favoriteBook ? () => setDetailBookId(favoriteBook.bookId) : undefined
+                }
+              />
+              <ProfileRecentInsights
+                insights={sentimentInsights}
+                ratedFinishedCount={ratedCount}
+                mode="self"
+              />
+            </>
           )}
-
         </div>
       </div>
+
       {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
         <RatedBookDetailSheet
           bookId={detailBookId}

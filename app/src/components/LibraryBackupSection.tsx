@@ -65,6 +65,43 @@ export function LibraryBackupSection() {
         />
       </div>
       {importMessage ? <p className="mt-2 text-xs text-foreground-muted">{importMessage}</p> : null}
+
+      <div className="mt-4 rounded-xl border border-dashed border-amber-900/25 bg-background/80 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wider text-amber-900/70">
+          Delete library
+        </p>
+        <p className="mt-2 text-xs leading-relaxed text-foreground-muted">
+          Remove every book from your shelves, clear progress and ratings, and drop cached book
+          metadata on this device.
+          {cloudConfigured && cloudUser
+            ? " Your cloud library may still exist — export a backup first, then sign in again to overwrite cloud if needed."
+            : " Data is not sent to a server unless you use cloud sign-in."}{" "}
+          You cannot undo this.
+        </p>
+        <button
+          type="button"
+          onClick={() => downloadLibraryBackup(state)}
+          className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground shadow-sm active:bg-accent-soft/40"
+        >
+          Export backup before clearing
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const ok = window.confirm(
+              "Clear all library data from this device? Export a backup first if you might need it later. This cannot be undone.",
+            );
+            if (!ok) return;
+            const exported = window.confirm(
+              "Did you export a backup? Choose OK only if you are sure you want to clear everything on this device.",
+            );
+            if (exported) actions.resetLibrary();
+          }}
+          className="mt-2 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-amber-900/35 bg-background px-4 text-sm font-semibold text-amber-950 shadow-sm active:bg-amber-100/60"
+        >
+          Clear all library data
+        </button>
+      </div>
     </section>
   );
 }

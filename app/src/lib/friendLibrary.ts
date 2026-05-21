@@ -1,10 +1,16 @@
-import type { AppState, Shelf } from "./types";
+import type { AppState, ProgressMode, Shelf } from "./types";
 
 export type FriendShelfBook = {
   id: string;
   title: string;
+  author: string;
   coverUrl: string;
   shelf: Shelf;
+  /** Present for Currently Reading rows. */
+  progressMode?: ProgressMode;
+  currentPage?: number | null;
+  estimatedRange?: [number, number] | null;
+  totalPages?: number;
 };
 
 const SHELF_ORDER: Shelf[] = ["reading", "finished", "want_to_read"];
@@ -15,12 +21,20 @@ export function listFriendShelfBooks(state: AppState): FriendShelfBook[] {
     if (!ub) continue;
     const book = state.catalog[id as keyof typeof state.catalog];
     if (!book) continue;
-    out.push({
+    const row: FriendShelfBook = {
       id,
       title: book.title,
+      author: book.author,
       coverUrl: book.coverUrl,
       shelf: ub.shelf,
-    });
+    };
+    if (ub.shelf === "reading") {
+      row.progressMode = ub.progressMode;
+      row.currentPage = ub.currentPage;
+      row.estimatedRange = ub.estimatedRange;
+      row.totalPages = book.totalPages;
+    }
+    out.push(row);
   }
   out.sort((a, b) => {
     const shelfDiff = SHELF_ORDER.indexOf(a.shelf) - SHELF_ORDER.indexOf(b.shelf);

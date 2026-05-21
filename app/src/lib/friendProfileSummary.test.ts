@@ -63,5 +63,48 @@ describe("buildFriendProfileSummary", () => {
     assert.ok(summary.topGenres.some((g) => g.label === "Science Fiction"));
     assert.ok(summary.topAuthors.some((a) => a.label === "Frank Herbert"));
     assert.equal(summary.sentimentInsights.find((s) => s.bucket === "liked")?.count, 1);
+    assert.equal(summary.favoriteBook?.title, "Dune");
+  });
+
+  it("includes reading progress fields on currently reading shelf books", () => {
+    let state = getInitialState();
+    const id = "openlibrary:READ1";
+    state = {
+      ...state,
+      catalog: {
+        ...state.catalog,
+        [id]: {
+          id,
+          title: "In Progress",
+          author: "Author",
+          coverUrl: "",
+          totalPages: 200,
+          genres: ["Fantasy"],
+          description: "",
+        },
+      },
+      userBooks: {
+        ...state.userBooks,
+        [id]: {
+          bookId: id,
+          shelf: "reading",
+          progressMode: "exact",
+          currentPage: 50,
+          estimatedRange: null,
+          finishedAt: null,
+          finishedSortAt: null,
+          sentimentBucket: null,
+          derivedScore: null,
+          addedAt: "2024-01-01",
+          notes: "",
+        },
+      },
+    };
+    const summary = buildFriendProfileSummary(state);
+    const reading = summary.books.find((b) => b.shelf === "reading");
+    assert.ok(reading);
+    assert.equal(reading?.progressMode, "exact");
+    assert.equal(reading?.currentPage, 50);
+    assert.equal(reading?.totalPages, 200);
   });
 });

@@ -6,13 +6,7 @@ import { useReadingNook } from "@/lib/app-state";
 import type { Book, UserBook, SentimentBucket } from "@/lib/types";
 import { SENTIMENT_BUCKETS } from "@/lib/types";
 import { sentimentLabel, sentimentTextColor } from "@/lib/sentiment-display";
-import {
-  estimatedQualitativeLabel,
-  estimatedRangeMidpoint,
-  formatEstimatedPercentRange,
-  formatExactProgressLines,
-  userBookShowsProgress,
-} from "@/lib/progress";
+import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
 import { ProgressBar } from "./ProgressBar";
 import { ScoreBadge } from "./ScoreBadge";
 import { FinishBookSheet } from "./FinishBookSheet";
@@ -28,42 +22,6 @@ type BookCardProps = {
   onOpenRatedDetail?: (bookId: string) => void;
 };
 
-type ReadingProgressVm = {
-  mode: "exact" | "estimated";
-  barValue: number;
-  estimatedBand?: [number, number];
-  line1: string;
-  line2: string | null;
-};
-
-function readingProgressView(book: Book, userBook: UserBook): ReadingProgressVm | null {
-  if (!userBookShowsProgress(userBook)) return null;
-
-  if (userBook.progressMode === "exact") {
-    if (book.totalPages <= 0 || userBook.currentPage === null) return null;
-    const total = Math.max(1, book.totalPages);
-    const page = Math.min(total, Math.max(0, Math.floor(userBook.currentPage)));
-    const { pagesLine, pctLine } = formatExactProgressLines(page, book.totalPages);
-    return {
-      mode: "exact",
-      barValue: page / total,
-      line1: pagesLine,
-      line2: pctLine,
-    };
-  }
-
-  if (!userBook.estimatedRange) return null;
-  const [lo, hi] = userBook.estimatedRange;
-  const mid = estimatedRangeMidpoint([lo, hi]);
-  return {
-    mode: "estimated",
-    barValue: mid,
-    estimatedBand: [lo, hi],
-    line1: formatEstimatedPercentRange([lo, hi]),
-    line2: estimatedQualitativeLabel([lo, hi]),
-  };
-}
-
 export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRatedDetail }: BookCardProps) {
   const [coverFailed, setCoverFailed] = useState(false);
   const { state, actions } = useReadingNook();
@@ -71,7 +29,7 @@ export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRated
   const [wantOpen, setWantOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
 
-  const progress = variant === "reading" ? readingProgressView(book, userBook) : null;
+  const progress = variant === "reading" ? readingProgressDisplayFromBook(book, userBook) : null;
 
   const isRatedFinished =
     variant === "finished" &&

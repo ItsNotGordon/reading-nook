@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { countAcceptedFriendships } from "@/lib/friendshipCounts";
 import { findFriendshipBetween, relationshipWithViewer } from "@/lib/friendshipStatus";
 import { normalizeUsername } from "@/lib/username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -49,6 +50,8 @@ export async function GET(
 
   const { relationship, friendshipId } = relationshipWithViewer(user.id, profile.id, links);
 
+  const friendCount = await countAcceptedFriendships(supabase, profile.id);
+
   return NextResponse.json({
     id: profile.id,
     username: profile.username,
@@ -57,5 +60,7 @@ export async function GET(
     tagline: profile.tagline ?? "",
     relationship,
     friendshipId,
+    followingCount: friendCount,
+    followersCount: friendCount,
   });
 }

@@ -27,11 +27,10 @@ export function ProfileHeroCard({
 }: ProfileHeroCardProps) {
   const [myUsername, setMyUsername] = useState<string | null>(null);
 
+  const showUsername = cloudConfigured && cloudUser;
+
   useEffect(() => {
-    if (!cloudConfigured || !cloudUser) {
-      setMyUsername(null);
-      return;
-    }
+    if (!showUsername) return;
     let cancelled = false;
     void fetch("/api/profile/username")
       .then((res) => res.json())
@@ -42,10 +41,11 @@ export function ProfileHeroCard({
     return () => {
       cancelled = true;
     };
-  }, [cloudConfigured, cloudUser, usernameRefreshKey]);
+  }, [showUsername, usernameRefreshKey]);
 
-  const showUsernameAsMain = cloudConfigured && cloudUser;
-  const hasUsername = Boolean(myUsername);
+  const showUsernameAsMain = showUsername;
+  const displayUsername = showUsername ? myUsername : null;
+  const hasUsername = Boolean(displayUsername);
 
   return (
     <section className="relative rounded-[1.75rem] border border-border bg-card-surface/95 p-5 pt-10 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
@@ -62,7 +62,7 @@ export function ProfileHeroCard({
 
       {showUsernameAsMain && hasUsername ? (
         <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-foreground">
-          {myUsername}
+          {displayUsername}
         </h1>
       ) : showUsernameAsMain && !hasUsername ? (
         <div className="mt-3">

@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { FriendCompareTaste } from "@/components/FriendCompareTaste";
 import { FriendProfileInsights } from "@/components/FriendProfileInsights";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { ProfileSocialTallies } from "@/components/ProfileSocialTallies";
 import type { FriendProfileSummary } from "@/lib/friendProfileSummary";
 import type { FriendRelationship } from "@/lib/friendshipStatus";
 import type { TasteComparison } from "@/lib/tasteComparison";
+import type { Shelf } from "@/lib/types";
 
 type PublicProfile = {
   id: string;
@@ -16,6 +18,8 @@ type PublicProfile = {
   tagline: string;
   relationship: FriendRelationship;
   friendshipId: string | null;
+  followingCount?: number;
+  followersCount?: number;
 };
 
 type TasteResponse = {
@@ -48,9 +52,12 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tasteOpen, setTasteOpen] = useState(true);
+  const [tasteOpen, setTasteOpen] = useState(false);
   const [taste, setTaste] = useState<TasteResponse | "loading" | null>(null);
   const [insights, setInsights] = useState<FriendProfileSummaryResponse | "loading" | null>(null);
+  const [shelvesOpen, setShelvesOpen] = useState(false);
+  const [ratingsOpen, setRatingsOpen] = useState(false);
+  const [focusShelf, setFocusShelf] = useState<Shelf | null>(null);
 
   const loadProfile = useCallback(async () => {
     setError(null);
@@ -68,7 +75,6 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     setProfile(data);
     document.title = `${data.displayName} · Reading Nook`;
     if (data.relationship === "accepted") {
-      setTasteOpen(true);
       setTaste("loading");
       setInsights("loading");
       const [insightsRes, tasteRes] = await Promise.all([
@@ -211,6 +217,11 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
 
       {isAccepted ? (
         <>
+          <ProfileSocialTallies
+            followingCount={profile.followingCount ?? null}
+            followersCount={profile.followersCount ?? null}
+          />
+
           <section className="rounded-xl border border-border/60 bg-card-surface/50 p-3">
             <button
               type="button"
@@ -236,7 +247,20 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
           {insights === "loading" ? (
             <p className="text-sm text-foreground-muted">Loading library and insights…</p>
           ) : insights ? (
-            <FriendProfileInsights summary={insights} />
+            <FriendProfileInsights
+              summary={insights}
+              focusShelf={focusShelf}
+              shelvesOpen={shelvesOpen}
+              ratingsOpen={ratingsOpen}
+              onShelvesOpenChange={setShelvesOpen}
+              onRatingsOpenChange={setRatingsOpen}
+              onShelfRowFocus={(shelf) => {
+                if (shelf === "finished") setRatingsOpen(true);
+                else setShelvesOpen(true);
+                setFocusShelf(shelf);
+                window.setTimeout(() => setFocusShelf(null), 400);
+              }}
+            />
           ) : (
             <p className="text-sm text-foreground-muted">Could not load their reading profile.</p>
           )}
