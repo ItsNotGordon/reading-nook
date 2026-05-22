@@ -160,7 +160,10 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
       const shelved = insights.books.find((b) => b.id === compareBookId);
       if (shelved) return friendBookFromShelf(shelved);
     }
-    const shared = taste?.comparison?.sharedRatedBooks.find((r) => r.bookId === compareBookId);
+    const shared =
+      taste && taste !== "loading"
+        ? taste.comparison?.sharedRatedBooks.find((r) => r.bookId === compareBookId)
+        : undefined;
     if (shared) return friendBookFromSharedRated(shared);
     if (process.env.NODE_ENV === "development") {
       console.warn("[FriendProfileView] compare book not found:", compareBookId);
