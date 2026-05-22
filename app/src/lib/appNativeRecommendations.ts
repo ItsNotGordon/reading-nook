@@ -1,4 +1,5 @@
 import { buildTasteSignals, type RecPersonalRow } from "@/lib/recPersonalization";
+import { RECOMMENDATION_SCORE_FLOOR } from "@/lib/ranking";
 import { HYBRID_SOURCE, hybridAprioriKnnRecommend, tfidfRecommend } from "@/lib/recommender";
 import type { AppState, Book } from "@/lib/types";
 import type { SearchBookResult } from "@/lib/bookProviders/types";
@@ -143,6 +144,8 @@ export function buildAppNativeRecommendations(
 
   let recommendations = buildRecommendationsByEngine(state, candidates, maxResults, engine);
 
+  recommendations = recommendations.filter((r) => r.score > RECOMMENDATION_SCORE_FLOOR);
+
   recommendations.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     const popA = a.readinglogCount ?? 0;
@@ -159,7 +162,8 @@ export function buildAppNativeRecommendations(
   if (recommendations.length === 0) {
     return {
       recommendations: [],
-      emptyReason: "No recommendations matched your taste from available candidates.",
+      emptyReason:
+        "No strong matches right now — try shuffle, different genres, or search Open Library for a specific title.",
     };
   }
 

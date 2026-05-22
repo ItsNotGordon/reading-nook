@@ -3,11 +3,12 @@
 import { CoverThumb } from "@/components/CoverThumb";
 import type { TasteComparison } from "@/lib/tasteComparison";
 import { sentimentLabel, sentimentTextColor } from "@/lib/sentiment-display";
-import type { SentimentBucket } from "@/lib/types";
+import type { BookId, SentimentBucket } from "@/lib/types";
 
 type FriendCompareTasteProps = {
   comparison: TasteComparison;
   friendName: string;
+  onBookPress?: (bookId: BookId) => void;
 };
 
 function formatRating(score: number | null, sentiment: SentimentBucket | null): string {
@@ -16,7 +17,7 @@ function formatRating(score: number | null, sentiment: SentimentBucket | null): 
   return "—";
 }
 
-export function FriendCompareTaste({ comparison, friendName }: FriendCompareTasteProps) {
+export function FriendCompareTaste({ comparison, friendName, onBookPress }: FriendCompareTasteProps) {
   const hasBooks = comparison.sharedRatedBooks.length > 0;
   const hasGenres = comparison.sharedGenres.length > 0;
   const hasAuthors = comparison.sharedAuthors.length > 0;
@@ -36,58 +37,74 @@ export function FriendCompareTaste({ comparison, friendName }: FriendCompareTast
         <div>
           <p className="text-xs font-semibold text-foreground">Books you both rated</p>
           <ul className="mt-2 space-y-2">
-            {comparison.sharedRatedBooks.map((row) => (
-              <li
-                key={row.bookId}
-                className="flex gap-2.5 rounded-xl border border-border/80 bg-background p-2.5"
-              >
-                <CoverThumb
-                  src={row.coverUrl}
-                  alt=""
-                  sizes="40px"
-                  fallbackLetter={row.title}
-                  className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-border"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{row.title}</p>
-                  <p className="truncate text-xs text-foreground-muted">{row.author}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <p className="font-semibold text-foreground-muted">You</p>
-                      <p
-                        className={`font-semibold tabular-nums ${
-                          row.yourSentiment ? sentimentTextColor(row.yourSentiment) : "text-foreground"
-                        }`}
-                      >
-                        {formatRating(row.yourScore, row.yourSentiment)}
-                        {row.yourScore != null && row.yourSentiment ? (
-                          <span className="ml-1 font-medium opacity-80">
-                            ({sentimentLabel(row.yourSentiment)})
-                          </span>
-                        ) : null}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground-muted">{friendName}</p>
-                      <p
-                        className={`font-semibold tabular-nums ${
-                          row.friendSentiment
-                            ? sentimentTextColor(row.friendSentiment)
-                            : "text-foreground"
-                        }`}
-                      >
-                        {formatRating(row.friendScore, row.friendSentiment)}
-                        {row.friendScore != null && row.friendSentiment ? (
-                          <span className="ml-1 font-medium opacity-80">
-                            ({sentimentLabel(row.friendSentiment)})
-                          </span>
-                        ) : null}
-                      </p>
+            {comparison.sharedRatedBooks.map((row) => {
+              const content = (
+                <>
+                  <CoverThumb
+                    src={row.coverUrl}
+                    alt=""
+                    sizes="40px"
+                    fallbackLetter={row.title}
+                    className="relative h-14 w-10 shrink-0 overflow-hidden rounded-md bg-border"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{row.title}</p>
+                    <p className="truncate text-xs text-foreground-muted">{row.author}</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="font-semibold text-foreground-muted">You</p>
+                        <p
+                          className={`font-semibold tabular-nums ${
+                            row.yourSentiment ? sentimentTextColor(row.yourSentiment) : "text-foreground"
+                          }`}
+                        >
+                          {formatRating(row.yourScore, row.yourSentiment)}
+                          {row.yourScore != null && row.yourSentiment ? (
+                            <span className="ml-1 font-medium opacity-80">
+                              ({sentimentLabel(row.yourSentiment)})
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground-muted">{friendName}</p>
+                        <p
+                          className={`font-semibold tabular-nums ${
+                            row.friendSentiment
+                              ? sentimentTextColor(row.friendSentiment)
+                              : "text-foreground"
+                          }`}
+                        >
+                          {formatRating(row.friendScore, row.friendSentiment)}
+                          {row.friendScore != null && row.friendSentiment ? (
+                            <span className="ml-1 font-medium opacity-80">
+                              ({sentimentLabel(row.friendSentiment)})
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={row.bookId}>
+                  {onBookPress ? (
+                    <button
+                      type="button"
+                      onClick={() => onBookPress(row.bookId)}
+                      className="flex w-full gap-2.5 rounded-xl border border-border/80 bg-background p-2.5 text-left transition-colors hover:border-accent/40 hover:bg-accent-soft/20 active:bg-accent-soft/40"
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <div className="flex gap-2.5 rounded-xl border border-border/80 bg-background p-2.5">
+                      {content}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       ) : null}

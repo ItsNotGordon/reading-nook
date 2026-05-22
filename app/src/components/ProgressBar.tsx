@@ -5,6 +5,8 @@ type ProgressBarProps = {
   /** Estimated: [lo, hi] with lo = start of uncertain band — 0→lo is green, lo→hi is yellow. */
   estimatedBand?: [number, number];
   "aria-label"?: string;
+  /** Override track height/styling (default h-3). */
+  trackClassName?: string;
 };
 
 function clamp01(n: number): number {
@@ -16,14 +18,17 @@ function clamp01(n: number): number {
  * Confirmed progress = green through the stretch before uncertainty.
  * Estimated band = yellow. Remaining track = white/clear behind a thin gray border.
  */
+const DEFAULT_TRACK_CLASS =
+  "relative h-3 w-full overflow-hidden rounded-full border border-border bg-progress-unread";
+
 export function ProgressBar({
   mode,
   value,
   estimatedBand,
   "aria-label": ariaLabel,
+  trackClassName,
 }: ProgressBarProps) {
-  const trackClass =
-    "relative h-3 w-full overflow-hidden rounded-full border border-border bg-progress-unread";
+  const trackClass = trackClassName ?? DEFAULT_TRACK_CLASS;
 
   if (mode === "exact") {
     const v = clamp01(value);

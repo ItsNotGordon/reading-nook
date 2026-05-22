@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState } from "react";
-
 type CoverThumbProps = {
   src: string;
   /** Empty string uses decorative-only presentation when cover shows. */
@@ -14,10 +13,7 @@ type CoverThumbProps = {
   fallbackLetter?: string;
 };
 
-/**
- * Small catalog/recommendation cover with placeholder on load error (broken URLs, blocked images).
- */
-export function CoverThumb({
+function CoverThumbInner({
   src,
   alt,
   sizes,
@@ -49,4 +45,12 @@ export function CoverThumb({
       )}
     </div>
   );
+}
+
+/**
+ * Small catalog/recommendation cover with placeholder on load error (broken URLs, blocked images).
+ * Remounts inner state when `src` changes so a new URL can retry after a failed load.
+ */
+export function CoverThumb(props: CoverThumbProps) {
+  return <CoverThumbInner key={props.src} {...props} />;
 }

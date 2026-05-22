@@ -6,6 +6,9 @@ export const BUCKET_RANGES: Record<SentimentBucket, { min: number; max: number }
   disliked: { min: 1.0, max: 3.5 },
 };
 
+/** Add-tab recs only; search results are not filtered by this. */
+export const RECOMMENDATION_SCORE_FLOOR = BUCKET_RANGES.disliked.max;
+
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }

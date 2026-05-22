@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AppState, Book, UserBook } from "@/lib/types";
 import { HYBRID_SOURCE, TFIDF_SOURCE } from "@/lib/recommender";
+import { RECOMMENDATION_SCORE_FLOOR } from "./ranking";
 import {
   buildAppNativeRecommendations,
   collectCandidates,
@@ -178,8 +179,32 @@ describe("buildAppNativeRecommendations", () => {
     const result = buildAppNativeRecommendations(state);
     const sf = result.recommendations.find((r) => r.bookId === sfCandidate);
     const rom = result.recommendations.find((r) => r.bookId === romCandidate);
-    assert.ok(sf && rom);
-    assert.ok(sf.score >= rom.score);
+    assert.ok(sf, "sci-fi match should still be recommended");
+    if (rom) assert.ok(sf.score >= rom.score);
+  });
+
+  it("never recommends books scored at or below the disliked ceiling", () => {
+    const likedId = "openlibrary:OL_L";
+    const romCandidate = "openlibrary:ROM_CAND";
+    const dislikedId = "openlibrary:ROM";
+    const state = baseState({
+      catalog: {
+        [likedId]: book(likedId, ["Fantasy"], "A"),
+        [dislikedId]: book(dislikedId, ["Romance"], "Author"),
+        [romCandidate]: book(romCandidate, ["Romance"], "Other"),
+      },
+      userBooks: {
+        [likedId]: finishedUserBook(likedId, "liked"),
+        [dislikedId]: finishedUserBook(dislikedId, "disliked"),
+      },
+    });
+    const result = buildAppNativeRecommendations(state);
+    for (const row of result.recommendations) {
+      assert.ok(
+        row.score > RECOMMENDATION_SCORE_FLOOR,
+        `expected score above ${RECOMMENDATION_SCORE_FLOOR}, got ${row.score} for ${row.bookId}`,
+      );
+    }
   });
 
   it("prefers higher readinglogCount when taste is similar", () => {

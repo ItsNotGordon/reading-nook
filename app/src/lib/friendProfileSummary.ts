@@ -14,8 +14,12 @@ export type FriendRatingRow = {
   title: string;
   author: string;
   coverUrl: string;
+  genres: string[];
+  readinglogCount?: number;
   derivedScore: number | null;
   sentimentBucket: SentimentBucket;
+  finishedAt: string | null;
+  notes: string;
 };
 
 export type FriendSentimentInsight = {
@@ -52,8 +56,12 @@ function buildRatings(state: AppState): FriendRatingRow[] {
         title: book.title,
         author: book.author,
         coverUrl: book.coverUrl,
+        genres: book.genres ?? [],
+        readinglogCount: book.readinglogCount,
         derivedScore: ub.derivedScore ?? null,
         sentimentBucket: ub.sentimentBucket,
+        finishedAt: ub.finishedAt,
+        notes: ub.notes ?? "",
       });
     }
   }

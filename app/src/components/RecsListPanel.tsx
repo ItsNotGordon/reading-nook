@@ -8,6 +8,8 @@ import { ShelfPickerSheet, shelfDisplayName } from "@/components/ShelfPickerShee
 import { useReadingNook } from "@/lib/app-state";
 import { catalogJsonToBook } from "@/lib/catalogBook";
 import { mergeCatalogGenres } from "@/lib/mergeCatalogGenres";
+import { sentimentFromPredictedScore } from "@/lib/predictRecommendedScore";
+import { sentimentTextColor } from "@/lib/sentiment-display";
 import type { RecommendationsPoolModel, Recommendation } from "@/lib/useRecommendationsPool";
 import { RECS_VISIBLE_COUNT } from "@/lib/useRecommendationsPool";
 import type { Book, SentimentBucket, Shelf } from "@/lib/types";
@@ -45,6 +47,7 @@ function RecommendationCard({
     });
   }, [rec.genres, userTopGenreLower]);
   const topGenres = orderedGenres.slice(0, 3);
+  const scoreBucket = sentimentFromPredictedScore(rec.score);
   const chipBase = "rounded-full border px-2 py-0.5 text-[10px] font-medium";
   const chipMatch = "border-border/80 bg-background text-accent";
   const chipDefault = "border-border/80 bg-background text-foreground-muted";
@@ -85,7 +88,9 @@ function RecommendationCard({
                     For you
                   </span>
                 ) : null}
-                <span className="rounded-full border border-border bg-background px-2 py-1 text-xs font-semibold tabular-nums text-[#426447]">
+                <span
+                  className={`rounded-full border border-border bg-background px-2 py-1 text-xs font-semibold tabular-nums ${sentimentTextColor(scoreBucket)}`}
+                >
                   {rec.score.toFixed(1)}
                 </span>
               </div>

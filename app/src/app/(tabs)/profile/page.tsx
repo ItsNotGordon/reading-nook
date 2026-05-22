@@ -148,7 +148,7 @@ export default function ProfilePage() {
                 followersCount={socialFriendCount}
                 gated={socialGated}
               />
-              <ProfileShelfBars rows={shelfRows} mode="self" />
+              <ProfileShelfBars rows={shelfRows} />
               <ProfileFavoritesSection
                 title="Your Favorites"
                 favoriteBook={favoriteBook}

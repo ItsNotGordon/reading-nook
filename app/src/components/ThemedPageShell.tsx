@@ -16,7 +16,7 @@ export function ThemedPageShell({ children, title }: ThemedPageShellProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-6 pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))]">
-        <div className="relative isolate -mx-4 flex min-w-0 flex-1 flex-col overflow-hidden sm:-mx-6">
+        <div className="relative isolate -mx-4 flex min-w-0 flex-1 flex-col sm:-mx-6">
           <ProfileDecorationBackdrop theme={theme} />
           <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-3 px-4 sm:px-6">
             {title ? (

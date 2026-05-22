@@ -1,14 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { FriendBookCompareSheet } from "@/components/FriendBookCompareSheet";
 import { FriendCompareTaste } from "@/components/FriendCompareTaste";
 import { FriendProfileInsights } from "@/components/FriendProfileInsights";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { ProfileSocialTallies } from "@/components/ProfileSocialTallies";
 import type { FriendProfileSummary } from "@/lib/friendProfileSummary";
 import type { FriendRelationship } from "@/lib/friendshipStatus";
+import {
+  findFriendBookSnapshot,
+  friendBookFromSharedRated,
+  friendBookFromShelf,
+  type FriendBookSnapshot,
+} from "@/lib/friendBookCompare";
 import type { TasteComparison } from "@/lib/tasteComparison";
-import type { Shelf } from "@/lib/types";
+import type { BookId } from "@/lib/types";
 
 type PublicProfile = {
   id: string;
@@ -55,9 +62,7 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   const [tasteOpen, setTasteOpen] = useState(false);
   const [taste, setTaste] = useState<TasteResponse | "loading" | null>(null);
   const [insights, setInsights] = useState<FriendProfileSummaryResponse | "loading" | null>(null);
-  const [shelvesOpen, setShelvesOpen] = useState(false);
-  const [ratingsOpen, setRatingsOpen] = useState(false);
-  const [focusShelf, setFocusShelf] = useState<Shelf | null>(null);
+  const [compareBookId, setCompareBookId] = useState<BookId | null>(null);
 
   const loadProfile = useCallback(async () => {
     setError(null);
@@ -138,6 +143,30 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   }
 
   const isAccepted = profile?.relationship === "accepted";
+
+  const openBookCompare = (bookId: BookId) => {
+    setCompareBookId(bookId);
+  };
+
+  const friendBookForSheet: FriendBookSnapshot | null = (() => {
+    if (!compareBookId) return null;
+    if (insights && insights !== "loading") {
+      const fromLibrary = findFriendBookSnapshot(
+        compareBookId,
+        insights.ratings,
+        insights.books,
+      );
+      if (fromLibrary) return fromLibrary;
+      const shelved = insights.books.find((b) => b.id === compareBookId);
+      if (shelved) return friendBookFromShelf(shelved);
+    }
+    const shared = taste?.comparison?.sharedRatedBooks.find((r) => r.bookId === compareBookId);
+    if (shared) return friendBookFromSharedRated(shared);
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[FriendProfileView] compare book not found:", compareBookId);
+    }
+    return null;
+  })();
 
   if (!profile && !error) {
     return <p className="text-sm text-foreground-muted">Loading…</p>;
@@ -236,7 +265,11 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
                 {taste === "loading" ? (
                   <p className="text-xs text-foreground-muted">Loading taste…</p>
                 ) : taste?.comparison ? (
-                  <FriendCompareTaste comparison={taste.comparison} friendName={profile.displayName} />
+                  <FriendCompareTaste
+                    comparison={taste.comparison}
+                    friendName={profile.displayName}
+                    onBookPress={openBookCompare}
+                  />
                 ) : (
                   <p className="text-xs text-foreground-muted">Could not load taste comparison.</p>
                 )}
@@ -247,20 +280,7 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
           {insights === "loading" ? (
             <p className="text-sm text-foreground-muted">Loading library and insights…</p>
           ) : insights ? (
-            <FriendProfileInsights
-              summary={insights}
-              focusShelf={focusShelf}
-              shelvesOpen={shelvesOpen}
-              ratingsOpen={ratingsOpen}
-              onShelvesOpenChange={setShelvesOpen}
-              onRatingsOpenChange={setRatingsOpen}
-              onShelfRowFocus={(shelf) => {
-                if (shelf === "finished") setRatingsOpen(true);
-                else setShelvesOpen(true);
-                setFocusShelf(shelf);
-                window.setTimeout(() => setFocusShelf(null), 400);
-              }}
-            />
+            <FriendProfileInsights summary={insights} onBookPress={openBookCompare} />
           ) : (
             <p className="text-sm text-foreground-muted">Could not load their reading profile.</p>
           )}
@@ -268,6 +288,16 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
       ) : null}
 
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
+
+      {compareBookId ? (
+        <FriendBookCompareSheet
+          key={compareBookId}
+          bookId={compareBookId}
+          friendDisplayName={profile.displayName}
+          friendBook={friendBookForSheet}
+          onClose={() => setCompareBookId(null)}
+        />
+      ) : null}
     </div>
   );
 }
