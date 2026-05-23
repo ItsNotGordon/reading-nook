@@ -8,6 +8,10 @@ import { ProfileHeroCard } from "@/components/ProfileHeroCard";
 import { ProfileRecentInsights } from "@/components/ProfileRecentInsights";
 import { ProfileShelfBars, profileShelfBarRows } from "@/components/ProfileShelfBars";
 import { ProfileSocialTallies } from "@/components/ProfileSocialTallies";
+import {
+  SocialConnectionsSheet,
+  type SocialConnectionUser,
+} from "@/components/SocialConnectionsSheet";
 import { PageShell } from "@/components/PageShell";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
@@ -24,6 +28,8 @@ import {
 } from "@/lib/profileStats";
 import type { BookId, SentimentBucket } from "@/lib/types";
 
+type AcceptedFriend = SocialConnectionUser & { direction: "incoming" | "outgoing" };
+
 export default function ProfilePage() {
   const { state } = useReadingNook();
   const { user: cloudUser, configured: cloudConfigured } = useSupabaseAuth();
@@ -36,7 +42,8 @@ export default function ProfilePage() {
   }>({ open: false, bookId: null, bucket: null });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [usernameRefreshKey, setUsernameRefreshKey] = useState(0);
-  const [friendCount, setFriendCount] = useState<number | null>(null);
+  const [friends, setFriends] = useState<AcceptedFriend[] | null>(null);
+  const [socialSheet, setSocialSheet] = useState<"following" | "followers" | null>(null);
 
   useEffect(() => {
     if (!cloudConfigured || !cloudUser) return;
@@ -47,18 +54,46 @@ export default function ProfilePage() {
   }, [cloudConfigured, cloudUser]);
 
   const canLoadSocial = cloudConfigured && Boolean(cloudUser);
-  const socialFriendCount = canLoadSocial ? friendCount : null;
 
   useEffect(() => {
     if (!canLoadSocial) return;
     void fetch("/api/friends")
       .then((res) => res.json())
-      .then((data: { friends?: Array<{ status: string }> }) => {
-        const n = (data.friends ?? []).filter((f) => f.status === "accepted").length;
-        setFriendCount(n);
-      })
-      .catch(() => setFriendCount(null));
+      .then(
+        (data: {
+          friends?: Array<{
+            status: string;
+            direction: "incoming" | "outgoing";
+            userId: string;
+            username: string | null;
+            displayName: string;
+            avatarUrl: string | null;
+            tagline: string;
+          }>;
+        }) => {
+          const accepted = (data.friends ?? []).filter((f) => f.status === "accepted");
+          setFriends(
+            accepted.map((f) => ({
+              userId: f.userId,
+              username: f.username,
+              displayName: f.displayName,
+              avatarUrl: f.avatarUrl,
+              tagline: f.tagline,
+              direction: f.direction,
+            })),
+          );
+        },
+      )
+      .catch(() => setFriends(null));
   }, [canLoadSocial]);
+
+  const followingList = useMemo(() => friends ?? [], [friends]);
+  const followersList = useMemo(
+    () => (friends ?? []).filter((f) => f.direction === "incoming"),
+    [friends],
+  );
+  const followingCount = canLoadSocial ? (friends == null ? null : followingList.length) : null;
+  const followersCount = canLoadSocial ? (friends == null ? null : followersList.length) : null;
 
   const shelfCounts = useMemo(() => getShelfCounts(state), [state]);
   const shelfRows = useMemo(() => profileShelfBarRows(shelfCounts), [shelfCounts]);
@@ -114,10 +149,17 @@ export default function ProfilePage() {
                 onEditProfile={() => setEditProfileOpen(true)}
               />
               <ProfileSocialTallies
-                followingCount={socialFriendCount}
-                followersCount={socialFriendCount}
+                followingCount={followingCount}
+                followersCount={followersCount}
                 gated={socialGated}
+                onFollowingPress={canLoadSocial ? () => setSocialSheet("following") : undefined}
+                onFollowersPress={canLoadSocial ? () => setSocialSheet("followers") : undefined}
               />
+              {!socialGated ? (
+                <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
+                  Following lists your friends. One-way follows for public accounts are coming later.
+                </p>
+              ) : null}
               <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
                 <p className="font-medium text-foreground">Your nook is empty</p>
                 <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
@@ -144,10 +186,17 @@ export default function ProfilePage() {
                 onEditProfile={() => setEditProfileOpen(true)}
               />
               <ProfileSocialTallies
-                followingCount={socialFriendCount}
-                followersCount={socialFriendCount}
+                followingCount={followingCount}
+                followersCount={followersCount}
                 gated={socialGated}
+                onFollowingPress={canLoadSocial ? () => setSocialSheet("following") : undefined}
+                onFollowersPress={canLoadSocial ? () => setSocialSheet("followers") : undefined}
               />
+              {!socialGated ? (
+                <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
+                  Following lists your friends. One-way follows for public accounts are coming later.
+                </p>
+              ) : null}
               <ProfileShelfBars rows={shelfRows} />
               <ProfileFavoritesSection
                 title="Your Favorites"
@@ -184,6 +233,21 @@ export default function ProfilePage() {
           newBookId={pairwise.bookId}
           bucket={pairwise.bucket}
           onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
+        />
+      ) : null}
+
+      {socialSheet === "following" ? (
+        <SocialConnectionsSheet
+          title="Following"
+          users={followingList}
+          onClose={() => setSocialSheet(null)}
+        />
+      ) : null}
+      {socialSheet === "followers" ? (
+        <SocialConnectionsSheet
+          title="Followers"
+          users={followersList}
+          onClose={() => setSocialSheet(null)}
         />
       ) : null}
     </PageShell>

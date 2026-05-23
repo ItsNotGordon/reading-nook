@@ -57,7 +57,7 @@ export async function GET() {
       avatarUrl: profile?.avatar_url ?? null,
       tagline: profile?.tagline ?? "",
       status: link.status,
-      direction: link.addressee_id === user.id && link.status === "pending" ? "incoming" : "outgoing",
+      direction: link.requester_id === user.id ? "outgoing" : "incoming",
     });
   }
 
