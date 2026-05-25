@@ -129,24 +129,41 @@ export async function searchOpenLibraryBooks(
   const cap = Math.min(Math.max(1, limit), 50);
   const canonicalGenre = resolveCanonicalGenreFromQuery(query);
 
-  const generalUrl = new URL(OPEN_LIBRARY_SEARCH_URL);
-  generalUrl.searchParams.set("q", withEnglishLanguageQuery(query));
-  generalUrl.searchParams.set("limit", String(cap));
-  generalUrl.searchParams.set("fields", SEARCH_FIELDS);
+  const engUrl = new URL(OPEN_LIBRARY_SEARCH_URL);
+  engUrl.searchParams.set("q", withEnglishLanguageQuery(query));
+  engUrl.searchParams.set("limit", String(cap));
+  engUrl.searchParams.set("fields", SEARCH_FIELDS);
 
-  const [byGenre, general] = await Promise.all([
+  const [byGenre, engResults] = await Promise.all([
     canonicalGenre ? discoverOpenLibraryByGenre(canonicalGenre, cap) : Promise.resolve([]),
-    fetchOpenLibrarySearch(generalUrl),
+    fetchOpenLibrarySearch(engUrl),
   ]);
 
   const seen = new Set<string>();
   const merged: SearchBookResult[] = [];
-  for (const book of [...byGenre, ...general]) {
+  for (const book of [...byGenre, ...engResults]) {
     if (seen.has(book.id)) continue;
     seen.add(book.id);
     merged.push(book);
     if (merged.length >= cap) break;
   }
+
+  const FALLBACK_THRESHOLD = 3;
+  if (merged.length < FALLBACK_THRESHOLD) {
+    const fallbackUrl = new URL(OPEN_LIBRARY_SEARCH_URL);
+    fallbackUrl.searchParams.set("q", query.trim());
+    fallbackUrl.searchParams.set("limit", String(cap));
+    fallbackUrl.searchParams.set("fields", SEARCH_FIELDS);
+    const fallback = await fetchOpenLibrarySearch(fallbackUrl);
+    for (const book of fallback) {
+      if (seen.has(book.id)) continue;
+      if (looksNonEnglishTitle(book.title)) continue;
+      seen.add(book.id);
+      merged.push(book);
+      if (merged.length >= cap) break;
+    }
+  }
+
   return merged;
 }
 
