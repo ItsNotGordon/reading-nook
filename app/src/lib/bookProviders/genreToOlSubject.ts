@@ -43,11 +43,11 @@ const GENRE_TO_OL_SUBJECT: Record<string, string> = {
 };
 
 function genreKey(label: string): string {
-  return label.trim().toLowerCase();
+  return label.trim().toLowerCase().replace(/-/g, " ");
 }
 
-/** OL `subject:"..."` phrase for a canonical genre label, or null if unknown. */
+/** OL subject phrase for a canonical genre label, or null if unknown. */
 export function canonicalGenreToOlSubject(genreLabel: string): string | null {
   const key = genreKey(genreLabel);
-  return GENRE_TO_OL_SUBJECT[key] ?? (genreLabel.trim() || null);
+  return GENRE_TO_OL_SUBJECT[key] ?? (genreLabel.trim().replace(/-/g, " ") || null);
 }

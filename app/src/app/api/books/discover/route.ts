@@ -23,27 +23,25 @@ export async function GET(request: Request) {
     );
   }
 
-  try {
-    const seen = new Set<string>();
-    const books = [];
-    for (const genre of genreLabels) {
+  const seen = new Set<string>();
+  const books = [];
+  for (const genre of genreLabels) {
+    try {
       const batch = await discoverOpenLibraryByGenre(genre, PER_GENRE_LIMIT, "discover");
       for (const book of batch) {
         if (seen.has(book.id)) continue;
         seen.add(book.id);
         books.push(book);
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      console.warn(`[discover] genre="${genre}" failed: ${msg}`);
     }
-
-    const body: BookSearchResponse = {
-      provider: "openlibrary",
-      books,
-    };
-    return NextResponse.json(body);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "";
-    console.warn(`[discover] genres="${raw}" failed: ${msg}`);
-    const body: BookSearchResponse = { provider: "openlibrary", books: [] };
-    return NextResponse.json(body);
   }
+
+  const body: BookSearchResponse = {
+    provider: "openlibrary",
+    books,
+  };
+  return NextResponse.json(body);
 }

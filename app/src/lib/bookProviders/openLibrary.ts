@@ -166,7 +166,9 @@ export async function searchOpenLibraryBooks(
   engUrl.searchParams.set("fields", SEARCH_FIELDS);
 
   const [byGenre, engResults] = await Promise.all([
-    canonicalGenre ? discoverOpenLibraryByGenre(canonicalGenre, cap, context) : Promise.resolve([]),
+    canonicalGenre
+      ? discoverOpenLibraryByGenre(canonicalGenre, cap, context).catch(() => [] as SearchBookResult[])
+      : Promise.resolve([] as SearchBookResult[]),
     fetchOpenLibrarySearch(engUrl, context),
   ]);
 
@@ -208,7 +210,8 @@ export async function discoverOpenLibraryByGenre(
   if (!subject) return [];
 
   const url = new URL(OPEN_LIBRARY_SEARCH_URL);
-  url.searchParams.set("q", withEnglishLanguageQuery(`subject:"${subject}"`));
+  url.searchParams.set("q", `subject:(${subject})`);
+  url.searchParams.set("lang", "eng");
   url.searchParams.set("sort", "readinglog");
   url.searchParams.set("limit", String(Math.min(Math.max(1, limit), 50)));
   url.searchParams.set("fields", SEARCH_FIELDS);
