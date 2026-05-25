@@ -318,7 +318,11 @@ export async function discoverGoogleBooksByGenre(
   if (!res.ok) throw new Error(`Google Books HTTP ${res.status}`);
 
   const data = (await res.json()) as GBSearchResponse;
-  const books = dedupeBooks(data.items ?? []);
+  const books = dedupeBooks(data.items ?? [])
+    .filter((b) => b.ratingsCount == null || b.ratingsCount > 0)
+    .filter((b) => !b.publishedYear || b.publishedYear >= 1900)
+    .filter((b) => b.description.length > 0)
+    .filter((b) => b.totalPages === 0 || b.totalPages >= 100);
 
   books.sort((a, b) => (b.ratingsCount ?? 0) - (a.ratingsCount ?? 0));
   return books;

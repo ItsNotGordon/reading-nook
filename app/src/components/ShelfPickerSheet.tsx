@@ -79,6 +79,11 @@ export function ShelfPickerSheet({ book, onClose, onChooseShelf }: ShelfPickerSh
                 Add to shelf
               </p>
               <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
+              {book.description ? (
+                <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-foreground-muted">
+                  {book.description}
+                </p>
+              ) : null}
             </div>
             <button
               type="button"
