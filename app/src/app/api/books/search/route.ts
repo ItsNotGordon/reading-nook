@@ -19,13 +19,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const books = await searchOpenLibraryBooks(q, SEARCH_LIMIT);
+    const books = await searchOpenLibraryBooks(q, SEARCH_LIMIT, "search");
     const body: BookSearchResponse = {
       provider: "openlibrary",
       books: books.slice(0, SEARCH_LIMIT),
     };
     return NextResponse.json(body);
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    console.warn(`[search] q="${q}" failed: ${msg}`);
     const body: BookSearchResponse = { provider: "openlibrary", books: [] };
     return NextResponse.json(body);
   }

@@ -12,9 +12,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const book = await lookupByIsbn(isbn);
+    const book = await lookupByIsbn(isbn, "isbn");
     return NextResponse.json({ book });
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    console.warn(`[isbn] isbn="${isbn}" failed: ${msg}`);
     return NextResponse.json({ book: null });
   }
 }

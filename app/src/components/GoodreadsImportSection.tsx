@@ -22,19 +22,22 @@ type EnrichProgress = {
   matched: number;
 };
 
-const BATCH_SIZE = 5;
-const BATCH_DELAY_MS = 300;
+const BATCH_SIZE = 3;
+const BATCH_DELAY_MS = 1500;
+
+class OLBlockedError extends Error {
+  constructor() {
+    super("Open Library 403");
+  }
+}
 
 async function lookupIsbn(isbn: string): Promise<SearchBookResult | null> {
   if (!isbn) return null;
-  try {
-    const res = await fetch(`/api/books/isbn?isbn=${encodeURIComponent(isbn)}`);
-    if (!res.ok) return null;
-    const data = (await res.json()) as { book: SearchBookResult | null };
-    return data.book ?? null;
-  } catch {
-    return null;
-  }
+  const res = await fetch(`/api/books/isbn?isbn=${encodeURIComponent(isbn)}`);
+  if (res.status === 403 || res.status === 502) throw new OLBlockedError();
+  if (!res.ok) return null;
+  const data = (await res.json()) as { book: SearchBookResult | null };
+  return data.book ?? null;
 }
 
 async function searchByTitle(
@@ -44,26 +47,23 @@ async function searchByTitle(
   const cleanTitle = stripSeriesInfo(title);
   const q = `${cleanTitle} ${author}`.trim();
   if (q.length < 2) return null;
-  try {
-    const res = await fetch(
-      `/api/books/search?q=${encodeURIComponent(q)}`,
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as BookSearchResponse;
-    if (!data.books || data.books.length === 0) return null;
-    const norm = (s: string) =>
-      s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-    const normTitle = norm(cleanTitle);
-    for (const book of data.books) {
-      const bookNorm = norm(book.title);
-      if (bookNorm === normTitle || bookNorm.startsWith(normTitle)) {
-        return book;
-      }
+  const res = await fetch(
+    `/api/books/search?q=${encodeURIComponent(q)}`,
+  );
+  if (res.status === 403 || res.status === 502) throw new OLBlockedError();
+  if (!res.ok) return null;
+  const data = (await res.json()) as BookSearchResponse;
+  if (!data.books || data.books.length === 0) return null;
+  const norm = (s: string) =>
+    s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normTitle = norm(cleanTitle);
+  for (const book of data.books) {
+    const bookNorm = norm(book.title);
+    if (bookNorm === normTitle || bookNorm.startsWith(normTitle)) {
+      return book;
     }
-    return null;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function enrichCatalogBook(existing: Book, ol: SearchBookResult): Book {
@@ -127,18 +127,25 @@ export function GoodreadsImportSection() {
     const total = withIsbn.length;
     let matched = 0;
     let done = 0;
+    let olBlocked = false;
     setEnrichProgress({ done: 0, total, matched: 0 });
 
     for (let i = 0; i < withIsbn.length; i += BATCH_SIZE) {
-      if (cancelRef.current) break;
+      if (cancelRef.current || olBlocked) break;
       const batch = withIsbn.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(async (row) => {
+
+      const results: { row: (typeof withIsbn)[number]; ol: SearchBookResult | null }[] = [];
+      for (const row of batch) {
+        if (olBlocked) break;
+        try {
           const isbn = row.isbn13 || row.isbn;
           const ol = await lookupIsbn(isbn);
-          return { row, ol };
-        }),
-      );
+          results.push({ row, ol });
+        } catch (err) {
+          if (err instanceof OLBlockedError) { olBlocked = true; break; }
+          results.push({ row, ol: null });
+        }
+      }
 
       for (const { row, ol } of results) {
         if (ol && !state.userBooks[ol.id]) {
@@ -150,7 +157,7 @@ export function GoodreadsImportSection() {
 
       setEnrichProgress({ done, total, matched });
 
-      if (i + BATCH_SIZE < withIsbn.length && !cancelRef.current) {
+      if (i + BATCH_SIZE < withIsbn.length && !cancelRef.current && !olBlocked) {
         await sleep(BATCH_DELAY_MS);
       }
     }
@@ -161,32 +168,39 @@ export function GoodreadsImportSection() {
       return;
     }
 
-    // Phase 2: title+author search for books that weren't enriched via ISBN
-    const PLACEHOLDER = "https://placehold.co/";
-    const unenriched = rows.filter(
-      (r) => !r.isbn && !r.isbn13 && r.catalogBook.coverUrl.startsWith(PLACEHOLDER),
-    );
-    if (unenriched.length > 0) {
-      const searchTotal = total + unenriched.length;
-      for (let i = 0; i < unenriched.length; i += BATCH_SIZE) {
-        if (cancelRef.current) break;
-        const batch = unenriched.slice(i, i + BATCH_SIZE);
-        const results = await Promise.all(
-          batch.map(async (row) => {
-            const ol = await searchByTitle(row.title, row.author);
-            return { row, ol };
-          }),
-        );
-        for (const { row, ol } of results) {
-          if (ol && !state.userBooks[ol.id]) {
-            row.catalogBook = enrichCatalogBook(row.catalogBook, ol);
-            matched++;
+    if (!olBlocked) {
+      const PLACEHOLDER = "https://placehold.co/";
+      const unenriched = rows.filter(
+        (r) => !r.isbn && !r.isbn13 && r.catalogBook.coverUrl.startsWith(PLACEHOLDER),
+      );
+      if (unenriched.length > 0) {
+        const searchTotal = total + unenriched.length;
+        for (let i = 0; i < unenriched.length; i += BATCH_SIZE) {
+          if (cancelRef.current || olBlocked) break;
+
+          const results: { row: (typeof unenriched)[number]; ol: SearchBookResult | null }[] = [];
+          for (const row of unenriched.slice(i, i + BATCH_SIZE)) {
+            if (olBlocked) break;
+            try {
+              const ol = await searchByTitle(row.title, row.author);
+              results.push({ row, ol });
+            } catch (err) {
+              if (err instanceof OLBlockedError) { olBlocked = true; break; }
+              results.push({ row, ol: null });
+            }
           }
-          done++;
-        }
-        setEnrichProgress({ done, total: searchTotal, matched });
-        if (i + BATCH_SIZE < unenriched.length && !cancelRef.current) {
-          await sleep(BATCH_DELAY_MS);
+
+          for (const { row, ol } of results) {
+            if (ol && !state.userBooks[ol.id]) {
+              row.catalogBook = enrichCatalogBook(row.catalogBook, ol);
+              matched++;
+            }
+            done++;
+          }
+          setEnrichProgress({ done, total: searchTotal, matched });
+          if (i + BATCH_SIZE < unenriched.length && !cancelRef.current && !olBlocked) {
+            await sleep(BATCH_DELAY_MS);
+          }
         }
       }
     }
@@ -199,7 +213,6 @@ export function GoodreadsImportSection() {
 
     let merged = mergeImportIntoState(state, rows);
 
-    // Backfill genres from Goodreads bookshelves onto existing books with no genres
     if (summary.duplicateRows.length > 0) {
       const { patchedCount, catalog } = backfillGenresFromDuplicates(
         summary.duplicateRows,
@@ -219,8 +232,11 @@ export function GoodreadsImportSection() {
       });
     }
     setStage("done");
+    const olNote = olBlocked
+      ? " Some books couldn't be matched (Open Library temporarily unavailable)."
+      : "";
     setMessage(
-      `Imported ${summary.toImport} book${summary.toImport === 1 ? "" : "s"} (${matched} matched on Open Library).`,
+      `Imported ${summary.toImport} book${summary.toImport === 1 ? "" : "s"} (${matched} matched on Open Library).${olNote}`,
     );
     setSummary(null);
     setEnrichProgress(null);

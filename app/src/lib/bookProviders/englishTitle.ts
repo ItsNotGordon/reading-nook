@@ -1,4 +1,5 @@
 import { openLibraryIdToWorkKey } from "./openLibraryIds";
+import { olFetch } from "./olFetch";
 
 const OPEN_LIBRARY_WORKS_BASE = "https://openlibrary.org/works";
 
@@ -94,7 +95,7 @@ function pickEnglishTitleFromEntries(entries: EditionEntry[]): string | null {
 
 async function fetchEditionsPage(workKey: string, offset = 0): Promise<EditionsPayload> {
   const url = `${OPEN_LIBRARY_WORKS_BASE}/${workKey}/editions.json?limit=30&offset=${offset}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await olFetch(url, "editions");
   if (!res.ok) {
     throw new Error(`Open Library editions HTTP ${res.status}`);
   }

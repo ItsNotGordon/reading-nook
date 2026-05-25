@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const seen = new Set<string>();
     const books = [];
     for (const genre of genreLabels) {
-      const batch = await discoverOpenLibraryByGenre(genre, PER_GENRE_LIMIT);
+      const batch = await discoverOpenLibraryByGenre(genre, PER_GENRE_LIMIT, "discover");
       for (const book of batch) {
         if (seen.has(book.id)) continue;
         seen.add(book.id);
@@ -40,7 +40,9 @@ export async function GET(request: Request) {
       books,
     };
     return NextResponse.json(body);
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    console.warn(`[discover] genres="${raw}" failed: ${msg}`);
     const body: BookSearchResponse = { provider: "openlibrary", books: [] };
     return NextResponse.json(body);
   }

@@ -165,8 +165,6 @@ export function buildAppNativeRecommendations(
 
   let recommendations = buildRecommendationsByEngine(state, candidates, maxResults, engine);
 
-  recommendations = recommendations.filter((r) => r.score > RECOMMENDATION_SCORE_FLOOR);
-
   recommendations.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     const popA = a.readinglogCount ?? 0;
@@ -177,6 +175,15 @@ export function buildAppNativeRecommendations(
     if (aOl !== bOl) return aOl ? -1 : 1;
     return a.bookId.localeCompare(b.bookId);
   });
+
+  const aboveFloor = recommendations.filter((r) => r.score > RECOMMENDATION_SCORE_FLOOR);
+
+  const MIN_FALLBACK_RECS = 10;
+  if (aboveFloor.length >= MIN_FALLBACK_RECS) {
+    recommendations = aboveFloor;
+  } else {
+    recommendations = recommendations.slice(0, Math.max(MIN_FALLBACK_RECS, aboveFloor.length));
+  }
 
   recommendations = recommendations.slice(0, maxResults);
 

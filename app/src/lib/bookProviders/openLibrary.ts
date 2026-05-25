@@ -5,6 +5,7 @@ import {
   withEnglishLanguageQuery,
 } from "./englishTitle";
 import { openLibraryIdToWorkKey, workKeyToOpenLibraryId } from "./openLibraryIds";
+import { olFetch } from "./olFetch";
 import { resolveCanonicalGenreFromQuery } from "@/lib/genreVocabulary";
 import { canonicalGenreToOlSubject } from "./genreToOlSubject";
 import { parseOpenLibrarySubjects } from "./openLibrarySubjects";
@@ -103,11 +104,40 @@ function docToBook(doc: OpenLibraryDoc): SearchBookResult | null {
   };
 }
 
-async function fetchOpenLibrarySearch(url: URL): Promise<SearchBookResult[]> {
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Open Library HTTP ${res.status}`);
+const RETRY_DELAYS_MS = [2000, 5000, 10000];
+
+async function fetchWithRetry(url: string, context = "ol"): Promise<Response> {
+  const res = await olFetch(url, context);
+  if (res.ok) return res;
+
+  // 403 = blocked; do not retry, throw immediately
+  if (res.status === 403) {
+    throw new Error(`Open Library HTTP 403`);
   }
+
+  // Only retry 429 (rate-limited)
+  if (res.status === 429) {
+    let lastError: Error = new Error(`Open Library HTTP 429`);
+    for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+      const delay = RETRY_DELAYS_MS[attempt];
+      console.log(
+        `[OL:${context}] 429 rate-limited, retrying in ${delay}ms (${attempt + 1}/${RETRY_DELAYS_MS.length})`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+      const retry = await olFetch(url, context);
+      if (retry.ok) return retry;
+      if (retry.status === 403) throw new Error(`Open Library HTTP 403`);
+      lastError = new Error(`Open Library HTTP ${retry.status}`);
+      if (retry.status !== 429) throw lastError;
+    }
+    throw lastError;
+  }
+
+  throw new Error(`Open Library HTTP ${res.status}`);
+}
+
+async function fetchOpenLibrarySearch(url: URL, context = "search"): Promise<SearchBookResult[]> {
+  const res = await fetchWithRetry(url.toString(), context);
   const payload = (await res.json()) as OpenLibrarySearchPayload;
   const docs = payload.docs ?? [];
   const books: SearchBookResult[] = [];
@@ -125,6 +155,7 @@ async function fetchOpenLibrarySearch(url: URL): Promise<SearchBookResult[]> {
 export async function searchOpenLibraryBooks(
   query: string,
   limit = 20,
+  context = "search",
 ): Promise<SearchBookResult[]> {
   const cap = Math.min(Math.max(1, limit), 50);
   const canonicalGenre = resolveCanonicalGenreFromQuery(query);
@@ -135,8 +166,8 @@ export async function searchOpenLibraryBooks(
   engUrl.searchParams.set("fields", SEARCH_FIELDS);
 
   const [byGenre, engResults] = await Promise.all([
-    canonicalGenre ? discoverOpenLibraryByGenre(canonicalGenre, cap) : Promise.resolve([]),
-    fetchOpenLibrarySearch(engUrl),
+    canonicalGenre ? discoverOpenLibraryByGenre(canonicalGenre, cap, context) : Promise.resolve([]),
+    fetchOpenLibrarySearch(engUrl, context),
   ]);
 
   const seen = new Set<string>();
@@ -154,7 +185,7 @@ export async function searchOpenLibraryBooks(
     fallbackUrl.searchParams.set("q", query.trim());
     fallbackUrl.searchParams.set("limit", String(cap));
     fallbackUrl.searchParams.set("fields", SEARCH_FIELDS);
-    const fallback = await fetchOpenLibrarySearch(fallbackUrl);
+    const fallback = await fetchOpenLibrarySearch(fallbackUrl, context);
     for (const book of fallback) {
       if (seen.has(book.id)) continue;
       if (looksNonEnglishTitle(book.title)) continue;
@@ -171,6 +202,7 @@ export async function searchOpenLibraryBooks(
 export async function discoverOpenLibraryByGenre(
   genreLabel: string,
   limit = 25,
+  context = "discover",
 ): Promise<SearchBookResult[]> {
   const subject = canonicalGenreToOlSubject(genreLabel);
   if (!subject) return [];
@@ -180,7 +212,7 @@ export async function discoverOpenLibraryByGenre(
   url.searchParams.set("sort", "readinglog");
   url.searchParams.set("limit", String(Math.min(Math.max(1, limit), 50)));
   url.searchParams.set("fields", SEARCH_FIELDS);
-  return fetchOpenLibrarySearch(url);
+  return fetchOpenLibrarySearch(url, context);
 }
 
 /* ------------------------------------------------------------------ */
@@ -200,12 +232,9 @@ type OpenLibraryAuthorPayload = {
   name?: string;
 };
 
-async function fetchAuthorName(authorKey: string): Promise<string> {
+async function fetchAuthorName(authorKey: string, context = "isbn"): Promise<string> {
   try {
-    const res = await fetch(`https://openlibrary.org${authorKey}.json`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return "";
+    const res = await fetchWithRetry(`https://openlibrary.org${authorKey}.json`, context);
     const data = (await res.json()) as OpenLibraryAuthorPayload;
     return typeof data.name === "string" ? data.name.trim() : "";
   } catch {
@@ -223,11 +252,14 @@ function parsePublishYear(publishDate: string | undefined): number | undefined {
 
 export async function lookupByIsbn(
   isbn: string,
+  context = "isbn",
 ): Promise<SearchBookResult | null> {
-  const res = await fetch(`https://openlibrary.org/isbn/${isbn}.json`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
+  let res: Response;
+  try {
+    res = await fetchWithRetry(`https://openlibrary.org/isbn/${isbn}.json`, context);
+  } catch {
+    return null;
+  }
   const data = (await res.json()) as OpenLibraryIsbnPayload;
   const title = typeof data.title === "string" ? data.title.trim() : "";
   if (!title) return null;
@@ -236,7 +268,7 @@ export async function lookupByIsbn(
   const id = workKey ? workKeyToOpenLibraryId(workKey) : `isbn:${isbn}`;
 
   const authorKeys = data.authors?.map((a) => a.key).filter(Boolean) ?? [];
-  const authorNames = await Promise.all(authorKeys.map(fetchAuthorName));
+  const authorNames = await Promise.all(authorKeys.map((k) => fetchAuthorName(k, context)));
   const author = authorNames.filter(Boolean).join(", ") || "Unknown";
 
   const coverUrl =
@@ -273,18 +305,13 @@ export type OpenLibraryWorkDetails = Pick<
 /** Fetch work JSON for description and subjects (use on shelf add, not per search row). */
 export async function fetchOpenLibraryWorkDetails(
   bookId: string,
-  options: { catalogTitle?: string } = {},
+  options: { catalogTitle?: string; context?: string } = {},
 ): Promise<OpenLibraryWorkDetails | null> {
+  const ctx = options.context ?? "work";
   const workKey = openLibraryIdToWorkKey(bookId);
   if (!workKey) return null;
 
-  const res = await fetch(`${OPEN_LIBRARY_WORKS_BASE}/${workKey}.json`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
-    throw new Error(`Open Library work HTTP ${res.status}`);
-  }
+  const res = await fetchWithRetry(`${OPEN_LIBRARY_WORKS_BASE}/${workKey}.json`, ctx);
 
   const payload = (await res.json()) as OpenLibraryWorkPayload & { title?: string };
   const description = parseWorkDescription(payload.description);
