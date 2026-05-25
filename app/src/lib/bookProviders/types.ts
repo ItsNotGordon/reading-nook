@@ -1,7 +1,7 @@
 import type { Book } from "@/lib/types";
 import { normalizeGenreList } from "@/lib/genreNormalize";
 
-export type BookSearchProvider = "openlibrary";
+export type BookSearchProvider = "googlebooks" | "openlibrary";
 
 export type SearchBookResult = {
   id: string;

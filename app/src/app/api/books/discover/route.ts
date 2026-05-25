@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { discoverOpenLibraryByGenre } from "@/lib/bookProviders/openLibrary";
+import { discoverGoogleBooksByGenre } from "@/lib/bookProviders/googleBooks";
 import type { BookSearchResponse } from "@/lib/bookProviders/types";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   const books = [];
   for (const genre of genreLabels) {
     try {
-      const batch = await discoverOpenLibraryByGenre(genre, PER_GENRE_LIMIT, "discover");
+      const batch = await discoverGoogleBooksByGenre(genre, PER_GENRE_LIMIT, "discover");
       for (const book of batch) {
         if (seen.has(book.id)) continue;
         seen.add(book.id);
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   }
 
   const body: BookSearchResponse = {
-    provider: "openlibrary",
+    provider: "googlebooks",
     books,
   };
   return NextResponse.json(body);

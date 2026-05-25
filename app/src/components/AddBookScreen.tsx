@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import { toAppBook } from "@/lib/bookProviders/types";
-import { enrichOpenLibraryBook } from "@/lib/enrichOpenLibraryBook";
+import { enrichBook } from "@/lib/enrichOpenLibraryBook";
 import { mergeCatalogGenres } from "@/lib/mergeCatalogGenres";
 import type { Book, Shelf } from "@/lib/types";
 import type { SentimentBucket } from "@/lib/types";
@@ -199,7 +199,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
     }
     closePicker();
     void (async () => {
-      const enriched = await enrichOpenLibraryBook(picked);
+      const enriched = await enrichBook(picked);
       const book = {
         ...enriched,
         genres: mergeCatalogGenres(enriched.genres, userGenres),
@@ -269,7 +269,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
 
       <div className="flex flex-col gap-2">
         {searchStatus === "ready" && queryReady ? (
-          <p className="text-center text-xs text-foreground-muted">Results from Open Library</p>
+          <p className="text-center text-xs text-foreground-muted">Results from Google Books</p>
         ) : null}
 
         {!queryReady && normalizedQuery.length > 0 && normalizedQuery.length < MIN_QUERY_LENGTH ? (

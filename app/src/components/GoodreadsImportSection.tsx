@@ -25,16 +25,16 @@ type EnrichProgress = {
 const BATCH_SIZE = 3;
 const BATCH_DELAY_MS = 1500;
 
-class OLBlockedError extends Error {
+class ApiBlockedError extends Error {
   constructor() {
-    super("Open Library 403");
+    super("Book API blocked");
   }
 }
 
 async function lookupIsbn(isbn: string): Promise<SearchBookResult | null> {
   if (!isbn) return null;
   const res = await fetch(`/api/books/isbn?isbn=${encodeURIComponent(isbn)}`);
-  if (res.status === 403 || res.status === 502) throw new OLBlockedError();
+  if (res.status === 403 || res.status === 502) throw new ApiBlockedError();
   if (!res.ok) return null;
   const data = (await res.json()) as { book: SearchBookResult | null };
   return data.book ?? null;
@@ -50,7 +50,7 @@ async function searchByTitle(
   const res = await fetch(
     `/api/books/search?q=${encodeURIComponent(q)}`,
   );
-  if (res.status === 403 || res.status === 502) throw new OLBlockedError();
+  if (res.status === 403 || res.status === 502) throw new ApiBlockedError();
   if (!res.ok) return null;
   const data = (await res.json()) as BookSearchResponse;
   if (!data.books || data.books.length === 0) return null;
@@ -142,7 +142,7 @@ export function GoodreadsImportSection() {
           const ol = await lookupIsbn(isbn);
           results.push({ row, ol });
         } catch (err) {
-          if (err instanceof OLBlockedError) { olBlocked = true; break; }
+          if (err instanceof ApiBlockedError) { olBlocked = true; break; }
           results.push({ row, ol: null });
         }
       }
@@ -185,7 +185,7 @@ export function GoodreadsImportSection() {
               const ol = await searchByTitle(row.title, row.author);
               results.push({ row, ol });
             } catch (err) {
-              if (err instanceof OLBlockedError) { olBlocked = true; break; }
+              if (err instanceof ApiBlockedError) { olBlocked = true; break; }
               results.push({ row, ol: null });
             }
           }
@@ -233,10 +233,10 @@ export function GoodreadsImportSection() {
     }
     setStage("done");
     const olNote = olBlocked
-      ? " Some books couldn't be matched (Open Library temporarily unavailable)."
+      ? " Some books couldn't be matched (book API temporarily unavailable)."
       : "";
     setMessage(
-      `Imported ${summary.toImport} book${summary.toImport === 1 ? "" : "s"} (${matched} matched on Open Library).${olNote}`,
+      `Imported ${summary.toImport} book${summary.toImport === 1 ? "" : "s"} (${matched} matched on Google Books).${olNote}`,
     );
     setSummary(null);
     setEnrichProgress(null);
@@ -417,7 +417,7 @@ export function GoodreadsImportSection() {
       {stage === "enriching" && enrichProgress ? (
         <div className="mt-3 space-y-2">
           <p className="text-xs font-semibold text-foreground">
-            Matching books on Open Library…
+            Matching books on Google Books…
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-foreground/10">
             <div

@@ -7,7 +7,7 @@ import {
   buildAppNativeRecommendations,
   collectCandidates,
   countUnshelvedCatalog,
-  isOpenLibraryBookId,
+  isExternalBookId,
 } from "./appNativeRecommendations";
 
 function book(id: string, genres: string[], author = "Author A"): Book {
@@ -50,10 +50,14 @@ function baseState(overrides: Partial<AppState> = {}): AppState {
   };
 }
 
-describe("isOpenLibraryBookId", () => {
+describe("isExternalBookId", () => {
   it("detects openlibrary prefix", () => {
-    assert.equal(isOpenLibraryBookId("openlibrary:OL123W"), true);
-    assert.equal(isOpenLibraryBookId("42"), false);
+    assert.equal(isExternalBookId("openlibrary:OL123W"), true);
+    assert.equal(isExternalBookId("42"), false);
+  });
+
+  it("detects googlebooks prefix", () => {
+    assert.equal(isExternalBookId("googlebooks:abc123"), true);
   });
 });
 
@@ -76,7 +80,7 @@ describe("collectCandidates", () => {
         genres: ["Fantasy"],
         score: 5,
         reason: "r",
-        source: "openlibrary-discover",
+        source: "googlebooks-discover",
       },
     ]);
     assert.ok(candidates.some((c) => c.bookId === "999"));

@@ -7,18 +7,18 @@ import type { SearchBookResult } from "@/lib/bookProviders/types";
 export { HYBRID_SOURCE };
 
 export const APP_NATIVE_SOURCE_CATALOG = "app-native-catalog";
-export const APP_NATIVE_SOURCE_DISCOVER = "openlibrary-discover";
+export const APP_NATIVE_SOURCE_DISCOVER = "googlebooks-discover";
 export const RECOMMENDATION_ENGINES = ["hybrid", "tfidf"] as const;
 export type RecommendationEngine = (typeof RECOMMENDATION_ENGINES)[number];
 
-/** Fetch OL discover when unshelved catalog count is below this. */
+/** Fetch discover candidates when unshelved catalog count is below this. */
 export const CATALOG_UNSHELVED_DISCOVER_THRESHOLD = 15;
 
 const DEFAULT_MAX_RESULTS = 60;
 const BASE_CATALOG_SCORE = 5;
 
 export type AppNativeRecommendationsInput = {
-  /** OL genre discovery rows (display-only until shelved). */
+  /** Genre discovery rows (display-only until shelved). */
   discoverCandidates?: readonly RecPersonalRow[];
   maxResults?: number;
   engine?: RecommendationEngine;
@@ -45,8 +45,13 @@ function buildRecommendationsByEngine(
   return hybridAprioriKnnRecommend(state, candidates, { maxResults });
 }
 
+export function isExternalBookId(bookId: string): boolean {
+  return bookId.startsWith("googlebooks:") || bookId.startsWith("openlibrary:");
+}
+
+/** @deprecated Use `isExternalBookId` instead. */
 export function isOpenLibraryBookId(bookId: string): boolean {
-  return bookId.startsWith("openlibrary:");
+  return isExternalBookId(bookId);
 }
 
 function bookToCandidate(book: Book): RecPersonalRow {
@@ -73,7 +78,7 @@ function discoverToCandidate(book: SearchBookResult): RecPersonalRow {
     coverUrl: book.coverUrl,
     genres: book.genres ?? [],
     score: BASE_CATALOG_SCORE,
-    reason: "Popular on Open Library in a genre you enjoy.",
+    reason: "Popular in a genre you enjoy.",
     source: APP_NATIVE_SOURCE_DISCOVER,
     ...(book.readinglogCount != null ? { readinglogCount: book.readinglogCount } : {}),
     ...(book.ratingsCount != null ? { ratingsCount: book.ratingsCount } : {}),
@@ -115,7 +120,7 @@ export function collectCandidates(
   }
 
   for (const rec of discoverCandidates) {
-    if (!isOpenLibraryBookId(rec.bookId)) continue;
+    if (!isExternalBookId(rec.bookId)) continue;
     if (shelved.has(rec.bookId) || seen.has(rec.bookId)) continue;
     if (excluded.has(rec.bookId) || titleBlacklisted(rec.title)) continue;
     seen.add(rec.bookId);
@@ -130,7 +135,7 @@ export function discoverResultsToCandidates(books: readonly SearchBookResult[]):
 }
 
 /**
- * Build weighted Apriori + sentiment KNN recommendations from app state (catalog + OL discover only).
+ * Build weighted Apriori + sentiment KNN recommendations from app state (catalog + discover).
  */
 export function buildAppNativeRecommendations(
   state: AppState,
@@ -159,7 +164,7 @@ export function buildAppNativeRecommendations(
     return {
       recommendations: [],
       emptyReason:
-        "No books to recommend yet. Search Open Library on Add to add titles, or finish rating more books so we can suggest popular reads in your genres.",
+        "No books to recommend yet. Search Google Books on Add to add titles, or finish rating more books so we can suggest popular reads in your genres.",
     };
   }
 
@@ -170,9 +175,9 @@ export function buildAppNativeRecommendations(
     const popA = a.readinglogCount ?? 0;
     const popB = b.readinglogCount ?? 0;
     if (popB !== popA) return popB - popA;
-    const aOl = isOpenLibraryBookId(a.bookId);
-    const bOl = isOpenLibraryBookId(b.bookId);
-    if (aOl !== bOl) return aOl ? -1 : 1;
+    const aExt = isExternalBookId(a.bookId);
+    const bExt = isExternalBookId(b.bookId);
+    if (aExt !== bExt) return aExt ? -1 : 1;
     return a.bookId.localeCompare(b.bookId);
   });
 
@@ -191,7 +196,7 @@ export function buildAppNativeRecommendations(
     return {
       recommendations: [],
       emptyReason:
-        "No strong matches right now — try shuffle, different genres, or search Open Library for a specific title.",
+        "No strong matches right now — try shuffle, different genres, or search for a specific title.",
     };
   }
 

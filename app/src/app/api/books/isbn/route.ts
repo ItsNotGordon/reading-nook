@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { lookupByIsbn } from "@/lib/bookProviders/openLibrary";
+import { searchGoogleBooksByIsbn } from "@/lib/bookProviders/googleBooks";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const book = await lookupByIsbn(isbn, "isbn");
+    const book = await searchGoogleBooksByIsbn(isbn, "isbn");
     return NextResponse.json({ book });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";

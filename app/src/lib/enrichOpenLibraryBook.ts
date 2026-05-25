@@ -1,6 +1,7 @@
-import { OPEN_LIBRARY_MAX_GENRES } from "@/lib/bookProviders/openLibrarySubjects";
 import { normalizeGenreList } from "@/lib/genreNormalize";
 import type { Book } from "@/lib/types";
+
+const MAX_GENRES = 6;
 
 type WorkDetailsResponse = {
   description?: string;
@@ -8,9 +9,14 @@ type WorkDetailsResponse = {
   title?: string;
 };
 
-/** Load description + subjects from Open Library work JSON when adding to shelf. */
-export async function enrichOpenLibraryBook(book: Book): Promise<Book> {
-  if (!book.id.startsWith("openlibrary:")) return book;
+/**
+ * Enrich a book with description + genres from the /api/books/work endpoint.
+ * Works for `googlebooks:` IDs (primary) and gracefully no-ops for legacy `openlibrary:` IDs.
+ */
+export async function enrichBook(book: Book): Promise<Book> {
+  if (!book.id.startsWith("googlebooks:") && !book.id.startsWith("openlibrary:")) {
+    return book;
+  }
 
   try {
     const params = new URLSearchParams({ id: book.id });
@@ -23,7 +29,7 @@ export async function enrichOpenLibraryBook(book: Book): Promise<Book> {
     const data = (await res.json()) as WorkDetailsResponse;
     const genres = normalizeGenreList([...(data.genres ?? []), ...book.genres]).slice(
       0,
-      OPEN_LIBRARY_MAX_GENRES,
+      MAX_GENRES,
     );
     const description =
       typeof data.description === "string" && data.description.trim()
@@ -38,3 +44,6 @@ export async function enrichOpenLibraryBook(book: Book): Promise<Book> {
     return book;
   }
 }
+
+/** @deprecated Use `enrichBook` instead. Kept for backward compatibility. */
+export const enrichOpenLibraryBook = enrichBook;
