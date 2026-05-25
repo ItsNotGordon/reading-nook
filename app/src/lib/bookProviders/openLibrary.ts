@@ -2,7 +2,6 @@ import {
   looksNonEnglishTitle,
   resolveEnglishDisplayTitle,
   resolveEnglishTitlesForBooks,
-  withEnglishLanguageQuery,
 } from "./englishTitle";
 import { openLibraryIdToWorkKey, workKeyToOpenLibraryId } from "./openLibraryIds";
 import { olFetch } from "./olFetch";
@@ -161,7 +160,8 @@ export async function searchOpenLibraryBooks(
   const canonicalGenre = resolveCanonicalGenreFromQuery(query);
 
   const engUrl = new URL(OPEN_LIBRARY_SEARCH_URL);
-  engUrl.searchParams.set("q", withEnglishLanguageQuery(query));
+  engUrl.searchParams.set("q", query.trim());
+  engUrl.searchParams.set("lang", "eng");
   engUrl.searchParams.set("limit", String(cap));
   engUrl.searchParams.set("fields", SEARCH_FIELDS);
 
