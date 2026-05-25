@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx --test src/lib/bookProviders/openLibrarySubjects.test.ts src/lib/bookProviders/englishTitle.test.ts src/lib/mergeCatalogGenres.test.ts src/lib/recommender/weightedApriori.test.ts src/lib/recommender/sentimentKnn.test.ts src/lib/recommender/popularityScore.test.ts src/lib/appNativeRecommendations.test.ts src/lib/cloudSync.test.ts src/lib/username.test.ts src/lib/profileAvatar.test.ts src/lib/app-reducer.test.ts src/lib/storage.profile.test.ts src/lib/friendProfileSummary.test.ts src/lib/tasteComparison.test.ts"
+    "test": "npx tsx --test src/lib/bookProviders/openLibrarySubjects.test.ts src/lib/bookProviders/englishTitle.test.ts src/lib/mergeCatalogGenres.test.ts src/lib/recommender/weightedApriori.test.ts src/lib/recommender/sentimentKnn.test.ts src/lib/recommender/popularityScore.test.ts src/lib/appNativeRecommendations.test.ts src/lib/cloudSync.test.ts src/lib/username.test.ts src/lib/profileAvatar.test.ts src/lib/app-reducer.test.ts src/lib/storage.profile.test.ts src/lib/friendProfileSummary.test.ts src/lib/tasteComparison.test.ts src/lib/goodreadsImport.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

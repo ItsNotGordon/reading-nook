@@ -183,6 +183,86 @@ export async function discoverOpenLibraryByGenre(
   return fetchOpenLibrarySearch(url);
 }
 
+/* ------------------------------------------------------------------ */
+/*  ISBN Lookup                                                        */
+/* ------------------------------------------------------------------ */
+
+type OpenLibraryIsbnPayload = {
+  title?: string;
+  authors?: { key: string }[];
+  covers?: number[];
+  number_of_pages?: number;
+  publish_date?: string;
+  works?: { key: string }[];
+};
+
+type OpenLibraryAuthorPayload = {
+  name?: string;
+};
+
+async function fetchAuthorName(authorKey: string): Promise<string> {
+  try {
+    const res = await fetch(`https://openlibrary.org${authorKey}.json`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return "";
+    const data = (await res.json()) as OpenLibraryAuthorPayload;
+    return typeof data.name === "string" ? data.name.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function parsePublishYear(publishDate: string | undefined): number | undefined {
+  if (!publishDate) return undefined;
+  const match = publishDate.match(/(\d{4})/);
+  if (!match) return undefined;
+  const year = parseInt(match[1], 10);
+  return Number.isFinite(year) ? year : undefined;
+}
+
+export async function lookupByIsbn(
+  isbn: string,
+): Promise<SearchBookResult | null> {
+  const res = await fetch(`https://openlibrary.org/isbn/${isbn}.json`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as OpenLibraryIsbnPayload;
+  const title = typeof data.title === "string" ? data.title.trim() : "";
+  if (!title) return null;
+
+  const workKey = data.works?.[0]?.key;
+  const id = workKey ? workKeyToOpenLibraryId(workKey) : `isbn:${isbn}`;
+
+  const authorKeys = data.authors?.map((a) => a.key).filter(Boolean) ?? [];
+  const authorNames = await Promise.all(authorKeys.map(fetchAuthorName));
+  const author = authorNames.filter(Boolean).join(", ") || "Unknown";
+
+  const coverUrl =
+    Array.isArray(data.covers) && data.covers.length > 0
+      ? `https://covers.openlibrary.org/b/id/${data.covers[0]}-M.jpg`
+      : `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`;
+
+  const totalPages =
+    typeof data.number_of_pages === "number" && data.number_of_pages > 0
+      ? data.number_of_pages
+      : 0;
+
+  const publishedYear = parsePublishYear(data.publish_date);
+
+  return {
+    id,
+    title,
+    author,
+    coverUrl,
+    totalPages,
+    genres: [],
+    description: "",
+    ...(publishedYear != null ? { publishedYear } : {}),
+  };
+}
+
 export type OpenLibraryWorkDetails = Pick<
   SearchBookResult,
   "description" | "genres"

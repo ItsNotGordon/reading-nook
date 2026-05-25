@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { BlacklistSection } from "@/components/BlacklistSection";
 import { DismissedRecsSection } from "@/components/DismissedRecsSection";
+import { GoodreadsImportSection } from "@/components/GoodreadsImportSection";
 import { LibraryBackupSection } from "@/components/LibraryBackupSection";
 import { ProfileAccountSection } from "@/components/ProfileAccountSection";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
@@ -20,6 +21,7 @@ export default function ProfileSettingsPage() {
         <ProfileAccountSection />
         <BlacklistSection />
         <DismissedRecsSection />
+        <GoodreadsImportSection />
         <LibraryBackupSection />
       </div>
     </ThemedPageShell>

@@ -231,6 +231,22 @@ export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRated
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  if (
+                    typeof window !== "undefined" &&
+                    !window.confirm(`Remove "${book.title}" from your library?`)
+                  ) {
+                    return;
+                  }
+                  actions.removeUserBook(userBook.bookId);
+                  setWantOpen(false);
+                }}
+                className="w-full rounded-xl border border-red-200 bg-card-surface px-3 py-2.5 text-left text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+              >
+                Remove from library
+              </button>
+              <button
+                type="button"
                 onClick={() => setWantOpen(false)}
                 className="mt-1 rounded-xl border border-border bg-background py-2 text-sm font-medium text-foreground-muted"
               >

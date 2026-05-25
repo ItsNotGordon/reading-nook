@@ -321,13 +321,29 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
               </div>
             </div>
 
-            <div className="border-t border-border px-4 py-4">
+            <div className="flex flex-col gap-2 border-t border-border px-4 py-4">
               <button
                 type="button"
                 onClick={() => dialogRef.current?.close()}
                 className="w-full rounded-xl border border-border bg-background py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-card-surface"
               >
                 Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    typeof window !== "undefined" &&
+                    !window.confirm(`Remove "${rowBook.title}" from your library? This will also remove its rating.`)
+                  ) {
+                    return;
+                  }
+                  actions.removeUserBook(bookId);
+                  onClose();
+                }}
+                className="w-full rounded-xl border border-red-200 bg-background py-2.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
+              >
+                Remove from library
               </button>
             </div>
           </div>
