@@ -26,6 +26,7 @@ export type ReadingNookActions = {
   markFinished: (bookId: BookId) => void;
   removeUserBook: (bookId: BookId) => void;
   updateFinishedAt: (bookId: BookId, finishedAt: string) => void;
+  updateAddedAt: (bookId: BookId, addedAt: string) => void;
   setSentimentBucket: (bookId: BookId, sentimentBucket: SentimentBucket | null) => void;
   insertBookIntoBucketAtIndex: (bookId: BookId, bucket: SentimentBucket, index: number) => void;
   updateBucketRankings: (bucket: SentimentBucket, orderedBookIds: BookId[]) => void;
@@ -87,6 +88,8 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       removeUserBook: (bookId) => dispatch({ type: "REMOVE_USER_BOOK", bookId }),
       updateFinishedAt: (bookId, finishedAt) =>
         dispatch({ type: "UPDATE_FINISHED_AT", bookId, finishedAt }),
+      updateAddedAt: (bookId, addedAt) =>
+        dispatch({ type: "UPDATE_ADDED_AT", bookId, addedAt }),
       setSentimentBucket: (bookId, sentimentBucket) =>
         dispatch({ type: "SET_SENTIMENT_BUCKET", bookId, sentimentBucket }),
       insertBookIntoBucketAtIndex: (bookId, bucket, index) =>

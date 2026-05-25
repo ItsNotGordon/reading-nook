@@ -31,6 +31,7 @@ export type AppAction =
   | { type: "MARK_FINISHED"; bookId: BookId }
   | { type: "REMOVE_USER_BOOK"; bookId: BookId }
   | { type: "UPDATE_FINISHED_AT"; bookId: BookId; finishedAt: string }
+  | { type: "UPDATE_ADDED_AT"; bookId: BookId; addedAt: string }
   | { type: "SET_SENTIMENT_BUCKET"; bookId: BookId; sentimentBucket: SentimentBucket | null }
   | { type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX"; bookId: BookId; bucket: SentimentBucket; index: number }
   | {
@@ -425,6 +426,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         userBooks: {
           ...state.userBooks,
           [action.bookId]: { ...ub, finishedAt: action.finishedAt, finishedSortAt: nowIso },
+        },
+      };
+    }
+
+    case "UPDATE_ADDED_AT": {
+      const ub = state.userBooks[action.bookId];
+      if (!ub) return state;
+      return {
+        ...state,
+        userBooks: {
+          ...state.userBooks,
+          [action.bookId]: { ...ub, addedAt: action.addedAt },
         },
       };
     }

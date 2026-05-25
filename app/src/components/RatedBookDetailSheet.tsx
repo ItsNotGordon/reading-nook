@@ -21,11 +21,18 @@ function scoreColorClass(bucket: SentimentBucket): string {
   return "text-[#b13d34]";
 }
 
-function formatFinishedAt(iso: string | null): string {
+function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+function toDateInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
 }
 
 const BUCKET_ORDER: SentimentBucket[] = ["liked", "okay", "disliked"];
@@ -53,6 +60,7 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
   const [draftGenres, setDraftGenres] = useState<string[]>([]);
   const [changingSentiment, setChangingSentiment] = useState(false);
   const [moveShelfOpen, setMoveShelfOpen] = useState(false);
+  const [editingFinishedAt, setEditingFinishedAt] = useState(false);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -182,11 +190,34 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                  Finished
-                </p>
-                <p className="mt-1 text-sm text-foreground">{formatFinishedAt(rowUb.finishedAt)}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                    Finished
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingFinishedAt((v) => !v)}
+                    className="text-xs font-semibold text-accent hover:underline"
+                  >
+                    {editingFinishedAt ? "Done" : "Edit"}
+                  </button>
+                </div>
+                {editingFinishedAt ? (
+                  <input
+                    type="date"
+                    value={toDateInputValue(rowUb.finishedAt)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      actions.updateFinishedAt(bookId, new Date(val + "T12:00:00").toISOString());
+                    }}
+                    className="mt-1 w-full rounded-lg border border-border bg-card-surface px-3 py-2 text-sm text-foreground"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-foreground">{formatDate(rowUb.finishedAt)}</p>
+                )}
               </div>
+
 
               <div className="space-y-2 border-t border-dashed border-border/70 pt-4">
                 <div className="flex flex-wrap gap-2">

@@ -218,6 +218,24 @@ export function ProgressUpdateSheet({
               {saveHint ? <p className="text-xs text-red-700">{saveHint}</p> : null}
 
               <div className="border-t border-border pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                    Date added
+                  </p>
+                </div>
+                <input
+                  type="date"
+                  value={userBook.addedAt ? new Date(userBook.addedAt).toISOString().slice(0, 10) : ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    actions.updateAddedAt(bookId, new Date(val + "T12:00:00").toISOString());
+                  }}
+                  className="mt-1 w-full rounded-lg border border-border bg-card-surface px-3 py-2 text-sm text-foreground"
+                />
+              </div>
+
+              <div className="border-t border-border pt-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
                   Wrong shelf?
                 </p>

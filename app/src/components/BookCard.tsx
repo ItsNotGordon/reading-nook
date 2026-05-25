@@ -208,6 +208,21 @@ export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRated
               Move book
             </p>
             <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
+                Date added
+              </p>
+              <input
+                type="date"
+                value={userBook.addedAt ? new Date(userBook.addedAt).toISOString().slice(0, 10) : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (!val) return;
+                  actions.updateAddedAt(userBook.bookId, new Date(val + "T12:00:00").toISOString());
+                }}
+                className="mt-1 w-full rounded-lg border border-border bg-card-surface px-3 py-2 text-sm text-foreground"
+              />
+            </div>
             <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"
