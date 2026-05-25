@@ -1,4 +1,5 @@
 import { normalizeGenreList } from "@/lib/genreNormalize";
+import { canonicalForSegment, type AcceptedGenre } from "@/lib/genreVocabulary";
 import type { SearchBookResult } from "./types";
 
 const GB_API_BASE = "https://www.googleapis.com/books/v1/volumes";
@@ -64,6 +65,8 @@ const MAX_GENRES = 6;
 /**
  * Parse Google Books `categories` into canonical genre labels.
  * Categories look like "Fiction / Science Fiction / General" or just "Fiction".
+ * Each segment is mapped through genreVocabulary's canonical lookup first,
+ * then falls back to the raw segment for normalizeGenreList to handle.
  */
 function parseCategories(categories: string[] | undefined): string[] {
   if (!categories || categories.length === 0) return [];
@@ -71,9 +74,9 @@ function parseCategories(categories: string[] | undefined): string[] {
   for (const cat of categories) {
     for (const seg of cat.split(/\s*\/\s*/)) {
       const trimmed = seg.trim();
-      if (trimmed && trimmed.toLowerCase() !== "general") {
-        segments.push(trimmed);
-      }
+      if (!trimmed || trimmed.toLowerCase() === "general") continue;
+      const canonical = canonicalForSegment(trimmed);
+      segments.push(canonical ?? trimmed);
     }
   }
   return normalizeGenreList(segments).slice(0, MAX_GENRES);
@@ -82,6 +85,64 @@ function parseCategories(categories: string[] | undefined): string[] {
 function stripHtml(html: string | undefined): string {
   if (!html) return "";
   return html.replace(/<[^>]*>/g, "").trim();
+}
+
+type DescGenreRule = readonly [RegExp, AcceptedGenre];
+
+const DESC_GENRE_RULES: DescGenreRule[] = [
+  [/\bdystopi(?:an|a)\b/i, "Dystopian"],
+  [/\bpost[\s-]?apocalyptic\b/i, "Dystopian"],
+  [/\bscience[\s-]?fiction\b/i, "Science fiction"],
+  [/\bsci[\s-]?fi\b/i, "Science fiction"],
+  [/\bthriller\b/i, "Thriller"],
+  [/\bsuspense\b/i, "Suspense"],
+  [/\bmystery\b/i, "Mystery"],
+  [/\bdetective\b/i, "Mystery"],
+  [/\bromance\b/i, "Romance"],
+  [/\bfantasy\b/i, "Fantasy"],
+  [/\bhorror\b/i, "Horror"],
+  [/\badventure\b/i, "Adventure"],
+  [/\bcoming[\s-]?of[\s-]?age\b/i, "Coming of age"],
+  [/\bhistorical fiction\b/i, "Historical fiction"],
+  [/\byoung[\s-]?adult\b/i, "Young adult"],
+  [/\bmemoir\b/i, "Memoir"],
+  [/\bcrime\b/i, "Crime"],
+  [/\bwestern\b/i, "Western"],
+  [/\bparanormal\b/i, "Paranormal"],
+  [/\bsupernatural\b/i, "Paranormal"],
+  [/\bvampire/i, "Paranormal"],
+  [/\bwar\b/i, "War"],
+  [/\bpoetry\b/i, "Poetry"],
+  [/\bbiograph(?:y|ical)\b/i, "Biography"],
+  [/\bautobiograph/i, "Memoir"],
+  [/\bcomic(?:s|\sbook)/i, "Comics"],
+  [/\bgraphic\s+novel/i, "Comics"],
+  [/\bmanga\b/i, "Manga"],
+  [/\btrue[\s-]?crime\b/i, "True crime"],
+  [/\bself[\s-]?help\b/i, "Self-help"],
+  [/\bpsycholog/i, "Psychology"],
+  [/\bphilosoph/i, "Philosophy"],
+];
+
+/**
+ * Extract additional genres by scanning a book's description for
+ * confident genre keywords. Only returns genres not already present.
+ */
+function extractGenresFromDescription(
+  description: string,
+  existing: readonly string[],
+): string[] {
+  if (!description || description.length < 20) return [];
+  const have = new Set(existing.map((g) => g.toLowerCase()));
+  const found: string[] = [];
+  for (const [pattern, genre] of DESC_GENRE_RULES) {
+    if (have.has(genre.toLowerCase())) continue;
+    if (pattern.test(description)) {
+      have.add(genre.toLowerCase());
+      found.push(genre);
+    }
+  }
+  return found;
 }
 
 function volumeToBook(item: GBVolumeItem): SearchBookResult | null {
@@ -96,6 +157,14 @@ function volumeToBook(item: GBVolumeItem): SearchBookResult | null {
       ? info.authors.join(", ")
       : "Unknown";
 
+  const description = stripHtml(info.description);
+  const categoryGenres = parseCategories(info.categories);
+  const descGenres = extractGenresFromDescription(description, categoryGenres);
+  const genres = normalizeGenreList([...categoryGenres, ...descGenres]).slice(
+    0,
+    MAX_GENRES,
+  );
+
   return {
     id: `googlebooks:${item.id}`,
     title: info.title.trim(),
@@ -105,8 +174,8 @@ function volumeToBook(item: GBVolumeItem): SearchBookResult | null {
       typeof info.pageCount === "number" && info.pageCount > 0
         ? info.pageCount
         : 0,
-    genres: parseCategories(info.categories),
-    description: stripHtml(info.description),
+    genres,
+    description,
     ...(parsePublishedYear(info.publishedDate) != null
       ? { publishedYear: parsePublishedYear(info.publishedDate) }
       : {}),
@@ -213,9 +282,17 @@ export async function fetchGoogleBooksVolumeDetails(
   const info = item.volumeInfo;
   if (!info) return null;
 
+  const description = stripHtml(info.description);
+  const categoryGenres = parseCategories(info.categories);
+  const descGenres = extractGenresFromDescription(description, categoryGenres);
+  const genres = normalizeGenreList([...categoryGenres, ...descGenres]).slice(
+    0,
+    MAX_GENRES,
+  );
+
   return {
-    description: stripHtml(info.description),
-    genres: parseCategories(info.categories),
+    description,
+    genres,
     ...(info.title?.trim() ? { title: info.title.trim() } : {}),
   };
 }
