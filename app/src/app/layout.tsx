@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   },
   description: "A cozy place for your reading life.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

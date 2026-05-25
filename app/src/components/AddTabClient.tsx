@@ -12,9 +12,6 @@ type FilterPanel = "genre" | "year" | "system" | null;
 export function AddTabClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [engine, setEngine] = useState<RecommendationEngine>("hybrid");
-  const recs = useRecommendationsPool(searchQuery, engine, setEngine);
-
-  const [openPanel, setOpenPanel] = useState<FilterPanel>(null);
   const [minYear, setMinYear] = useState("");
   const [maxYear, setMaxYear] = useState("");
   const parsedMin = minYear !== "" ? parseInt(minYear, 10) : null;
@@ -27,6 +24,10 @@ export function AddTabClient() {
     parsedMin > parsedMax;
   const effectiveMin = yearInvalid || parsedMin == null || Number.isNaN(parsedMin) ? null : parsedMin;
   const effectiveMax = yearInvalid || parsedMax == null || Number.isNaN(parsedMax) ? null : parsedMax;
+
+  const recs = useRecommendationsPool(searchQuery, engine, setEngine, effectiveMin, effectiveMax);
+
+  const [openPanel, setOpenPanel] = useState<FilterPanel>(null);
 
   const genreProps =
     recs.status === "ready" && recs.sortedFilterGenres.length > 0
@@ -73,7 +74,7 @@ export function AddTabClient() {
         minYear={effectiveMin}
         maxYear={effectiveMax}
       />
-      <RecsListPanel model={recs} minYear={effectiveMin} maxYear={effectiveMax} />
+      <RecsListPanel model={recs} />
     </div>
   );
 }

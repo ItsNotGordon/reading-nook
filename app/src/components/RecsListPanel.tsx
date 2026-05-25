@@ -134,11 +134,9 @@ function RecommendationCard({
 
 type RecsListPanelProps = {
   model: RecommendationsPoolModel;
-  minYear?: number | null;
-  maxYear?: number | null;
 };
 
-export function RecsListPanel({ model, minYear, maxYear }: RecsListPanelProps) {
+export function RecsListPanel({ model }: RecsListPanelProps) {
   const { state, actions } = useReadingNook();
   const {
     rows,
@@ -155,18 +153,6 @@ export function RecsListPanel({ model, minYear, maxYear }: RecsListPanelProps) {
     appNativeEmptyReason,
     discoverLoading,
   } = model;
-
-  const yearFilteredRecs = useMemo(() => {
-    const min = minYear ?? null;
-    const max = maxYear ?? null;
-    if (min == null && max == null) return visibleRecs;
-    return visibleRecs.filter((rec) => {
-      if (rec.publishedYear == null) return false;
-      if (min != null && rec.publishedYear < min) return false;
-      if (max != null && rec.publishedYear > max) return false;
-      return true;
-    });
-  }, [visibleRecs, minYear, maxYear]);
 
   const [pickerBook, setPickerBook] = useState<Book | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -268,7 +254,7 @@ export function RecsListPanel({ model, minYear, maxYear }: RecsListPanelProps) {
             <div className="space-y-1">
               {queueAfterFilter > RECS_VISIBLE_COUNT ? (
                 <p className="text-xs text-foreground-muted/90">
-                  Showing {yearFilteredRecs.length} of {queueAfterFilter} recommendations. Shuffle for
+                  Showing {visibleRecs.length} of {queueAfterFilter} recommendations. Shuffle for
                   a different set.
                 </p>
               ) : null}
@@ -287,7 +273,7 @@ export function RecsListPanel({ model, minYear, maxYear }: RecsListPanelProps) {
             </div>
 
             <ul className="space-y-2.5">
-              {yearFilteredRecs.map((rec) => (
+              {visibleRecs.map((rec) => (
                 <RecommendationCard
                   key={rec.bookId}
                   rec={rec}

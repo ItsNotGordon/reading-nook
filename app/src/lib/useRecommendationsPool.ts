@@ -100,6 +100,8 @@ export function useRecommendationsPool(
   chipFilterQuery = "",
   engine: RecommendationEngine = "hybrid",
   setEngine: (engine: RecommendationEngine) => void = () => undefined,
+  minYear: number | null = null,
+  maxYear: number | null = null,
 ): RecommendationsPoolModel {
   const { state } = useReadingNook();
   const [discoverCache, setDiscoverCache] = useState<{
@@ -215,7 +217,7 @@ export function useRecommendationsPool(
 
   const filterActive = activeFilterLowerKeys.length > 0;
 
-  const filteredPool = useMemo(() => {
+  const genreFilteredPool = useMemo(() => {
     if (activeFilterLowerKeys.length === 0) return notShelvedRecs;
     const sel = new Set(activeFilterLowerKeys);
     return notShelvedRecs.filter((rec) =>
@@ -223,13 +225,25 @@ export function useRecommendationsPool(
     );
   }, [notShelvedRecs, activeFilterLowerKeys]);
 
+  const filteredPool = useMemo(() => {
+    if (minYear == null && maxYear == null) return genreFilteredPool;
+    return genreFilteredPool.filter((rec) => {
+      if (rec.publishedYear == null) return false;
+      if (minYear != null && rec.publishedYear < minYear) return false;
+      if (maxYear != null && rec.publishedYear > maxYear) return false;
+      return true;
+    });
+  }, [genreFilteredPool, minYear, maxYear]);
+
   const poolKey = useMemo(
     () =>
       [
         filteredPool.map((r) => r.bookId).join("|"),
         filterActive ? activeFilterLowerKeys.join("|") : "",
+        minYear ?? "",
+        maxYear ?? "",
       ].join("::"),
-    [filteredPool, filterActive, activeFilterLowerKeys],
+    [filteredPool, filterActive, activeFilterLowerKeys, minYear, maxYear],
   );
 
   const visibleRecs = useMemo(() => {
@@ -258,9 +272,10 @@ export function useRecommendationsPool(
 
   const clearGenreFilters = useCallback(() => setSelectedGenreLowerKeys([]), []);
 
+  const yearFilterActive = minYear != null || maxYear != null;
   const queueAfterFilter = filteredPool.length;
   const hasFilterNoMatches =
-    filterActive && queueAfterFilter === 0 && notShelvedRecs.length > 0;
+    (filterActive || yearFilterActive) && queueAfterFilter === 0 && notShelvedRecs.length > 0;
   const poolExhausted = rows.length > 0 && notShelvedRecs.length === 0;
 
   const retryLoad = useCallback(() => {
