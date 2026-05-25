@@ -7,6 +7,7 @@ import {
   parseGoodreadsCsv,
   buildImportPlan,
   mergeImportIntoState,
+  backfillGenresFromDuplicates,
   stripSeriesInfo,
   type ImportSummary,
 } from "@/lib/goodreadsImport";
@@ -196,7 +197,19 @@ export function GoodreadsImportSection() {
       return;
     }
 
-    const merged = mergeImportIntoState(state, rows);
+    let merged = mergeImportIntoState(state, rows);
+
+    // Backfill genres from Goodreads bookshelves onto existing books with no genres
+    if (summary.duplicateRows.length > 0) {
+      const { patchedCount, catalog } = backfillGenresFromDuplicates(
+        summary.duplicateRows,
+        merged,
+      );
+      if (patchedCount > 0) {
+        merged = { ...merged, catalog };
+      }
+    }
+
     actions.hydrateLibrary(merged);
     if (cloudConfigured && cloudUser) {
       void fetch("/api/sync", {

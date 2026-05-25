@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { SENTIMENT_BUCKETS } from "./types";
 import { computeDerivedScores } from "./ranking";
+import { normalizeGenreList } from "./genreNormalize";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -235,16 +236,26 @@ export function goodreadsImportId(goodreadsBookId: string): BookId {
   return `goodreads-import:${goodreadsBookId}`;
 }
 
+function parseGoodreadsShelves(bookshelves: string): string[] {
+  if (!bookshelves.trim()) return [];
+  const raw = bookshelves
+    .split(",")
+    .map((s) => s.trim().replace(/-/g, " "))
+    .filter(Boolean);
+  return normalizeGenreList(raw).slice(0, 6);
+}
+
 export function buildCatalogBook(row: GoodreadsRow): Book {
   const publishedYear =
     row.originalPublicationYear ?? row.yearPublished ?? undefined;
+  const genres = parseGoodreadsShelves(row.bookshelves);
   const book: Book = {
     id: goodreadsImportId(row.bookId),
     title: row.title,
     author: row.author,
     coverUrl: PLACEHOLDER_COVER,
     totalPages: row.numberOfPages > 0 ? row.numberOfPages : 0,
-    genres: [],
+    genres,
     description: "",
   };
   if (publishedYear != null) book.publishedYear = publishedYear;
@@ -290,17 +301,17 @@ function titlesMatch(a: string, b: string): boolean {
   return false;
 }
 
-export function findDuplicate(
+export function findDuplicateBookId(
   row: GoodreadsRow,
   catalog: Record<BookId, Book>,
   userBooks: Partial<Record<BookId, UserBook>>,
-): boolean {
+): BookId | null {
   const importId = goodreadsImportId(row.bookId);
-  if (userBooks[importId]) return true;
+  if (userBooks[importId]) return importId;
 
   const normTitle = normalizeForMatch(row.title);
   const normAuthor = normalizeForMatch(row.author);
-  if (!normTitle) return false;
+  if (!normTitle) return null;
 
   for (const book of Object.values(catalog)) {
     if (!book) continue;
@@ -308,10 +319,18 @@ export function findDuplicate(
     const catTitle = normalizeForMatch(book.title);
     const catAuthor = normalizeForMatch(book.author);
     if (catAuthor !== normAuthor) continue;
-    if (titlesMatch(catTitle, normTitle)) return true;
+    if (titlesMatch(catTitle, normTitle)) return book.id;
   }
 
-  return false;
+  return null;
+}
+
+export function findDuplicate(
+  row: GoodreadsRow,
+  catalog: Record<BookId, Book>,
+  userBooks: Partial<Record<BookId, UserBook>>,
+): boolean {
+  return findDuplicateBookId(row, catalog, userBooks) !== null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -492,4 +511,41 @@ export function mergeImportIntoState(
     userBooks: nextUserBooks,
     bucketRankings,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Genre Backfill for Duplicates                                      */
+/* ------------------------------------------------------------------ */
+
+export type GenreBackfillResult = {
+  patchedCount: number;
+  catalog: Record<BookId, Book>;
+};
+
+/**
+ * For duplicate rows (already in library), backfill genres from Goodreads
+ * bookshelves onto existing catalog entries that have empty genres.
+ */
+export function backfillGenresFromDuplicates(
+  duplicateRows: ImportRow[],
+  state: AppState,
+): GenreBackfillResult {
+  const catalog = { ...state.catalog };
+  let patchedCount = 0;
+
+  for (const row of duplicateRows) {
+    if (row.catalogBook.genres.length === 0) continue;
+
+    const matchId = findDuplicateBookId(row, catalog, state.userBooks);
+    if (!matchId) continue;
+
+    const existing = catalog[matchId];
+    if (!existing) continue;
+    if (existing.genres.length > 0) continue;
+
+    catalog[matchId] = { ...existing, genres: row.catalogBook.genres };
+    patchedCount++;
+  }
+
+  return { patchedCount, catalog };
 }
