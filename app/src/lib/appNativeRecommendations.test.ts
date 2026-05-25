@@ -120,7 +120,7 @@ describe("buildAppNativeRecommendations", () => {
     assert.ok(!result.recommendations.some((r) => r.bookId === id));
   });
 
-  it("uses Apriori + KNN source and reason for native rows", () => {
+  it("uses For You source and reason for native rows", () => {
     const likedId = "openlibrary:OL10W";
     const candidateId = "openlibrary:OL11W";
     const state = baseState({
@@ -136,10 +136,10 @@ describe("buildAppNativeRecommendations", () => {
     const row = result.recommendations.find((r) => r.bookId === candidateId);
     assert.ok(row);
     assert.equal(row?.source, HYBRID_SOURCE);
-    assert.ok(row?.reason.includes("Apriori") || row?.reason.includes("KNN"));
+    assert.ok(row?.reason.includes("Based on") || row?.reason.includes("Recommended from") || row?.reason.includes("Similar to"));
   });
 
-  it("uses TF-IDF source when TF-IDF engine is selected", () => {
+  it("uses Similar Vibes source when tfidf engine is selected", () => {
     const likedId = "openlibrary:OL20W";
     const candidateId = "openlibrary:OL21W";
     const state = baseState({
@@ -155,7 +155,7 @@ describe("buildAppNativeRecommendations", () => {
     const row = result.recommendations.find((r) => r.bookId === candidateId);
     assert.ok(row);
     assert.equal(row?.source, TFIDF_SOURCE);
-    assert.ok(row?.reason.includes("TF-IDF"));
+    assert.ok(row?.reason.includes("genre") || row?.reason.includes("author"));
   });
 
   it("ranks sci-fi above romance after many liked sci-fi and one disliked romance", () => {

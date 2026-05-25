@@ -57,6 +57,7 @@ function bookToCandidate(book: Book): RecPersonalRow {
     source: APP_NATIVE_SOURCE_CATALOG,
     ...(book.readinglogCount != null ? { readinglogCount: book.readinglogCount } : {}),
     ...(book.ratingsCount != null ? { ratingsCount: book.ratingsCount } : {}),
+    ...(book.publishedYear != null ? { publishedYear: book.publishedYear } : {}),
   };
 }
 
@@ -72,6 +73,7 @@ function discoverToCandidate(book: SearchBookResult): RecPersonalRow {
     source: APP_NATIVE_SOURCE_DISCOVER,
     ...(book.readinglogCount != null ? { readinglogCount: book.readinglogCount } : {}),
     ...(book.ratingsCount != null ? { ratingsCount: book.ratingsCount } : {}),
+    ...(book.publishedYear != null ? { publishedYear: book.publishedYear } : {}),
   };
 }
 

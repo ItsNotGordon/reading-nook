@@ -109,9 +109,11 @@ export function predictLikeScore(
 }
 
 export function knnReasonFragment(prediction: KnnPrediction): string {
-  if (prediction.neighborCount === 0) return "KNN: no finished books to compare";
+  if (prediction.neighborCount === 0) return "";
   if (prediction.likedNeighborCount > 0) {
-    return `KNN: similar to ${prediction.likedNeighborCount} book(s) you liked`;
+    const n = prediction.likedNeighborCount;
+    return `Similar to ${n} ${n === 1 ? "book" : "books"} you've enjoyed`;
   }
-  return `KNN: similar to ${prediction.neighborCount} finished book(s)`;
+  const n = prediction.neighborCount;
+  return `Similar to ${n} ${n === 1 ? "book" : "books"} you've read`;
 }

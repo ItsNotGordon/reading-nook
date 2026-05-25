@@ -14,7 +14,7 @@ import { runWeightedApriori } from "./weightedApriori";
 import { authorKey, buildWeightedTasteProfile, genreKey, topGenresByAffinity } from "./weightedTaste";
 import { knnReasonFragment, predictLikeScore } from "./sentimentKnn";
 
-export const HYBRID_SOURCE = "Apriori + KNN";
+export const HYBRID_SOURCE = "For You";
 
 const MIN_FILTERED_CANDIDATES = 5;
 const APRIORI_BLEND = 0.45;
@@ -75,18 +75,26 @@ function buildReason(
 ): string {
   const parts: string[] = [];
   if (ruleBlurbs.length > 0) {
-    parts.push(`Apriori: ${ruleBlurbs.slice(0, 2).join("; ")}`);
+    const genres = ruleBlurbs.slice(0, 3);
+    if (genres.length === 1) {
+      parts.push(`Based on your love of ${genres[0]}`);
+    } else {
+      const last = genres.pop()!;
+      parts.push(`Based on your love of ${genres.join(", ")} and ${last}`);
+    }
   } else {
-    parts.push("Apriori: top genres from your finished books");
+    parts.push("Recommended from your reading history");
   }
-  parts.push(knnFragment);
+  if (knnFragment) {
+    parts.push(knnFragment);
+  }
   if (penaltyBlurb && penaltyBlurb !== "Neutral for your taste so far.") {
     parts.push(penaltyBlurb);
   }
   if (serendipity) {
-    parts.push("Less widely read on Open Library");
+    parts.push("A hidden gem");
   }
-  return parts.join(". ");
+  return parts.join(". ") + ".";
 }
 
 function candidateGenreKeys(genres: string[]): string[] {
@@ -123,9 +131,9 @@ function applySerendipitySlots(
     if (gems.length >= SERENDIPITY_SLOTS) break;
     if (row.tasteFit < TASTE_FIT_GEM_MIN) continue;
     if (row.popularityScore > popThreshold) continue;
-    const gemReason = row.reason.includes("Less widely read")
+    const gemReason = row.reason.includes("hidden gem")
       ? row.reason
-      : `${row.reason}. Less widely read on Open Library.`;
+      : row.reason.replace(/\.$/, ". A hidden gem.");
     gems.push({ ...row, reason: gemReason });
   }
 

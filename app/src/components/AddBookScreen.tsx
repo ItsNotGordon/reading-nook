@@ -98,9 +98,19 @@ export type AddBookScreenProps = {
   onQueryChange?: (value: string) => void;
   /** Rendered directly under the catalog search field (e.g. recommendation genre filters). */
   afterSearch?: ReactNode;
+  minYear?: number | null;
+  maxYear?: number | null;
 };
 
-export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: AddBookScreenProps = {}) {
+function passesYearFilter(book: Book, min: number | null, max: number | null): boolean {
+  if (min == null && max == null) return true;
+  if (book.publishedYear == null) return false;
+  if (min != null && book.publishedYear < min) return false;
+  if (max != null && book.publishedYear > max) return false;
+  return true;
+}
+
+export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, minYear, maxYear }: AddBookScreenProps = {}) {
   const { state, actions } = useReadingNook();
   const [internalQuery, setInternalQuery] = useState("");
   const controlled = onQueryChange !== undefined;
@@ -159,11 +169,15 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch }: 
     };
   }, [normalizedQuery, queryReady, retryKey]);
 
+  const yearMin = minYear ?? null;
+  const yearMax = maxYear ?? null;
   const allMatches = useMemo(() => {
     if (searchStatus !== "ready" || !queryReady) return [];
     const inLibrary = new Set(Object.keys(state.userBooks));
-    return searchResults.filter((b) => !inLibrary.has(b.id));
-  }, [searchResults, searchStatus, queryReady, state.userBooks]);
+    return searchResults
+      .filter((b) => !inLibrary.has(b.id))
+      .filter((b) => passesYearFilter(b, yearMin, yearMax));
+  }, [searchResults, searchStatus, queryReady, state.userBooks, yearMin, yearMax]);
   const results = useMemo(() => allMatches.slice(0, MAX_RESULTS), [allMatches]);
 
   const closePicker = useCallback(() => setPickerBook(null), []);

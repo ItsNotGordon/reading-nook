@@ -34,6 +34,7 @@ export type Recommendation = {
   source: string;
   readinglogCount?: number;
   ratingsCount?: number;
+  publishedYear?: number;
 };
 
 export type RecommendationsPoolModel = {

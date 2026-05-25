@@ -14,6 +14,7 @@ export type RecPersonalRow = {
   rawKind?: string;
   readinglogCount?: number;
   ratingsCount?: number;
+  publishedYear?: number;
 };
 
 const NEUTRAL_FIT = 5;

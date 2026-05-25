@@ -134,9 +134,11 @@ function RecommendationCard({
 
 type RecsListPanelProps = {
   model: RecommendationsPoolModel;
+  minYear?: number | null;
+  maxYear?: number | null;
 };
 
-export function RecsListPanel({ model }: RecsListPanelProps) {
+export function RecsListPanel({ model, minYear, maxYear }: RecsListPanelProps) {
   const { state, actions } = useReadingNook();
   const {
     rows,
@@ -153,6 +155,18 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
     appNativeEmptyReason,
     discoverLoading,
   } = model;
+
+  const yearFilteredRecs = useMemo(() => {
+    const min = minYear ?? null;
+    const max = maxYear ?? null;
+    if (min == null && max == null) return visibleRecs;
+    return visibleRecs.filter((rec) => {
+      if (rec.publishedYear == null) return false;
+      if (min != null && rec.publishedYear < min) return false;
+      if (max != null && rec.publishedYear > max) return false;
+      return true;
+    });
+  }, [visibleRecs, minYear, maxYear]);
 
   const [pickerBook, setPickerBook] = useState<Book | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -254,7 +268,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
             <div className="space-y-1">
               {queueAfterFilter > RECS_VISIBLE_COUNT ? (
                 <p className="text-xs text-foreground-muted/90">
-                  Showing {visibleRecs.length} of {queueAfterFilter} recommendations. Shuffle for
+                  Showing {yearFilteredRecs.length} of {queueAfterFilter} recommendations. Shuffle for
                   a different set.
                 </p>
               ) : null}
@@ -262,32 +276,18 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
             </div>
 
             <div className="flex justify-end">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground-muted" htmlFor="rec-engine">
-                  System
-                </label>
-                <select
-                  id="rec-engine"
-                  value={model.engine}
-                  onChange={(e) => model.setEngine(e.target.value as "hybrid" | "tfidf")}
-                  className="min-h-9 rounded-xl border border-border bg-background px-2.5 text-xs font-semibold text-foreground"
-                >
-                  <option value="hybrid">Apriori + KNN</option>
-                  <option value="tfidf">TF-IDF</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={reshuffle}
-                  disabled={filteredPool.length < 2}
-                  className="min-h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50"
-                >
-                  Shuffle
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={reshuffle}
+                disabled={filteredPool.length < 2}
+                className="min-h-9 rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50"
+              >
+                Shuffle
+              </button>
             </div>
 
             <ul className="space-y-2.5">
-              {visibleRecs.map((rec) => (
+              {yearFilteredRecs.map((rec) => (
                 <RecommendationCard
                   key={rec.bookId}
                   rec={rec}

@@ -150,9 +150,14 @@ export function recommendTargetGenres(
     for (const c of rule.consequent) {
       if (positiveAffinity(c)) targetGenres.add(c);
     }
-    const ant = rule.antecedent.join(", ");
-    const cons = rule.consequent.join(", ");
-    ruleBlurbs.push(`${ant} → ${cons}`);
+    for (const c of rule.consequent) {
+      const displayName = c.charAt(0).toUpperCase() + c.slice(1);
+      if (!ruleBlurbs.includes(displayName)) ruleBlurbs.push(displayName);
+    }
+    for (const a of rule.antecedent) {
+      const displayName = a.charAt(0).toUpperCase() + a.slice(1);
+      if (!ruleBlurbs.includes(displayName)) ruleBlurbs.push(displayName);
+    }
   }
 
   return { targetGenres, matchedRules, ruleBlurbs };

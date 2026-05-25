@@ -168,6 +168,17 @@ Built from **`app/src/lib/appNativeRecommendations.ts`** using **`hybridAprioriK
 
 **Rules:** Hide shelved books and dismissed IDs (`dismissedRecIds`); do **not** depend on Goodbooks JSON for live UI.
 
+### Recommendation system display names
+
+The two recommendation engines use **user-friendly names** in the UI to make them accessible to the average user:
+
+| Internal engine | UI label | Description |
+| --------------- | -------------- | ----------- |
+| `hybrid` (Apriori + KNN) | **For You** | Personalized recommendations blending genre affinity mining, sentiment-based nearest-neighbor scoring, and Open Library popularity. |
+| `tfidf` | **Similar Vibes** | Recommendations based on genre and author term overlap with the user's finished books. |
+
+The internal engine identifiers (`hybrid`, `tfidf`) and algorithm implementations are unchanged; only the labels shown to users were updated.
+
 ### `/recs`
 
 **Not a product route** — exists only as a **redirect to `/add`** (`app/src/app/(tabs)/recs/page.tsx`). Do not document a standalone Recs tab.

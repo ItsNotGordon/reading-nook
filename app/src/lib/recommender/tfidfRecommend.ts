@@ -3,7 +3,7 @@ import type { RecPersonalRow } from "@/lib/recPersonalization";
 import type { AppState } from "@/lib/types";
 import { buildWeightedTasteProfile, genreKey } from "./weightedTaste";
 
-export const TFIDF_SOURCE = "TF-IDF";
+export const TFIDF_SOURCE = "Similar Vibes";
 
 const TERM_BOOST_LIKED = 1;
 const TERM_BOOST_OKAY = 0.45;
@@ -140,7 +140,7 @@ export function tfidfRecommend(
       ...rec,
       score: toDisplayScore(similarity),
       source: TFIDF_SOURCE,
-      reason: "TF-IDF: overlaps with your finished-book genre/author terms.",
+      reason: "Matches the genres and authors from your finished books.",
     };
   });
 

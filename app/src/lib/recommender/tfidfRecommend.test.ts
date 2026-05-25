@@ -77,7 +77,7 @@ describe("tfidfRecommend", () => {
     assert.equal(rows[0]?.bookId, fantasyCandidate);
   });
 
-  it("labels rows with TF-IDF source", () => {
+  it("labels rows with Similar Vibes source", () => {
     const likedId = "openlibrary:OL_LIKE2";
     const candidateId = "openlibrary:OL_CAND2";
     const state = baseState({
@@ -92,6 +92,6 @@ describe("tfidfRecommend", () => {
       candidate(candidateId, ["Mystery"], "Author Y"),
     ]);
     assert.equal(rows[0]?.source, TFIDF_SOURCE);
-    assert.ok(rows[0]?.reason.includes("TF-IDF"));
+    assert.ok(rows[0]?.reason.includes("genre") || rows[0]?.reason.includes("author"));
   });
 });
