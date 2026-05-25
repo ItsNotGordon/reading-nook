@@ -41,7 +41,11 @@ export type AppAction =
   | { type: "UPDATE_USER_BOOK_NOTES"; bookId: BookId; notes: string }
   | { type: "UPDATE_CATALOG_GENRES"; bookId: BookId; genres: string[] }
   | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string; theme?: AppTheme }
-  | { type: "DISMISS_REC"; bookId: BookId };
+  | { type: "DISMISS_REC"; bookId: BookId; catalogBook?: Book }
+  | { type: "ADD_BLACKLIST_WORD"; word: string }
+  | { type: "REMOVE_BLACKLIST_WORD"; word: string }
+  | { type: "RESTORE_DISMISSED_REC"; bookId: BookId }
+  | { type: "RESTORE_ALL_DISMISSED_RECS" };
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -173,6 +177,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...action.payload,
         profile: action.payload.profile ?? defaultUserProfile(),
         dismissedRecIds: action.payload.dismissedRecIds ?? [],
+        blacklistedTitleWords: action.payload.blacklistedTitleWords ?? [],
       };
 
     case "RESET_LIBRARY":
@@ -206,7 +211,37 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case "DISMISS_REC": {
       if (state.dismissedRecIds.includes(action.bookId)) return state;
-      return { ...state, dismissedRecIds: [...state.dismissedRecIds, action.bookId] };
+      let catalog = state.catalog;
+      if (action.catalogBook && action.catalogBook.id === action.bookId && !catalog[action.bookId]) {
+        catalog = { ...catalog, [action.bookId]: action.catalogBook };
+      }
+      return { ...state, catalog, dismissedRecIds: [...state.dismissedRecIds, action.bookId] };
+    }
+
+    case "ADD_BLACKLIST_WORD": {
+      const word = action.word.trim();
+      if (!word || state.blacklistedTitleWords.includes(word)) return state;
+      return { ...state, blacklistedTitleWords: [...state.blacklistedTitleWords, word] };
+    }
+
+    case "REMOVE_BLACKLIST_WORD": {
+      return {
+        ...state,
+        blacklistedTitleWords: state.blacklistedTitleWords.filter((w) => w !== action.word),
+      };
+    }
+
+    case "RESTORE_DISMISSED_REC": {
+      if (!state.dismissedRecIds.includes(action.bookId)) return state;
+      return {
+        ...state,
+        dismissedRecIds: state.dismissedRecIds.filter((id) => id !== action.bookId),
+      };
+    }
+
+    case "RESTORE_ALL_DISMISSED_RECS": {
+      if (state.dismissedRecIds.length === 0) return state;
+      return { ...state, dismissedRecIds: [] };
     }
 
     case "ADD_BOOK_TO_SHELF": {

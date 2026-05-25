@@ -102,6 +102,7 @@ export function useRecommendationsPool(
   setEngine: (engine: RecommendationEngine) => void = () => undefined,
   minYear: number | null = null,
   maxYear: number | null = null,
+  blacklistEnabled = true,
 ): RecommendationsPoolModel {
   const { state } = useReadingNook();
   const [discoverCache, setDiscoverCache] = useState<{
@@ -118,7 +119,7 @@ export function useRecommendationsPool(
   const tasteActive = useMemo(() => buildTasteSignals(state).active, [state]);
   const unshelvedCatalogCount = useMemo(() => countUnshelvedCatalog(state), [state]);
   const topGenresForDiscover = useMemo(
-    () => getWeightedTopGenres(state, 2),
+    () => getWeightedTopGenres(state, 4),
     [state],
   );
 
@@ -154,11 +155,18 @@ export function useRecommendationsPool(
     return discoverResultsToCandidates(discoverCache.books);
   }, [shouldFetchDiscover, discoverGenreKey, discoverCache]);
 
+  const excludeTitleWords = useMemo(
+    () => (blacklistEnabled ? state.blacklistedTitleWords : []),
+    [blacklistEnabled, state.blacklistedTitleWords],
+  );
+
   const { rows, appNativeEmptyReason } = useMemo(() => {
     const native = buildAppNativeRecommendations(state, {
       discoverCandidates,
       maxResults: RECS_POOL_MAX,
       engine,
+      excludeBookIds: state.dismissedRecIds,
+      excludeTitleWords,
     });
     const normalized = native.recommendations.map((r) => ({
       ...r,
@@ -168,7 +176,7 @@ export function useRecommendationsPool(
       rows: normalized as Recommendation[],
       appNativeEmptyReason: native.emptyReason,
     };
-  }, [state, discoverCandidates, engine]);
+  }, [state, discoverCandidates, engine, excludeTitleWords]);
 
   const notShelvedRecs = useMemo(
     () =>
@@ -217,13 +225,21 @@ export function useRecommendationsPool(
 
   const filterActive = activeFilterLowerKeys.length > 0;
 
+  const blacklistWords = state.blacklistedTitleWords;
+  const afterBlacklist = useMemo(() => {
+    if (!blacklistEnabled || blacklistWords.length === 0) return notShelvedRecs;
+    return notShelvedRecs.filter(
+      (rec) => !blacklistWords.some((w) => rec.title.includes(w)),
+    );
+  }, [notShelvedRecs, blacklistEnabled, blacklistWords]);
+
   const genreFilteredPool = useMemo(() => {
-    if (activeFilterLowerKeys.length === 0) return notShelvedRecs;
+    if (activeFilterLowerKeys.length === 0) return afterBlacklist;
     const sel = new Set(activeFilterLowerKeys);
-    return notShelvedRecs.filter((rec) =>
+    return afterBlacklist.filter((rec) =>
       rec.genres.some((g) => sel.has(g.trim().toLowerCase())),
     );
-  }, [notShelvedRecs, activeFilterLowerKeys]);
+  }, [afterBlacklist, activeFilterLowerKeys]);
 
   const filteredPool = useMemo(() => {
     if (minYear == null && maxYear == null) return genreFilteredPool;

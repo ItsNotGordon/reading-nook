@@ -26,6 +26,9 @@ type FilterToolbarProps = {
   engine: RecommendationEngine;
   onEngineChange: (e: RecommendationEngine) => void;
   onClearAll: () => void;
+  blacklistEnabled: boolean;
+  onBlacklistToggle: () => void;
+  hasBlacklistWords: boolean;
 };
 
 const btnBase =
@@ -45,6 +48,9 @@ export function FilterToolbar({
   engine,
   onEngineChange,
   onClearAll,
+  blacklistEnabled,
+  onBlacklistToggle,
+  hasBlacklistWords,
 }: FilterToolbarProps) {
   const [genreSearch, setGenreSearch] = useState("");
 
@@ -86,6 +92,16 @@ export function FilterToolbar({
         >
           System{systemNonDefault ? " *" : ""}
         </button>
+        {hasBlacklistWords ? (
+          <button
+            type="button"
+            onClick={onBlacklistToggle}
+            aria-pressed={blacklistEnabled}
+            className={`${btnBase} ${blacklistEnabled ? btnActive : btnIdle}`}
+          >
+            Blacklist {blacklistEnabled ? "On" : "Off"}
+          </button>
+        ) : null}
         {anyFilterActive ? (
           <button
             type="button"

@@ -6,14 +6,17 @@ import { FilterToolbar } from "@/components/FilterToolbar";
 import { RecsListPanel } from "@/components/RecsListPanel";
 import type { RecommendationEngine } from "@/lib/appNativeRecommendations";
 import { useRecommendationsPool } from "@/lib/useRecommendationsPool";
+import { useReadingNook } from "@/lib/app-state";
 
 type FilterPanel = "genre" | "year" | "system" | null;
 
 export function AddTabClient() {
+  const { state } = useReadingNook();
   const [searchQuery, setSearchQuery] = useState("");
   const [engine, setEngine] = useState<RecommendationEngine>("hybrid");
   const [minYear, setMinYear] = useState("");
   const [maxYear, setMaxYear] = useState("");
+  const [blacklistEnabled, setBlacklistEnabled] = useState(true);
   const parsedMin = minYear !== "" ? parseInt(minYear, 10) : null;
   const parsedMax = maxYear !== "" ? parseInt(maxYear, 10) : null;
   const yearInvalid =
@@ -25,7 +28,9 @@ export function AddTabClient() {
   const effectiveMin = yearInvalid || parsedMin == null || Number.isNaN(parsedMin) ? null : parsedMin;
   const effectiveMax = yearInvalid || parsedMax == null || Number.isNaN(parsedMax) ? null : parsedMax;
 
-  const recs = useRecommendationsPool(searchQuery, engine, setEngine, effectiveMin, effectiveMax);
+  const hasBlacklistWords = state.blacklistedTitleWords.length > 0;
+
+  const recs = useRecommendationsPool(searchQuery, engine, setEngine, effectiveMin, effectiveMax, blacklistEnabled);
 
   const [openPanel, setOpenPanel] = useState<FilterPanel>(null);
 
@@ -62,6 +67,9 @@ export function AddTabClient() {
       engine={engine}
       onEngineChange={setEngine}
       onClearAll={clearAllFilters}
+      blacklistEnabled={blacklistEnabled}
+      onBlacklistToggle={() => setBlacklistEnabled((prev) => !prev)}
+      hasBlacklistWords={hasBlacklistWords}
     />
   );
 

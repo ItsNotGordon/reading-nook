@@ -38,7 +38,11 @@ export type ReadingNookActions = {
   updateUserBookNotes: (bookId: BookId, notes: string) => void;
   updateCatalogGenres: (bookId: BookId, genres: string[]) => void;
   updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline" | "theme">>) => void;
-  dismissRec: (bookId: BookId) => void;
+  dismissRec: (bookId: BookId, catalogBook?: Book) => void;
+  addBlacklistWord: (word: string) => void;
+  removeBlacklistWord: (word: string) => void;
+  restoreDismissedRec: (bookId: BookId) => void;
+  restoreAllDismissedRecs: () => void;
 };
 
 type ReadingNookContextValue = {
@@ -97,7 +101,11 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       updateCatalogGenres: (bookId, genres) =>
         dispatch({ type: "UPDATE_CATALOG_GENRES", bookId, genres }),
       updateProfile: (patch) => dispatch({ type: "UPDATE_PROFILE", ...patch }),
-      dismissRec: (bookId) => dispatch({ type: "DISMISS_REC", bookId }),
+      dismissRec: (bookId, catalogBook) => dispatch({ type: "DISMISS_REC", bookId, catalogBook }),
+      addBlacklistWord: (word) => dispatch({ type: "ADD_BLACKLIST_WORD", word }),
+      removeBlacklistWord: (word) => dispatch({ type: "REMOVE_BLACKLIST_WORD", word }),
+      restoreDismissedRec: (bookId) => dispatch({ type: "RESTORE_DISMISSED_REC", bookId }),
+      restoreAllDismissedRecs: () => dispatch({ type: "RESTORE_ALL_DISMISSED_RECS" }),
     }),
     [],
   );

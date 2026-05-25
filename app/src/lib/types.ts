@@ -80,4 +80,6 @@ export type AppState = {
   profile: UserProfile;
   /** Recommendation bookIds the user marked as not interested. */
   dismissedRecIds: BookId[];
+  /** Case-sensitive title words that hide matching recommendations. */
+  blacklistedTitleWords: string[];
 };

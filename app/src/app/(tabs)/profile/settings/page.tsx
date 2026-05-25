@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { BlacklistSection } from "@/components/BlacklistSection";
+import { DismissedRecsSection } from "@/components/DismissedRecsSection";
 import { LibraryBackupSection } from "@/components/LibraryBackupSection";
 import { ProfileAccountSection } from "@/components/ProfileAccountSection";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
@@ -16,6 +18,8 @@ export default function ProfileSettingsPage() {
       </Link>
       <div className="flex flex-col gap-4">
         <ProfileAccountSection />
+        <BlacklistSection />
+        <DismissedRecsSection />
         <LibraryBackupSection />
       </div>
     </ThemedPageShell>

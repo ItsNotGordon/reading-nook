@@ -61,27 +61,6 @@ function IconLeaderboard({ className }: { className?: string }) {
   );
 }
 
-function IconFriends({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="8.5" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M4 19v-.5a4.5 4.5 0 0 1 9 0V19"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-      <circle cx="16" cy="9" r="2.25" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M13.5 19v-.5a3.5 3.5 0 0 1 6.5 0V19"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function IconProfile({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -96,11 +75,26 @@ function IconProfile({ className }: { className?: string }) {
   );
 }
 
+function IconHome({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M9 21V14h6v7" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const tabs: Tab[] = [
+  { href: "/home", label: "Home", Icon: IconHome },
   { href: "/library", label: "Library", Icon: IconLibrary },
-  { href: "/ratings", label: "Ratings", Icon: IconLeaderboard },
   { href: "/add", label: "Add", Icon: IconAdd },
-  { href: "/friends", label: "Friends", Icon: IconFriends },
+  { href: "/ratings", label: "Ratings", Icon: IconLeaderboard },
   { href: "/profile", label: "Profile", Icon: IconProfile },
 ];
 
@@ -117,7 +111,10 @@ export function BottomNav() {
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
       >
         {tabs.map(({ href, label, Icon }) => {
-          const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+          const active =
+            pathname === href ||
+            (href !== "/" && pathname.startsWith(`${href}/`)) ||
+            (href === "/home" && pathname.startsWith("/friends"));
           return (
             <Link
               key={href}

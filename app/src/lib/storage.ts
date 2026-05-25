@@ -294,6 +294,11 @@ function parseDismissedRecIds(value: unknown): BookId[] {
   return value.filter((id): id is BookId => typeof id === "string" && id.trim() !== "");
 }
 
+function parseBlacklistedTitleWords(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((w): w is string => typeof w === "string" && w.trim() !== "");
+}
+
 /** Default empty catalog and library; books are loaded from `public/data/books.json` in the Add flow. */
 export function getInitialState(): AppState {
   return {
@@ -303,6 +308,7 @@ export function getInitialState(): AppState {
     bucketRankings: emptyRankings(),
     profile: defaultUserProfile(),
     dismissedRecIds: [],
+    blacklistedTitleWords: [],
   };
 }
 
@@ -376,6 +382,7 @@ export function parseStoredState(raw: string): AppState | null {
 
   const profile = parseProfile(parsed.profile);
   const dismissedRecIds = parseDismissedRecIds(parsed.dismissedRecIds);
+  const blacklistedTitleWords = parseBlacklistedTitleWords(parsed.blacklistedTitleWords);
 
   return {
     version: 1,
@@ -384,6 +391,7 @@ export function parseStoredState(raw: string): AppState | null {
     bucketRankings: rankings,
     profile,
     dismissedRecIds,
+    blacklistedTitleWords,
   };
 }
 

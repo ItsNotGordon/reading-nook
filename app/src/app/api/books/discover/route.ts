@@ -4,8 +4,8 @@ import type { BookSearchResponse } from "@/lib/bookProviders/types";
 
 export const dynamic = "force-dynamic";
 
-const MAX_GENRES = 2;
-const PER_GENRE_LIMIT = 25;
+const MAX_GENRES = 4;
+const PER_GENRE_LIMIT = 40;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

@@ -22,6 +22,10 @@ export type AppNativeRecommendationsInput = {
   discoverCandidates?: readonly RecPersonalRow[];
   maxResults?: number;
   engine?: RecommendationEngine;
+  /** Book IDs to exclude from the candidate pool (dismissed recs). */
+  excludeBookIds?: readonly string[];
+  /** Title words to exclude from the candidate pool (blacklist). */
+  excludeTitleWords?: readonly string[];
 };
 
 export type AppNativeRecommendationsResult = {
@@ -90,13 +94,22 @@ export function countUnshelvedCatalog(state: AppState): number {
 export function collectCandidates(
   state: AppState,
   discoverCandidates: readonly RecPersonalRow[] = [],
+  excludeBookIds: readonly string[] = [],
+  excludeTitleWords: readonly string[] = [],
 ): RecPersonalRow[] {
   const shelved = new Set(Object.keys(state.userBooks));
+  const excluded = new Set(excludeBookIds);
   const seen = new Set<string>();
   const out: RecPersonalRow[] = [];
 
+  function titleBlacklisted(title: string): boolean {
+    if (excludeTitleWords.length === 0) return false;
+    return excludeTitleWords.some((w) => title.includes(w));
+  }
+
   for (const book of Object.values(state.catalog)) {
     if (!book || shelved.has(book.id) || seen.has(book.id)) continue;
+    if (excluded.has(book.id) || titleBlacklisted(book.title)) continue;
     seen.add(book.id);
     out.push(bookToCandidate(book));
   }
@@ -104,6 +117,7 @@ export function collectCandidates(
   for (const rec of discoverCandidates) {
     if (!isOpenLibraryBookId(rec.bookId)) continue;
     if (shelved.has(rec.bookId) || seen.has(rec.bookId)) continue;
+    if (excluded.has(rec.bookId) || titleBlacklisted(rec.title)) continue;
     seen.add(rec.bookId);
     out.push(rec);
   }
@@ -134,7 +148,12 @@ export function buildAppNativeRecommendations(
     };
   }
 
-  const candidates = collectCandidates(state, input.discoverCandidates ?? []);
+  const candidates = collectCandidates(
+    state,
+    input.discoverCandidates ?? [],
+    input.excludeBookIds ?? [],
+    input.excludeTitleWords ?? [],
+  );
 
   if (candidates.length === 0) {
     return {

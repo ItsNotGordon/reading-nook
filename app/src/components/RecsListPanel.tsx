@@ -180,11 +180,12 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
   }, [feedback]);
 
   const dismissRec = useCallback(
-    (bookId: string) => {
-      actions.dismissRec(bookId);
+    (rec: Recommendation) => {
+      const catalogBook = state.catalog[rec.bookId] ?? recommendationToBook(rec);
+      actions.dismissRec(rec.bookId, catalogBook);
       setFeedback("Removed from recommendations.");
     },
-    [actions],
+    [actions, state.catalog],
   );
 
   const chooseShelf = (shelf: Shelf, userGenres: string[]) => {
@@ -280,7 +281,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
                   userTopGenreLower={userTopGenreLower}
                   personalizationActive={personalizationActive}
                   onSelect={() => openPickerForRec(rec)}
-                  onDismiss={() => dismissRec(rec.bookId)}
+                  onDismiss={() => dismissRec(rec)}
                 />
               ))}
             </ul>
