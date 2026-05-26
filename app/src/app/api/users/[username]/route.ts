@@ -50,7 +50,7 @@ export async function GET(
 
   const { relationship, friendshipId } = relationshipWithViewer(user.id, profile.id, links);
 
-  const friendCount = await countAcceptedFriendships(supabase, profile.id);
+  const counts = await countAcceptedFriendships(supabase, profile.id);
 
   return NextResponse.json({
     id: profile.id,
@@ -60,7 +60,7 @@ export async function GET(
     tagline: profile.tagline ?? "",
     relationship,
     friendshipId,
-    followingCount: friendCount,
-    followersCount: friendCount,
+    followingCount: counts.following,
+    followersCount: counts.followers,
   });
 }

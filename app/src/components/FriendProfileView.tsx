@@ -6,6 +6,10 @@ import { FriendCompareTaste } from "@/components/FriendCompareTaste";
 import { FriendProfileInsights } from "@/components/FriendProfileInsights";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { ProfileSocialTallies } from "@/components/ProfileSocialTallies";
+import {
+  SocialConnectionsSheet,
+  type SocialConnectionUser,
+} from "@/components/SocialConnectionsSheet";
 import type { FriendProfileSummary } from "@/lib/friendProfileSummary";
 import type { FriendRelationship } from "@/lib/friendshipStatus";
 import {
@@ -63,6 +67,10 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   const [taste, setTaste] = useState<TasteResponse | "loading" | null>(null);
   const [insights, setInsights] = useState<FriendProfileSummaryResponse | "loading" | null>(null);
   const [compareBookId, setCompareBookId] = useState<BookId | null>(null);
+  const [socialSheet, setSocialSheet] = useState<"following" | "followers" | null>(null);
+  const [friendsList, setFriendsList] = useState<
+    (SocialConnectionUser & { direction: "incoming" | "outgoing" })[] | null
+  >(null);
 
   const loadProfile = useCallback(async () => {
     setError(null);
@@ -143,6 +151,26 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   }
 
   const isAccepted = profile?.relationship === "accepted";
+
+  const openSocialSheet = useCallback(
+    async (which: "following" | "followers") => {
+      setSocialSheet(which);
+      if (friendsList) return;
+      try {
+        const res = await fetch(
+          `/api/users/${encodeURIComponent(username)}/friends`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          friends: (SocialConnectionUser & { direction: "incoming" | "outgoing" })[];
+        };
+        setFriendsList(data.friends ?? []);
+      } catch {
+        /* leave null — sheet shows empty */
+      }
+    },
+    [username, friendsList],
+  );
 
   const openBookCompare = (bookId: BookId) => {
     setCompareBookId(bookId);
@@ -252,6 +280,8 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
           <ProfileSocialTallies
             followingCount={profile.followingCount ?? null}
             followersCount={profile.followersCount ?? null}
+            onFollowingPress={() => void openSocialSheet("following")}
+            onFollowersPress={() => void openSocialSheet("followers")}
           />
 
           <section className="rounded-xl border border-border/60 bg-card-surface/50 p-3">
@@ -299,6 +329,25 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
           friendDisplayName={profile.displayName}
           friendBook={friendBookForSheet}
           onClose={() => setCompareBookId(null)}
+        />
+      ) : null}
+
+      {socialSheet === "following" ? (
+        <SocialConnectionsSheet
+          title="Following"
+          users={friendsList ?? []}
+          onClose={() => setSocialSheet(null)}
+        />
+      ) : null}
+      {socialSheet === "followers" ? (
+        <SocialConnectionsSheet
+          title="Followers"
+          users={
+            friendsList
+              ? friendsList.filter((f) => f.direction === "incoming")
+              : []
+          }
+          onClose={() => setSocialSheet(null)}
         />
       ) : null}
     </div>
