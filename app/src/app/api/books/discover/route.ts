@@ -72,6 +72,7 @@ export async function GET(request: Request) {
   const sb = getServiceClient();
   const seen = new Set<string>();
   const books: SearchBookResult[] = [];
+  let rateLimited = false;
 
   for (const genre of genreLabels) {
     // Try cache first
@@ -94,6 +95,7 @@ export async function GET(request: Request) {
 
     // Cache miss — fetch from Google Books
     const genreBooks: SearchBookResult[] = [];
+    let hitRateLimit = false;
     const baseOffset = page * BATCHES_PER_PAGE * PER_GENRE_LIMIT;
     for (let batch = 0; batch < BATCHES_PER_PAGE; batch++) {
       const startIndex = baseOffset + batch * PER_GENRE_LIMIT;
@@ -107,8 +109,13 @@ export async function GET(request: Request) {
         genreBooks.push(...results);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("429")) hitRateLimit = true;
         console.warn(`[discover] genre="${genre}" batch=${batch} failed: ${msg}`);
       }
+    }
+
+    if (hitRateLimit && genreBooks.length === 0) {
+      rateLimited = true;
     }
 
     // Store in cache
@@ -126,6 +133,14 @@ export async function GET(request: Request) {
       seen.add(book.id);
       books.push(book);
     }
+  }
+
+  // If every genre was rate-limited and we got zero books, tell the client
+  if (rateLimited && books.length === 0) {
+    return NextResponse.json(
+      { provider: "googlebooks", books: [], rateLimited: true },
+      { status: 429 },
+    );
   }
 
   const body: BookSearchResponse = {

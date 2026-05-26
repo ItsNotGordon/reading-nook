@@ -27,6 +27,9 @@ const REFILL_THRESHOLD = 10;
 /** Don't fetch more than this many pages (0-indexed). */
 const MAX_DISCOVER_PAGES = 1;
 
+/** Cooldown after a 429 rate-limit response (5 minutes). */
+const RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
+
 export type Recommendation = {
   bookId: string;
   title: string;
@@ -90,14 +93,25 @@ function sampleRandomBookIds(pool: Recommendation[], count: number): string[] {
   return shuffled.slice(0, Math.min(count, shuffled.length)).map((r) => r.bookId);
 }
 
+let discoverCooldownUntil = 0;
+
 async function fetchDiscoverBooks(
   genres: string[],
   page = 0,
 ): Promise<SearchBookResult[]> {
   if (genres.length === 0) return [];
+  if (Date.now() < discoverCooldownUntil) return [];
+
   const params = new URLSearchParams({ genres: genres.join(","), page: String(page) });
   const res = await fetch(`/api/books/discover?${params.toString()}`, { cache: "no-store" });
+
+  if (res.status === 429) {
+    discoverCooldownUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+    console.warn(`[discover] rate-limited, cooling down for 5 minutes`);
+    return [];
+  }
   if (!res.ok) return [];
+
   const data: unknown = await res.json();
   if (!data || typeof data !== "object") return [];
   const books = (data as { books?: unknown }).books;
