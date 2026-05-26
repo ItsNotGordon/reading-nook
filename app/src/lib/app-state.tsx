@@ -6,12 +6,14 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
 import { APP_THEMES, type AppState, type Book, type BookId, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
+import { postFeedEvent } from "./feedClient";
 
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
@@ -58,6 +60,8 @@ const ReadingNookContext = createContext<ReadingNookContextValue | null>(null);
 export function ReadingNookProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, undefined, getInitialState);
   const [ready, setReady] = useState(false);
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; });
 
   useEffect(() => {
     const loaded = loadState();
@@ -79,24 +83,64 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
 
   const actions = useMemo<ReadingNookActions>(
     () => ({
-      addBookToShelf: (bookId, shelf, catalogBook) =>
-        dispatch({ type: "ADD_BOOK_TO_SHELF", bookId, shelf, catalogBook }),
-      moveBookToShelf: (bookId, shelf) =>
-        dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf }),
+      addBookToShelf: (bookId, shelf, catalogBook) => {
+        dispatch({ type: "ADD_BOOK_TO_SHELF", bookId, shelf, catalogBook });
+        if (catalogBook) {
+          postFeedEvent({
+            eventType: "shelved",
+            bookId,
+            bookTitle: catalogBook.title,
+            bookAuthor: catalogBook.author,
+            bookCoverUrl: catalogBook.coverUrl,
+            shelf,
+          });
+        }
+      },
+      moveBookToShelf: (bookId, shelf) => {
+        dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf });
+      },
       updateExactProgress: (bookId, currentPage) =>
         dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage }),
       updateReadingExactProgress: (bookId, totalPages, currentPage) =>
         dispatch({ type: "UPDATE_READING_EXACT_PROGRESS", bookId, totalPages, currentPage }),
       updateEstimatedProgress: (bookId, estimatedRange) =>
         dispatch({ type: "UPDATE_ESTIMATED_PROGRESS", bookId, estimatedRange }),
-      markFinished: (bookId) => dispatch({ type: "MARK_FINISHED", bookId }),
+      markFinished: (bookId) => {
+        dispatch({ type: "MARK_FINISHED", bookId });
+        const cat = stateRef.current.catalog[bookId];
+        if (cat) {
+          postFeedEvent({
+            eventType: "finished",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "finished",
+          });
+        }
+      },
       removeUserBook: (bookId) => dispatch({ type: "REMOVE_USER_BOOK", bookId }),
       updateFinishedAt: (bookId, finishedAt) =>
         dispatch({ type: "UPDATE_FINISHED_AT", bookId, finishedAt }),
       updateAddedAt: (bookId, addedAt) =>
         dispatch({ type: "UPDATE_ADDED_AT", bookId, addedAt }),
-      setSentimentBucket: (bookId, sentimentBucket) =>
-        dispatch({ type: "SET_SENTIMENT_BUCKET", bookId, sentimentBucket }),
+      setSentimentBucket: (bookId, sentimentBucket) => {
+        dispatch({ type: "SET_SENTIMENT_BUCKET", bookId, sentimentBucket });
+        if (sentimentBucket) {
+          const cat = stateRef.current.catalog[bookId];
+          if (cat) {
+            postFeedEvent({
+              eventType: "finished",
+              bookId,
+              bookTitle: cat.title,
+              bookAuthor: cat.author,
+              bookCoverUrl: cat.coverUrl,
+              shelf: "finished",
+              sentiment: sentimentBucket,
+            });
+          }
+        }
+      },
       insertBookIntoBucketAtIndex: (bookId, bucket, index) =>
         dispatch({ type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX", bookId, bucket, index }),
       updateBucketRankings: (bucket, orderedBookIds) =>

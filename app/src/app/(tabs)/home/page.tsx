@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
+import { HomeFeed } from "@/components/HomeFeed";
 import { useReadingNook } from "@/lib/app-state";
 import { formatEstimatedPercentRange } from "@/lib/progress";
 import { itemsForShelf, type ShelfItem } from "@/lib/shelfItems";
@@ -85,26 +86,37 @@ export default function HomePage() {
   return (
     <ThemedPageShell title="Home">
       <div className="flex flex-col gap-5">
-        {/* Find friends entry point */}
-        <Link
-          href="/friends"
-          className="flex items-center justify-between rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
-              <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none">
+        {/* Friends + Clubs buttons */}
+        <div className="flex gap-3">
+          <Link
+            href="/friends"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle cx="8.5" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.75" />
                 <path d="M4 19v-.5a4.5 4.5 0 0 1 9 0V19" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
                 <circle cx="16" cy="9" r="2.25" stroke="currentColor" strokeWidth="1.75" />
                 <path d="M13.5 19v-.5a3.5 3.5 0 0 1 6.5 0V19" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
               </svg>
             </span>
-            <span className="text-sm font-semibold text-foreground">
-              Find friends
+            <span className="text-sm font-semibold text-foreground">Friends</span>
+          </Link>
+
+          <Link
+            href="/clubs"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />
+                <path d="M9 7h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
             </span>
-          </div>
-          <span className="text-xs text-foreground-muted">&rsaquo;</span>
-        </Link>
+            <span className="text-sm font-semibold text-foreground">Clubs</span>
+          </Link>
+        </div>
 
         {/* Continue Reading */}
         {reading.length > 0 ? (
@@ -128,43 +140,8 @@ export default function HomePage() {
           </section>
         ) : null}
 
-        {/* Quick actions */}
-        <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">
-            Discover
-          </h2>
-          <Link
-            href="/add"
-            className="flex items-center gap-3 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
-              <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.75" />
-                <path d="M12 8v8M8 12h8" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-              </svg>
-            </span>
-            <span className="text-sm font-semibold text-foreground">
-              Search &amp; recommendations
-            </span>
-          </Link>
-        </section>
-
-        {/* Friend activity placeholder / empty state */}
-        <section className="rounded-2xl border border-border bg-card-surface/95 p-5 text-center shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
-          <p className="text-sm font-semibold text-foreground">
-            Your feed is quiet.
-          </p>
-          <p className="mt-1 text-xs text-foreground-muted">
-            Find friends to see what they&apos;re reading, finishing, and
-            ranking.
-          </p>
-          <Link
-            href="/friends"
-            className="mt-3 inline-flex h-9 items-center justify-center rounded-xl border border-accent bg-accent px-5 text-sm font-semibold text-white shadow-sm active:bg-accent/80"
-          >
-            Find friends
-          </Link>
-        </section>
+        {/* Social feed */}
+        <HomeFeed />
       </div>
     </ThemedPageShell>
   );
