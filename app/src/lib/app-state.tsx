@@ -14,6 +14,7 @@ import { appReducer } from "./app-reducer";
 import { APP_THEMES, type AppState, type Book, type BookId, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 import { postFeedEvent, debouncedPostFeedEvent } from "./feedClient";
+import { scoreForRankIndex } from "./ranking";
 
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
@@ -185,8 +186,26 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
           }
         }
       },
-      insertBookIntoBucketAtIndex: (bookId, bucket, index) =>
-        dispatch({ type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX", bookId, bucket, index }),
+      insertBookIntoBucketAtIndex: (bookId, bucket, index) => {
+        const prevRanking = stateRef.current.bucketRankings[bucket] ?? [];
+        const alreadyIn = prevRanking.includes(bookId);
+        const n = alreadyIn ? prevRanking.length : prevRanking.length + 1;
+        const score = scoreForRankIndex(bucket, index, n);
+        dispatch({ type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX", bookId, bucket, index });
+        const cat = stateRef.current.catalog[bookId];
+        if (cat) {
+          postFeedEvent({
+            eventType: "finished",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "finished",
+            sentiment: bucket,
+            derivedScore: score,
+          });
+        }
+      },
       updateBucketRankings: (bucket, orderedBookIds) =>
         dispatch({ type: "UPDATE_BUCKET_RANKINGS", bucket, orderedBookIds }),
       resetLibrary: () => dispatch({ type: "RESET_LIBRARY" }),

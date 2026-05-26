@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
 import { toggleLike, addComment, deletePost, editPost } from "@/lib/feedClient";
+import { sentimentTextColor } from "@/lib/sentiment-display";
+import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 
 function timeAgo(iso: string): string {
@@ -28,14 +30,6 @@ function shelfLabel(shelf: string): string {
   }
 }
 
-function sentimentLabel(sentiment: string | null): string {
-  switch (sentiment) {
-    case "liked": return "\u2764\uFE0F Liked";
-    case "okay": return "\uD83D\uDE10 Okay";
-    case "disliked": return "\uD83D\uDC4E Disliked";
-    default: return "";
-  }
-}
 
 function authorLabel(author: FeedAuthor): string {
   return author.username ? `@${author.username}` : author.displayName;
@@ -283,12 +277,14 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
                     </span>
                   </div>
                 ) : null}
-                {item.sentiment ? (
-                  <p className="mt-1 text-xs font-medium text-foreground-muted">
-                    {sentimentLabel(item.sentiment)}
-                  </p>
-                ) : null}
               </div>
+              {item.sentiment && item.derivedScore != null ? (
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-semibold tabular-nums ${sentimentTextColor(item.sentiment as SentimentBucket)}`}
+                >
+                  {item.derivedScore.toFixed(1)}
+                </div>
+              ) : null}
             </div>
 
             {item.notes && !progressFraction ? (
