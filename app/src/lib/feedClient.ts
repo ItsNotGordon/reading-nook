@@ -10,6 +10,8 @@ export type FeedComment = {
   author: FeedAuthor;
   body: string;
   createdAt: string;
+  likeCount: number;
+  userLiked: boolean;
   replies: FeedComment[];
 };
 
@@ -166,6 +168,15 @@ export async function deleteEventComment(eventId: string, reactionId: string): P
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reactionId }),
+  });
+  return res.ok;
+}
+
+export async function toggleCommentLike(reactionId: string, source: "post" | "event"): Promise<boolean> {
+  const res = await fetch(`/api/feed/comments/${reactionId}/like`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source }),
   });
   return res.ok;
 }

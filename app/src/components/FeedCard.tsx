@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
-import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost } from "@/lib/feedClient";
+import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost, toggleCommentLike } from "@/lib/feedClient";
 import { sentimentTextColor } from "@/lib/sentiment-display";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
@@ -83,18 +83,54 @@ function BookThumbnail({ coverUrl, title }: { coverUrl: string; title: string })
   );
 }
 
+function CommentLikeButton({ reactionId, source, initialCount, initialLiked }: {
+  reactionId: string;
+  source: "post" | "event";
+  initialCount: number;
+  initialLiked: boolean;
+}) {
+  const [liked, setLiked] = useState(initialLiked);
+  const [count, setCount] = useState(initialCount);
+
+  async function handleToggle() {
+    const ok = await toggleCommentLike(reactionId, source);
+    if (ok) {
+      setLiked((prev) => !prev);
+      setCount((prev) => (liked ? prev - 1 : prev + 1));
+    }
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
+        liked ? "text-red-500" : "text-foreground-muted/70 hover:text-red-400"
+      }`}
+    >
+      {liked ? (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      ) : (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      )}
+      {count > 0 ? count : null}
+    </button>
+  );
+}
+
 function CommentSection({
   targetId,
   targetType = "post",
   comments,
   currentUserId,
   onCommentAdded,
+  likeButton,
 }: {
   targetId: string;
   targetType?: "post" | "event";
   comments: FeedCommentType[];
   currentUserId: string | null;
   onCommentAdded: () => void;
+  likeButton?: React.ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
@@ -138,66 +174,82 @@ function CommentSection({
     }
   }
 
-  if (!expanded && totalCount === 0) {
-    return (
-      <button
-        onClick={() => setExpanded(true)}
-        className="text-xs font-medium text-foreground-muted"
-      >
-        Comment
-      </button>
-    );
-  }
+  const commentToggle = totalCount > 0 && !expanded ? (
+    <button
+      onClick={() => setExpanded(true)}
+      className="inline-flex items-center gap-1 text-xs font-medium text-foreground-muted hover:text-accent"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      View {totalCount} comment{totalCount !== 1 ? "s" : ""}
+    </button>
+  ) : !expanded ? (
+    <button
+      onClick={() => setExpanded(true)}
+      className="inline-flex items-center gap-1 text-xs font-medium text-foreground-muted"
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Comment
+    </button>
+  ) : null;
 
   return (
-    <div className="mt-2 border-t border-border pt-2">
-      {totalCount > 0 && !expanded ? (
-        <button
-          onClick={() => setExpanded(true)}
-          className="text-xs font-medium text-accent"
-        >
-          View {totalCount} comment{totalCount !== 1 ? "s" : ""}
-        </button>
-      ) : null}
+    <div className="mt-2 border-t border-border pt-2 space-y-2">
+      <div className="flex items-center gap-4">
+        {likeButton}
+        {commentToggle}
+      </div>
 
-      {expanded || totalCount > 0 ? (
-        <div className="flex flex-col gap-1.5">
+      {expanded ? (
+        <div className="flex flex-col gap-3">
           {comments.map((c) => (
             <div key={c.id}>
-              <div className="flex items-start gap-2">
+              {/* Top-level comment */}
+              <div className="flex items-start gap-2.5">
                 <AuthorLink author={c.author} currentUserId={currentUserId}>
                   <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
                 </AuthorLink>
                 <div className="min-w-0 flex-1">
-                  <AuthorLink author={c.author} currentUserId={currentUserId}>
-                    <span className="text-xs font-semibold text-foreground">
-                      {authorLabel(c.author)}
+                  <div>
+                    <AuthorLink author={c.author} currentUserId={currentUserId}>
+                      <span className="text-xs font-semibold text-foreground">
+                        {authorLabel(c.author)}
+                      </span>
+                    </AuthorLink>
+                    <span className="ml-1.5 text-xs text-foreground/80">
+                      {c.body}
                     </span>
-                  </AuthorLink>
-                  <span className="ml-1.5 text-xs text-foreground-muted">
-                    {c.body}
-                  </span>
-                  <button
-                    onClick={() => handleReply(c)}
-                    className="ml-2 text-[10px] font-medium text-foreground-muted/70 hover:text-accent"
-                  >
-                    Reply
-                  </button>
-                  {c.author.userId === currentUserId ? (
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className="text-[10px] text-foreground-muted/60">{timeAgo(c.createdAt)}</span>
+                    <CommentLikeButton
+                      reactionId={c.id}
+                      source={targetType}
+                      initialCount={c.likeCount ?? 0}
+                      initialLiked={c.userLiked ?? false}
+                    />
                     <button
-                      onClick={() => handleDeleteComment(c.id)}
-                      className="ml-1 text-[10px] font-medium text-foreground-muted/70 hover:text-red-400"
+                      onClick={() => handleReply(c)}
+                      className="text-[10px] font-semibold text-foreground-muted/70 hover:text-accent"
                     >
-                      Delete
+                      Reply
                     </button>
-                  ) : null}
+                    {c.author.userId === currentUserId ? (
+                      <button
+                        onClick={() => handleDeleteComment(c.id)}
+                        className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
+              {/* Threaded replies */}
               {c.replies?.length > 0 ? (
-                <div className="ml-10 mt-1 flex flex-col gap-1">
+                <div className="ml-6 mt-1.5 border-l-2 border-border/60 pl-4">
                   {c.replies.map((r) => (
-                    <div key={r.id} className="flex items-start gap-1.5">
+                    <div key={r.id} className="flex items-start gap-2 py-1">
                       <AuthorLink author={r.author} currentUserId={currentUserId}>
                         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft/40 text-[9px] font-semibold text-accent">
                           {r.author.avatarUrl ? (
@@ -208,22 +260,33 @@ function CommentSection({
                         </div>
                       </AuthorLink>
                       <div className="min-w-0 flex-1">
-                        <AuthorLink author={r.author} currentUserId={currentUserId}>
-                          <span className="text-[10px] font-semibold text-foreground">
-                            {authorLabel(r.author)}
+                        <div>
+                          <AuthorLink author={r.author} currentUserId={currentUserId}>
+                            <span className="text-[11px] font-semibold text-foreground">
+                              {authorLabel(r.author)}
+                            </span>
+                          </AuthorLink>
+                          <span className="ml-1.5 text-[11px] text-foreground/80">
+                            {r.body}
                           </span>
-                        </AuthorLink>
-                        <span className="ml-1 text-[10px] text-foreground-muted">
-                          {r.body}
-                        </span>
-                        {r.author.userId === currentUserId ? (
-                          <button
-                            onClick={() => handleDeleteComment(r.id)}
-                            className="ml-1 text-[10px] font-medium text-foreground-muted/70 hover:text-red-400"
-                          >
-                            Delete
-                          </button>
-                        ) : null}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-2">
+                          <span className="text-[10px] text-foreground-muted/60">{timeAgo(r.createdAt)}</span>
+                          <CommentLikeButton
+                            reactionId={r.id}
+                            source={targetType}
+                            initialCount={r.likeCount ?? 0}
+                            initialLiked={r.userLiked ?? false}
+                          />
+                          {r.author.userId === currentUserId ? (
+                            <button
+                              onClick={() => handleDeleteComment(r.id)}
+                              className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -235,36 +298,39 @@ function CommentSection({
       ) : null}
 
       {replyingTo ? (
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-foreground-muted">
             Replying to {replyingTo.username}
           </span>
-          <button onClick={cancelReply} className="text-[10px] font-medium text-foreground-muted/70 hover:text-red-400">
-            Cancel
+          <button onClick={cancelReply} className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400">
+            ✕
           </button>
         </div>
       ) : null}
 
-      <div className="mt-1.5 flex items-center gap-2">
-        <input
-          ref={(el) => { inputRef[0] = el; }}
-          type="text"
-          placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
-          }}
-          className="flex-1 rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!text.trim() || sending}
-          className="text-xs font-semibold text-accent disabled:opacity-40"
-        >
-          Send
-        </button>
-      </div>
+      {expanded ? (
+        <div className="flex items-center gap-2">
+          <input
+            ref={(el) => { inputRef[0] = el; }}
+            type="text"
+            placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSend();
+            }}
+            className="flex-1 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!text.trim() || sending}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm disabled:opacity-30"
+            aria-label="Send"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -390,26 +456,32 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
               </p>
             ) : null}
 
-            <div className="mt-2 flex items-center gap-4">
-              <button
-                onClick={handleToggleLike}
-                className={`flex items-center gap-1 text-xs font-medium ${
-                  liked ? "text-red-500" : "text-foreground-muted"
-                }`}
-              >
-                {liked ? "\u2764\uFE0F" : "\u2661"} {likeCount > 0 ? likeCount : "Like"}
-              </button>
-              <CommentSection
-                targetId={item.id}
-                targetType="event"
-                comments={item.comments}
-                currentUserId={currentUserId}
-                onCommentAdded={onRefresh}
-              />
-            </div>
           </div>
         </div>
-      </div>
+
+      <CommentSection
+        targetId={item.id}
+        targetType="event"
+        comments={item.comments}
+        currentUserId={currentUserId}
+        onCommentAdded={onRefresh}
+        likeButton={
+          <button
+            onClick={handleToggleLike}
+            className={`flex items-center gap-1.5 text-xs font-medium ${
+              liked ? "text-red-500" : "text-foreground-muted"
+            }`}
+          >
+            {liked ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            )}
+            {likeCount > 0 ? likeCount : "Like"}
+          </button>
+        }
+      />
+    </div>
     );
   }
 
@@ -498,25 +570,31 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
             </div>
           ) : null}
 
-          <div className="mt-2 flex items-center gap-4">
-            <button
-              onClick={handleToggleLike}
-              className={`flex items-center gap-1 text-xs font-medium ${
-                liked ? "text-red-500" : "text-foreground-muted"
-              }`}
-            >
-              {liked ? "\u2764\uFE0F" : "\u2661"} {likeCount > 0 ? likeCount : "Like"}
-            </button>
-            <CommentSection
-              targetId={item.id}
-              targetType="post"
-              comments={item.comments}
-              currentUserId={currentUserId}
-              onCommentAdded={onRefresh}
-            />
-          </div>
         </div>
       </div>
+
+      <CommentSection
+        targetId={item.id}
+        targetType="post"
+        comments={item.comments}
+        currentUserId={currentUserId}
+        onCommentAdded={onRefresh}
+        likeButton={
+          <button
+            onClick={handleToggleLike}
+            className={`flex items-center gap-1.5 text-xs font-medium ${
+              liked ? "text-red-500" : "text-foreground-muted"
+            }`}
+          >
+            {liked ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            )}
+            {likeCount > 0 ? likeCount : "Like"}
+          </button>
+        }
+      />
     </div>
   );
 }

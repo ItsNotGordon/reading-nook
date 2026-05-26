@@ -158,20 +158,63 @@ export async function GET() {
     }
   }
 
+  // Collect all comment reaction IDs to fetch their likes
+  const allCommentIds: { id: string; source: "post" | "event" }[] = [];
+  for (const entry of reactionMap.values()) {
+    for (const c of entry.comments) {
+      allCommentIds.push({ id: c.id, source: "post" });
+      for (const r of c.replies) allCommentIds.push({ id: r.id, source: "post" });
+    }
+  }
+  for (const entry of eventReactionMap.values()) {
+    for (const c of entry.comments) {
+      allCommentIds.push({ id: c.id, source: "event" });
+      for (const r of c.replies) allCommentIds.push({ id: r.id, source: "event" });
+    }
+  }
+
+  const commentLikesMap = new Map<string, { count: number; userLiked: boolean }>();
+  if (allCommentIds.length > 0) {
+    const ids = allCommentIds.map((c) => c.id);
+    const { data: cLikes } = await supabase
+      .from("comment_likes")
+      .select("reaction_id, user_id")
+      .in("reaction_id", ids);
+    for (const cl of cLikes ?? []) {
+      let entry = commentLikesMap.get(cl.reaction_id);
+      if (!entry) {
+        entry = { count: 0, userLiked: false };
+        commentLikesMap.set(cl.reaction_id, entry);
+      }
+      entry.count += 1;
+      if (cl.user_id === user.id) entry.userLiked = true;
+    }
+  }
+
   function serializeComments(comments: CommentRow[]) {
-    return comments.map((c) => ({
-      id: c.id,
-      author: makeAuthor(c.user_id),
-      body: c.body,
-      createdAt: c.created_at,
-      replies: c.replies.map((reply) => ({
-        id: reply.id,
-        author: makeAuthor(reply.user_id),
-        body: reply.body,
-        createdAt: reply.created_at,
-        replies: [],
-      })),
-    }));
+    return comments.map((c) => {
+      const cl = commentLikesMap.get(c.id);
+      return {
+        id: c.id,
+        author: makeAuthor(c.user_id),
+        body: c.body,
+        createdAt: c.created_at,
+        likeCount: cl?.count ?? 0,
+        userLiked: cl?.userLiked ?? false,
+        replies: c.replies.map((reply) => {
+          const rl = commentLikesMap.get(reply.id);
+          return {
+            id: reply.id,
+            author: makeAuthor(reply.user_id),
+            body: reply.body,
+            createdAt: reply.created_at,
+            likeCount: rl?.count ?? 0,
+            userLiked: rl?.userLiked ?? false,
+            replies: [],
+          };
+        }),
+      };
+    });
   }
 
   type Item = { kind: string; createdAt: string; [key: string]: unknown };
