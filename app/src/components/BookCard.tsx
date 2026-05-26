@@ -44,7 +44,7 @@ export function BookCard({ book, userBook, variant, onStartPairwise, onOpenRated
   return (
     <>
       <article
-        className="flex w-[9.75rem] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card-surface shadow-sm ring-1 ring-black/[0.03]"
+        className="flex w-[9.75rem] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card-surface shadow-sm ring-1 ring-black/[0.03] origin-center transition-all duration-200 hover:scale-105 hover:shadow-lg hover:z-10 [[data-dragging]_&]:!transform-none [[data-dragging]_&]:!shadow-sm"
         role={variant === "want" || variant === "finished" ? "button" : undefined}
         tabIndex={variant === "want" || variant === "finished" ? 0 : undefined}
         onClick={
