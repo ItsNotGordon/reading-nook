@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
-import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
+import { BookDetailSheet } from "@/components/BookDetailSheet";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { useReadingNook } from "@/lib/app-state";
@@ -172,7 +172,7 @@ export function RatingsPageClient() {
   return (
     <ThemedPageShell title="Ratings">
       {openDetailBookId ? (
-        <RatedBookDetailSheet
+        <BookDetailSheet
           bookId={openDetailBookId}
           onClose={() => setDetailBookId(null)}
           onStartPairwise={(bookId, bucket) => {

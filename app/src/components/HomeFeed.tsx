@@ -3,8 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { fetchFeed, type FeedItem } from "@/lib/feedClient";
-import { FeedCard } from "./FeedCard";
+import { useReadingNook } from "@/lib/app-state";
+import { FeedCard, type FeedBookInfo } from "./FeedCard";
 import { NewPostComposer } from "./NewPostComposer";
+import { BookDetailSheet } from "./BookDetailSheet";
+import { FeedBookPreviewSheet } from "./FeedBookPreviewSheet";
+import type { BookId, SentimentBucket } from "@/lib/types";
+import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
 
 export function HomeFeed() {
   const [items, setItems] = useState<FeedItem[]>([]);
@@ -12,6 +17,15 @@ export function HomeFeed() {
   const [loading, setLoading] = useState(true);
   const [trigger, setTrigger] = useState(0);
   const mountedRef = useRef(true);
+  const { state } = useReadingNook();
+
+  const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
+  const [previewBook, setPreviewBook] = useState<FeedBookInfo | null>(null);
+  const [pairwise, setPairwise] = useState<{
+    open: boolean;
+    bookId: BookId | null;
+    bucket: SentimentBucket | null;
+  }>({ open: false, bookId: null, bucket: null });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -31,6 +45,17 @@ export function HomeFeed() {
   const reload = useCallback(() => {
     setTrigger((n) => n + 1);
   }, []);
+
+  const handleBookClick = useCallback(
+    (book: FeedBookInfo) => {
+      if (state.catalog[book.bookId] && state.userBooks[book.bookId]) {
+        setDetailBookId(book.bookId);
+      } else {
+        setPreviewBook(book);
+      }
+    },
+    [state.catalog, state.userBooks],
+  );
 
   return (
     <section className="flex flex-col gap-3">
@@ -63,9 +88,36 @@ export function HomeFeed() {
             item={item}
             currentUserId={currentUserId}
             onRefresh={reload}
+            onBookClick={handleBookClick}
           />
         ))
       )}
+
+      {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
+        <BookDetailSheet
+          bookId={detailBookId}
+          onClose={() => setDetailBookId(null)}
+          onStartPairwise={(bookId, bucket) => {
+            setDetailBookId(null);
+            setPairwise({ open: true, bookId, bucket });
+          }}
+        />
+      ) : null}
+
+      {previewBook ? (
+        <FeedBookPreviewSheet
+          book={previewBook}
+          onClose={() => setPreviewBook(null)}
+        />
+      ) : null}
+
+      {pairwise.open && pairwise.bookId && pairwise.bucket ? (
+        <PairwiseComparisonSheet
+          newBookId={pairwise.bookId}
+          bucket={pairwise.bucket}
+          onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
+        />
+      ) : null}
     </section>
   );
 }

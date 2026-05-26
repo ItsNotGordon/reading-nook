@@ -131,6 +131,7 @@ type ShelfSectionProps = {
   sectionId?: string;
   onStartPairwise?: (bookId: string, bucket: SentimentBucket) => void;
   onOpenRatedDetail?: (bookId: string) => void;
+  onOpenDetail?: (bookId: string) => void;
   headerMeta?: ReactNode;
 };
 
@@ -143,6 +144,7 @@ export function ShelfSection({
   sectionId,
   onStartPairwise,
   onOpenRatedDetail,
+  onOpenDetail,
   headerMeta,
 }: ShelfSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -209,6 +211,7 @@ export function ShelfSection({
                     variant={variant}
                     onStartPairwise={onStartPairwise}
                     onOpenRatedDetail={onOpenRatedDetail}
+                    onOpenDetail={onOpenDetail}
                   />
                 </li>
               ))}

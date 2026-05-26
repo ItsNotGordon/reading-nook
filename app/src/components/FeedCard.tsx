@@ -69,7 +69,7 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
   );
 }
 
-function BookThumbnail({ coverUrl, title }: { coverUrl: string; title: string }) {
+function BookThumbnail({ coverUrl, title, onClick }: { coverUrl: string; title: string; onClick?: () => void }) {
   if (!coverUrl) return null;
   return (
     <Image
@@ -77,8 +77,9 @@ function BookThumbnail({ coverUrl, title }: { coverUrl: string; title: string })
       alt={title}
       width={40}
       height={60}
-      className="h-[60px] w-[40px] shrink-0 rounded-lg object-cover shadow-sm"
+      className={`h-[60px] w-[40px] shrink-0 rounded-lg object-cover shadow-sm${onClick ? " cursor-pointer" : ""}`}
       unoptimized
+      onClick={onClick}
     />
   );
 }
@@ -335,13 +336,21 @@ function CommentSection({
   );
 }
 
+export type FeedBookInfo = {
+  bookId: string;
+  title: string;
+  author: string;
+  coverUrl: string;
+};
+
 type FeedCardProps = {
   item: FeedItem;
   currentUserId: string | null;
   onRefresh: () => void;
+  onBookClick?: (book: FeedBookInfo) => void;
 };
 
-export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
+export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCardProps) {
   const [liked, setLiked] = useState(item.userLiked ?? false);
   const [likeCount, setLikeCount] = useState(item.likes ?? 0);
   const [editing, setEditing] = useState(false);
@@ -419,7 +428,11 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
               {timeAgo(item.createdAt)}
             </p>
 
-            <div className="mt-2 flex items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => onBookClick?.({ bookId: item.bookId, title: item.bookTitle, author: item.bookAuthor, coverUrl: item.bookCoverUrl })}
+              className="mt-2 flex w-full items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5 text-left transition-colors hover:bg-accent-soft/20"
+            >
               <BookThumbnail coverUrl={item.bookCoverUrl} title={item.bookTitle} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-foreground">
@@ -448,7 +461,7 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
                   {item.derivedScore.toFixed(1)}
                 </div>
               ) : null}
-            </div>
+            </button>
 
             {item.notes && !progressFraction ? (
               <p className="mt-1.5 text-xs italic text-foreground-muted">
@@ -561,7 +574,11 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
           )}
 
           {item.bookTitle ? (
-            <div className="mt-2 flex items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5">
+            <button
+              type="button"
+              onClick={() => onBookClick?.({ bookId: item.bookId!, title: item.bookTitle!, author: item.bookAuthor ?? "", coverUrl: item.bookCoverUrl ?? "" })}
+              className="mt-2 flex w-full items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5 text-left transition-colors hover:bg-accent-soft/20"
+            >
               {item.bookCoverUrl ? (
                 <BookThumbnail coverUrl={item.bookCoverUrl} title={item.bookTitle} />
               ) : null}
@@ -575,7 +592,7 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
                   </p>
                 ) : null}
               </div>
-            </div>
+            </button>
           ) : null}
 
         </div>

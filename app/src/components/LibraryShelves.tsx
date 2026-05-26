@@ -8,7 +8,8 @@ import type { SentimentBucket, Shelf } from "@/lib/types";
 import { itemsForShelf } from "@/lib/shelfItems";
 import { ShelfSection } from "./ShelfSection";
 import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
-import { RatedBookDetailSheet } from "./RatedBookDetailSheet";
+import { BookDetailSheet } from "./BookDetailSheet";
+import { FinishBookSheet } from "./FinishBookSheet";
 import type { BookId } from "@/lib/types";
 
 const FINISHED_PREVIEW_LIMIT = 12;
@@ -25,10 +26,11 @@ function parseShelfParam(value: string | null): Shelf | null {
 }
 
 export function LibraryShelves() {
-  const { state } = useReadingNook();
+  const { state, actions } = useReadingNook();
   const searchParams = useSearchParams();
   const shelfParam = parseShelfParam(searchParams.get("shelf"));
   const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
+  const [finishBookId, setFinishBookId] = useState<BookId | null>(null);
   const [pairwise, setPairwise] = useState<{
     open: boolean;
     bookId: string | null;
@@ -65,6 +67,21 @@ export function LibraryShelves() {
     return () => cancelAnimationFrame(frame);
   }, [shelfParam, libraryEmpty, reading.length, finished.length, want.length]);
 
+  const openDetail = (bookId: BookId) => {
+    const ub = state.userBooks[bookId];
+    if (!ub) return;
+    if (ub.shelf === "finished" && !ub.sentimentBucket) {
+      const hasRanking = (["liked", "okay", "disliked"] as SentimentBucket[]).some(
+        (b) => state.bucketRankings[b]?.includes(bookId),
+      );
+      if (!hasRanking) {
+        setFinishBookId(bookId);
+        return;
+      }
+    }
+    setDetailBookId(bookId);
+  };
+
   return (
     <div className="flex flex-col gap-10">
       {libraryEmpty ? (
@@ -89,6 +106,7 @@ export function LibraryShelves() {
         emptyTitle="Nothing in progress"
         emptyBody="When you shelve a book as currently reading, it will appear here in a cozy row you can scroll sideways."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
+        onOpenDetail={openDetail}
       />
       <ShelfSection
         sectionId={SHELF_SECTION_ID.finished}
@@ -98,7 +116,7 @@ export function LibraryShelves() {
         emptyTitle="No finished books yet"
         emptyBody="Finished titles land here with room for a sentiment and a simple score when you are ready."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
-        onOpenRatedDetail={(bookId) => setDetailBookId(bookId)}
+        onOpenDetail={openDetail}
         headerMeta={
           <div className="flex items-center gap-2 text-[11px] font-medium">
             {finished.length > FINISHED_PREVIEW_LIMIT ? (
@@ -124,16 +142,31 @@ export function LibraryShelves() {
         emptyTitle="Your wishlist is empty"
         emptyBody="Books you want to read will stack here—unhurried, one scroll at a time."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
+        onOpenDetail={openDetail}
       />
 
       {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
-        <RatedBookDetailSheet
+        <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
           onStartPairwise={(bookId, bucket) => {
             setDetailBookId(null);
             setPairwise({ open: true, bookId, bucket });
           }}
+        />
+      ) : null}
+
+      {finishBookId && state.catalog[finishBookId] && state.userBooks[finishBookId] ? (
+        <FinishBookSheet
+          bookId={finishBookId}
+          book={state.catalog[finishBookId]}
+          userBook={state.userBooks[finishBookId]}
+          actions={actions}
+          onStartPairwise={(bucket) => {
+            setFinishBookId(null);
+            setPairwise({ open: true, bookId: finishBookId, bucket });
+          }}
+          onClose={() => setFinishBookId(null)}
         />
       ) : null}
 

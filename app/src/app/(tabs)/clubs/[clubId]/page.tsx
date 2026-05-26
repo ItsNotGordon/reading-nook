@@ -5,12 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
-import { FeedCard } from "@/components/FeedCard";
+import { FeedCard, type FeedBookInfo } from "@/components/FeedCard";
 import { NewPostComposer } from "@/components/NewPostComposer";
 import { BookPickerSheet } from "@/components/BookPickerSheet";
+import { BookDetailSheet } from "@/components/BookDetailSheet";
+import { FeedBookPreviewSheet } from "@/components/FeedBookPreviewSheet";
+import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { fetchClubDetail, fetchClubFeed, updateClub, leaveClub, deleteClub, type ClubDetail, type ClubMember } from "@/lib/clubClient";
+import { useReadingNook } from "@/lib/app-state";
 import type { FeedItem } from "@/lib/feedClient";
-import type { Book } from "@/lib/types";
+import type { Book, BookId, SentimentBucket } from "@/lib/types";
 
 function MemberAvatar({ member }: { member: ClubMember }) {
   if (member.avatarUrl) {
@@ -38,6 +42,7 @@ export default function ClubDetailPage() {
   const router = useRouter();
   const clubId = params.clubId as string;
 
+  const { state: appState } = useReadingNook();
   const [club, setClub] = useState<ClubDetail | null>(null);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -45,7 +50,21 @@ export default function ClubDetailPage() {
   const [copied, setCopied] = useState(false);
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
+  const [previewBook, setPreviewBook] = useState<FeedBookInfo | null>(null);
+  const [pairwise, setPairwise] = useState<{ open: boolean; bookId: BookId | null; bucket: SentimentBucket | null }>({ open: false, bookId: null, bucket: null });
   const mountedRef = useRef(true);
+
+  const handleBookClick = useCallback(
+    (book: FeedBookInfo) => {
+      if (appState.catalog[book.bookId] && appState.userBooks[book.bookId]) {
+        setDetailBookId(book.bookId);
+      } else {
+        setPreviewBook(book);
+      }
+    },
+    [appState.catalog, appState.userBooks],
+  );
 
   const loadClub = useCallback(() => {
     fetchClubDetail(clubId).then((data) => {
@@ -311,6 +330,7 @@ export default function ClubDetailPage() {
                 item={item}
                 currentUserId={currentUserId}
                 onRefresh={loadFeed}
+                onBookClick={handleBookClick}
               />
             ))
           )}
@@ -325,6 +345,32 @@ export default function ClubDetailPage() {
           setBookPickerOpen(false);
         }}
       />
+
+      {detailBookId && appState.catalog[detailBookId] && appState.userBooks[detailBookId] ? (
+        <BookDetailSheet
+          bookId={detailBookId}
+          onClose={() => setDetailBookId(null)}
+          onStartPairwise={(bookId, bucket) => {
+            setDetailBookId(null);
+            setPairwise({ open: true, bookId, bucket });
+          }}
+        />
+      ) : null}
+
+      {previewBook ? (
+        <FeedBookPreviewSheet
+          book={previewBook}
+          onClose={() => setPreviewBook(null)}
+        />
+      ) : null}
+
+      {pairwise.open && pairwise.bookId && pairwise.bucket ? (
+        <PairwiseComparisonSheet
+          newBookId={pairwise.bookId}
+          bucket={pairwise.bucket}
+          onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
+        />
+      ) : null}
     </ThemedPageShell>
   );
 }

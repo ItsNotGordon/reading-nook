@@ -14,7 +14,7 @@ import {
 } from "@/components/SocialConnectionsSheet";
 import { PageShell } from "@/components/PageShell";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
-import { RatedBookDetailSheet } from "@/components/RatedBookDetailSheet";
+import { BookDetailSheet } from "@/components/BookDetailSheet";
 import { ProfileDecorationBackdrop } from "@/components/ProfileDecorationBackdrop";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { useReadingNook } from "@/lib/app-state";
@@ -218,7 +218,7 @@ export default function ProfilePage() {
       </div>
 
       {detailBookId && state.catalog[detailBookId] && state.userBooks[detailBookId] ? (
-        <RatedBookDetailSheet
+        <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
           onStartPairwise={(bookId, bucket) => {
