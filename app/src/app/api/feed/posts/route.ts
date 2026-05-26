@@ -31,6 +31,7 @@ export async function POST(request: Request) {
   const bookTitle = typeof b.bookTitle === "string" && b.bookTitle ? b.bookTitle : null;
   const bookAuthor = typeof b.bookAuthor === "string" && b.bookAuthor ? b.bookAuthor : null;
   const bookCoverUrl = typeof b.bookCoverUrl === "string" && b.bookCoverUrl ? b.bookCoverUrl : null;
+  const clubId = typeof b.clubId === "string" && b.clubId ? b.clubId : null;
 
   const { error } = await supabase.from("posts").insert({
     user_id: user.id,
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     book_title: bookTitle,
     book_author: bookAuthor,
     book_cover_url: bookCoverUrl,
+    club_id: clubId,
   });
 
   if (error) {

@@ -1,48 +1,59 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isSupabaseConfigured, getSupabaseUrl, getSupabaseServiceRoleKey } from "@/lib/supabase/config";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ items: [] });
+function getServiceClient() {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    return createClient(getSupabaseUrl(), getSupabaseServiceRoleKey());
+  } catch {
+    return null;
   }
+}
+
+type Ctx = { params: Promise<{ clubId: string }> };
+
+export async function GET(_req: Request, ctx: Ctx) {
+  if (!isSupabaseConfigured()) return NextResponse.json({ items: [] });
   const supabase = await createSupabaseServerClient();
   if (!supabase) return NextResponse.json({ items: [] });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
 
-  const { data: events } = await supabase
-    .from("feed_events")
-    .select("id, user_id, event_type, book_id, book_title, book_author, book_cover_url, shelf, sentiment, derived_score, notes, created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const { clubId } = await ctx.params;
+  const sb = getServiceClient();
+  if (!sb) return NextResponse.json({ items: [] });
 
-  const { data: posts } = await supabase
+  const { data: membership } = await sb
+    .from("club_members")
+    .select("id")
+    .eq("club_id", clubId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!membership) return NextResponse.json({ error: "Not a member." }, { status: 403 });
+
+  const { data: posts } = await sb
     .from("posts")
     .select("id, user_id, body, book_id, book_title, book_author, book_cover_url, club_id, created_at")
+    .eq("club_id", clubId)
     .order("created_at", { ascending: false })
     .limit(50);
 
   const authorIds = new Set<string>();
-  for (const e of events ?? []) authorIds.add(e.user_id);
   for (const p of posts ?? []) authorIds.add(p.user_id);
 
   const profileMap = new Map<string, { display_name: string; username: string | null; avatar_url: string | null }>();
   if (authorIds.size > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles } = await sb
       .from("profiles")
       .select("id, display_name, username, avatar_url")
       .in("id", Array.from(authorIds));
-    for (const p of profiles ?? []) {
-      profileMap.set(p.id, p);
-    }
+    for (const p of profiles ?? []) profileMap.set(p.id, p);
   }
 
   function makeAuthor(userId: string) {
@@ -60,7 +71,7 @@ export async function GET() {
   const reactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
 
   if (postIds.length > 0) {
-    const { data: reactions } = await supabase
+    const { data: reactions } = await sb
       .from("post_reactions")
       .select("id, post_id, user_id, type, body, parent_id, created_at")
       .in("post_id", postIds)
@@ -95,53 +106,8 @@ export async function GET() {
     }
   }
 
-  const eventIds = (events ?? []).map((e) => e.id);
-  const eventReactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
-
-  if (eventIds.length > 0) {
-    const { data: eReactions } = await supabase
-      .from("event_reactions")
-      .select("id, event_id, user_id, type, body, parent_id, created_at")
-      .in("event_id", eventIds)
-      .order("created_at", { ascending: true });
-
-    for (const r of eReactions ?? []) {
-      let entry = eventReactionMap.get(r.event_id);
-      if (!entry) {
-        entry = { likes: 0, userLiked: false, comments: [] };
-        eventReactionMap.set(r.event_id, entry);
-      }
-      if (r.type === "like") {
-        entry.likes += 1;
-        if (r.user_id === user.id) entry.userLiked = true;
-      } else if (r.type === "comment" && r.body) {
-        entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, parent_id: r.parent_id ?? null, created_at: r.created_at, replies: [] });
-      }
-    }
-
-    for (const entry of eventReactionMap.values()) {
-      const topLevel: CommentRow[] = [];
-      const byId = new Map<string, CommentRow>();
-      for (const c of entry.comments) byId.set(c.id, c);
-      for (const c of entry.comments) {
-        if (c.parent_id && byId.has(c.parent_id)) {
-          byId.get(c.parent_id)!.replies.push(c);
-        } else {
-          topLevel.push(c);
-        }
-      }
-      entry.comments = topLevel;
-    }
-  }
-
   const commentAuthorIds = new Set<string>();
   for (const entry of reactionMap.values()) {
-    for (const c of entry.comments) {
-      commentAuthorIds.add(c.user_id);
-      for (const r of c.replies) commentAuthorIds.add(r.user_id);
-    }
-  }
-  for (const entry of eventReactionMap.values()) {
     for (const c of entry.comments) {
       commentAuthorIds.add(c.user_id);
       for (const r of c.replies) commentAuthorIds.add(r.user_id);
@@ -150,7 +116,7 @@ export async function GET() {
   if (commentAuthorIds.size > 0) {
     const missing = Array.from(commentAuthorIds).filter((id) => !profileMap.has(id));
     if (missing.length > 0) {
-      const { data: extra } = await supabase
+      const { data: extra } = await sb
         .from("profiles")
         .select("id, display_name, username, avatar_url")
         .in("id", missing);
@@ -158,28 +124,20 @@ export async function GET() {
     }
   }
 
-  // Collect all comment reaction IDs to fetch their likes
-  const allCommentIds: { id: string; source: "post" | "event" }[] = [];
+  const allCommentIds: string[] = [];
   for (const entry of reactionMap.values()) {
     for (const c of entry.comments) {
-      allCommentIds.push({ id: c.id, source: "post" });
-      for (const r of c.replies) allCommentIds.push({ id: r.id, source: "post" });
-    }
-  }
-  for (const entry of eventReactionMap.values()) {
-    for (const c of entry.comments) {
-      allCommentIds.push({ id: c.id, source: "event" });
-      for (const r of c.replies) allCommentIds.push({ id: r.id, source: "event" });
+      allCommentIds.push(c.id);
+      for (const r of c.replies) allCommentIds.push(r.id);
     }
   }
 
   const commentLikesMap = new Map<string, { count: number; userLiked: boolean }>();
   if (allCommentIds.length > 0) {
-    const ids = allCommentIds.map((c) => c.id);
-    const { data: cLikes } = await supabase
+    const { data: cLikes } = await sb
       .from("comment_likes")
       .select("reaction_id, user_id")
-      .in("reaction_id", ids);
+      .in("reaction_id", allCommentIds);
     for (const cl of cLikes ?? []) {
       let entry = commentLikesMap.get(cl.reaction_id);
       if (!entry) {
@@ -217,48 +175,12 @@ export async function GET() {
     });
   }
 
-  const clubIds = new Set<string>();
-  for (const p of posts ?? []) {
-    if (p.club_id) clubIds.add(p.club_id);
-  }
-  const clubNameMap = new Map<string, string>();
-  if (clubIds.size > 0) {
-    const { data: clubs } = await supabase
-      .from("clubs")
-      .select("id, name")
-      .in("id", Array.from(clubIds));
-    for (const c of clubs ?? []) clubNameMap.set(c.id, c.name);
-  }
+  const { data: clubRow } = await sb.from("clubs").select("name").eq("id", clubId).single();
 
-  type Item = { kind: string; createdAt: string; [key: string]: unknown };
-  const items: Item[] = [];
-
-  for (const e of events ?? []) {
-    const er = eventReactionMap.get(e.id);
-    items.push({
-      kind: "event",
-      id: e.id,
-      author: makeAuthor(e.user_id),
-      eventType: e.event_type,
-      shelf: e.shelf ?? "",
-      bookId: e.book_id,
-      bookTitle: e.book_title,
-      bookAuthor: e.book_author,
-      bookCoverUrl: e.book_cover_url,
-      sentiment: e.sentiment ?? null,
-      derivedScore: e.derived_score ?? null,
-      notes: e.notes ?? "",
-      likes: er?.likes ?? 0,
-      userLiked: er?.userLiked ?? false,
-      comments: serializeComments(er?.comments ?? []),
-      createdAt: e.created_at,
-    });
-  }
-
-  for (const p of posts ?? []) {
+  const items = (posts ?? []).map((p) => {
     const r = reactionMap.get(p.id);
-    items.push({
-      kind: "post",
+    return {
+      kind: "post" as const,
       id: p.id,
       author: makeAuthor(p.user_id),
       body: p.body,
@@ -267,15 +189,13 @@ export async function GET() {
       bookAuthor: p.book_author ?? null,
       bookCoverUrl: p.book_cover_url ?? null,
       clubId: p.club_id ?? null,
-      clubName: p.club_id ? (clubNameMap.get(p.club_id) ?? null) : null,
+      clubName: clubRow?.name ?? null,
       likes: r?.likes ?? 0,
       userLiked: r?.userLiked ?? false,
       comments: serializeComments(r?.comments ?? []),
       createdAt: p.created_at,
-    });
-  }
+    };
+  });
 
-  items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  return NextResponse.json({ items: items.slice(0, 50), currentUserId: user.id });
+  return NextResponse.json({ items, currentUserId: user.id });
 }

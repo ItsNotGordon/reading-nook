@@ -499,6 +499,14 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
                   {authorLabel(item.author)}
                 </span>
               </AuthorLink>
+              {item.clubName ? (
+                <Link
+                  href={`/clubs/${item.clubId}`}
+                  className="truncate rounded-full bg-accent-soft/15 px-1.5 py-0.5 text-[10px] font-medium text-accent hover:bg-accent-soft/25"
+                >
+                  in {item.clubName}
+                </Link>
+              ) : null}
               <span className="text-[10px] text-foreground-muted">
                 {timeAgo(item.createdAt)}
               </span>

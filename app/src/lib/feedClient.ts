@@ -43,6 +43,8 @@ export type FeedPost = {
   bookTitle: string | null;
   bookAuthor: string | null;
   bookCoverUrl: string | null;
+  clubId: string | null;
+  clubName: string | null;
   likes: number;
   userLiked: boolean;
   comments: FeedComment[];
@@ -107,6 +109,7 @@ export type CreatePostInput = {
   bookTitle?: string;
   bookAuthor?: string;
   bookCoverUrl?: string;
+  clubId?: string;
 };
 
 export async function createPost(input: CreatePostInput): Promise<boolean> {
