@@ -26,6 +26,9 @@ export type FeedEvent = {
   sentiment: string | null;
   derivedScore: number | null;
   notes: string;
+  likes: number;
+  userLiked: boolean;
+  comments: FeedComment[];
   createdAt: string;
 };
 
@@ -133,6 +136,33 @@ export async function addComment(postId: string, body: string, parentId?: string
 
 export async function deleteComment(postId: string, reactionId: string): Promise<boolean> {
   const res = await fetch(`/api/feed/posts/${postId}/react`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reactionId }),
+  });
+  return res.ok;
+}
+
+export async function toggleEventLike(eventId: string): Promise<boolean> {
+  const res = await fetch(`/api/feed/events/${eventId}/react`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "like" }),
+  });
+  return res.ok;
+}
+
+export async function addEventComment(eventId: string, body: string, parentId?: string): Promise<boolean> {
+  const res = await fetch(`/api/feed/events/${eventId}/react`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "comment", body, ...(parentId ? { parentId } : {}) }),
+  });
+  return res.ok;
+}
+
+export async function deleteEventComment(eventId: string, reactionId: string): Promise<boolean> {
+  const res = await fetch(`/api/feed/events/${eventId}/react`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reactionId }),

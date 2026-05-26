@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
-import { toggleLike, addComment, deleteComment, deletePost, editPost } from "@/lib/feedClient";
+import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost } from "@/lib/feedClient";
 import { sentimentTextColor } from "@/lib/sentiment-display";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
@@ -35,10 +35,12 @@ function authorLabel(author: FeedAuthor): string {
   return author.username ? `@${author.username}` : author.displayName;
 }
 
-function AuthorLink({ author, children }: { author: FeedAuthor; children: React.ReactNode }) {
+function AuthorLink({ author, currentUserId, children }: { author: FeedAuthor; currentUserId?: string | null; children: React.ReactNode }) {
   if (author.username) {
+    const isSelf = currentUserId && author.userId === currentUserId;
+    const href = isSelf ? "/profile" : `/friends/${encodeURIComponent(author.username)}`;
     return (
-      <Link href={`/friends/${encodeURIComponent(author.username)}`} className="inline-flex items-center gap-1.5">
+      <Link href={href} className="inline-flex items-center gap-1.5">
         {children}
       </Link>
     );
@@ -82,12 +84,14 @@ function BookThumbnail({ coverUrl, title }: { coverUrl: string; title: string })
 }
 
 function CommentSection({
-  postId,
+  targetId,
+  targetType = "post",
   comments,
   currentUserId,
   onCommentAdded,
 }: {
-  postId: string;
+  targetId: string;
+  targetType?: "post" | "event";
   comments: FeedCommentType[];
   currentUserId: string | null;
   onCommentAdded: () => void;
@@ -99,6 +103,9 @@ function CommentSection({
   const inputRef = useState<HTMLInputElement | null>(null);
 
   const totalCount = comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
+
+  const doAddComment = targetType === "event" ? addEventComment : addComment;
+  const doDeleteComment = targetType === "event" ? deleteEventComment : deleteComment;
 
   function handleReply(comment: FeedCommentType) {
     const label = authorLabel(comment.author);
@@ -114,7 +121,7 @@ function CommentSection({
   }
 
   async function handleDeleteComment(reactionId: string) {
-    const ok = await deleteComment(postId, reactionId);
+    const ok = await doDeleteComment(targetId, reactionId);
     if (ok) onCommentAdded();
   }
 
@@ -122,7 +129,7 @@ function CommentSection({
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
-    const ok = await addComment(postId, t, replyingTo?.id);
+    const ok = await doAddComment(targetId, t, replyingTo?.id);
     setSending(false);
     if (ok) {
       setText("");
@@ -158,11 +165,11 @@ function CommentSection({
           {comments.map((c) => (
             <div key={c.id}>
               <div className="flex items-start gap-2">
-                <AuthorLink author={c.author}>
+                <AuthorLink author={c.author} currentUserId={currentUserId}>
                   <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
                 </AuthorLink>
                 <div className="min-w-0 flex-1">
-                  <AuthorLink author={c.author}>
+                  <AuthorLink author={c.author} currentUserId={currentUserId}>
                     <span className="text-xs font-semibold text-foreground">
                       {authorLabel(c.author)}
                     </span>
@@ -191,7 +198,7 @@ function CommentSection({
                 <div className="ml-10 mt-1 flex flex-col gap-1">
                   {c.replies.map((r) => (
                     <div key={r.id} className="flex items-start gap-1.5">
-                      <AuthorLink author={r.author}>
+                      <AuthorLink author={r.author} currentUserId={currentUserId}>
                         <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft/40 text-[9px] font-semibold text-accent">
                           {r.author.avatarUrl ? (
                             <Image src={r.author.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" unoptimized />
@@ -201,7 +208,7 @@ function CommentSection({
                         </div>
                       </AuthorLink>
                       <div className="min-w-0 flex-1">
-                        <AuthorLink author={r.author}>
+                        <AuthorLink author={r.author} currentUserId={currentUserId}>
                           <span className="text-[10px] font-semibold text-foreground">
                             {authorLabel(r.author)}
                           </span>
@@ -269,8 +276,8 @@ type FeedCardProps = {
 };
 
 export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
-  const [liked, setLiked] = useState(item.kind === "post" ? item.userLiked : false);
-  const [likeCount, setLikeCount] = useState(item.kind === "post" ? item.likes : 0);
+  const [liked, setLiked] = useState(item.userLiked ?? false);
+  const [likeCount, setLikeCount] = useState(item.likes ?? 0);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(item.kind === "post" ? item.body : "");
   const [saving, setSaving] = useState(false);
@@ -278,8 +285,9 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
   const isOwn = item.author.userId === currentUserId;
 
   async function handleToggleLike() {
-    if (item.kind !== "post") return;
-    const ok = await toggleLike(item.id);
+    const ok = item.kind === "event"
+      ? await toggleEventLike(item.id)
+      : await toggleLike(item.id);
     if (ok) {
       setLiked((prev) => !prev);
       setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
@@ -328,13 +336,13 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
     return (
       <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
         <div className="flex items-start gap-2.5">
-          <AuthorLink author={item.author}>
+          <AuthorLink author={item.author} currentUserId={currentUserId}>
             <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
           </AuthorLink>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <p className="text-sm text-foreground">
-                <AuthorLink author={item.author}>
+                <AuthorLink author={item.author} currentUserId={currentUserId}>
                   <span className="font-semibold">{authorLabel(item.author)}</span>
                 </AuthorLink>{" "}
                 {verb}{" "}
@@ -381,6 +389,24 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
                 &ldquo;{item.notes}&rdquo;
               </p>
             ) : null}
+
+            <div className="mt-2 flex items-center gap-4">
+              <button
+                onClick={handleToggleLike}
+                className={`flex items-center gap-1 text-xs font-medium ${
+                  liked ? "text-red-500" : "text-foreground-muted"
+                }`}
+              >
+                {liked ? "\u2764\uFE0F" : "\u2661"} {likeCount > 0 ? likeCount : "Like"}
+              </button>
+              <CommentSection
+                targetId={item.id}
+                targetType="event"
+                comments={item.comments}
+                currentUserId={currentUserId}
+                onCommentAdded={onRefresh}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -390,13 +416,13 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
   return (
     <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
       <div className="flex items-start gap-2.5">
-        <AuthorLink author={item.author}>
+        <AuthorLink author={item.author} currentUserId={currentUserId}>
           <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
         </AuthorLink>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <AuthorLink author={item.author}>
+              <AuthorLink author={item.author} currentUserId={currentUserId}>
                 <span className="text-sm font-semibold text-foreground">
                   {authorLabel(item.author)}
                 </span>
@@ -482,7 +508,8 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
               {liked ? "\u2764\uFE0F" : "\u2661"} {likeCount > 0 ? likeCount : "Like"}
             </button>
             <CommentSection
-              postId={item.id}
+              targetId={item.id}
+              targetType="post"
               comments={item.comments}
               currentUserId={currentUserId}
               onCommentAdded={onRefresh}

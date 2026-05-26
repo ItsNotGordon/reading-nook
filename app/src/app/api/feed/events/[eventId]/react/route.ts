@@ -1,0 +1,129 @@
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ eventId: string }> },
+) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ ok: false }, { status: 503 });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const { eventId } = await params;
+  const raw: unknown = await request.json().catch(() => null);
+  if (!raw || typeof raw !== "object") {
+    return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+  }
+
+  const b = raw as Record<string, unknown>;
+  const type = typeof b.type === "string" ? b.type : "";
+
+  if (type === "like") {
+    const { data: existing } = await supabase
+      .from("event_reactions")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("user_id", user.id)
+      .eq("type", "like")
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("event_reactions").delete().eq("id", existing.id);
+      return NextResponse.json({ ok: true, liked: false });
+    }
+
+    const { error } = await supabase.from("event_reactions").insert({
+      event_id: eventId,
+      user_id: user.id,
+      type: "like",
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, liked: true });
+  }
+
+  if (type === "comment") {
+    const commentBody = typeof b.body === "string" ? b.body.trim() : "";
+    if (!commentBody) {
+      return NextResponse.json({ error: "Comment body is required." }, { status: 400 });
+    }
+
+    const parentId = typeof b.parentId === "string" ? b.parentId : null;
+
+    if (parentId) {
+      const { data: parent } = await supabase
+        .from("event_reactions")
+        .select("id, event_id, parent_id")
+        .eq("id", parentId)
+        .maybeSingle();
+
+      if (!parent || parent.event_id !== eventId) {
+        return NextResponse.json({ error: "Invalid parent comment." }, { status: 400 });
+      }
+      if (parent.parent_id) {
+        return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 400 });
+      }
+    }
+
+    const { error } = await supabase.from("event_reactions").insert({
+      event_id: eventId,
+      user_id: user.id,
+      type: "comment",
+      body: commentBody,
+      parent_id: parentId,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "Invalid type." }, { status: 400 });
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ eventId: string }> },
+) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ ok: false }, { status: 503 });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const { eventId } = await params;
+  const raw: unknown = await request.json().catch(() => null);
+  if (!raw || typeof raw !== "object") {
+    return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+  }
+
+  const b = raw as Record<string, unknown>;
+  const reactionId = typeof b.reactionId === "string" ? b.reactionId : "";
+  if (!reactionId) {
+    return NextResponse.json({ error: "reactionId is required." }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("event_reactions")
+    .delete()
+    .eq("id", reactionId)
+    .eq("user_id", user.id)
+    .eq("event_id", eventId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

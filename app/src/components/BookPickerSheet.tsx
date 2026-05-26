@@ -49,16 +49,17 @@ export function BookPickerSheet({ open, onClose, onPick }: BookPickerSheetProps)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-t-2xl border border-border bg-card-surface shadow-xl">
+      <div className="relative z-10 w-full max-w-lg rounded-2xl border border-border bg-card-surface shadow-xl">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h3 className="text-sm font-semibold text-foreground">Attach a book</h3>
           <button
             onClick={onClose}
-            className="text-xs font-medium text-foreground-muted"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-muted hover:bg-accent-soft/20"
+            aria-label="Close"
           >
-            Cancel
+            &times;
           </button>
         </div>
         <div className="px-4 py-2">

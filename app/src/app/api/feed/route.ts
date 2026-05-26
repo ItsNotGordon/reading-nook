@@ -95,8 +95,53 @@ export async function GET() {
     }
   }
 
+  const eventIds = (events ?? []).map((e) => e.id);
+  const eventReactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
+
+  if (eventIds.length > 0) {
+    const { data: eReactions } = await supabase
+      .from("event_reactions")
+      .select("id, event_id, user_id, type, body, parent_id, created_at")
+      .in("event_id", eventIds)
+      .order("created_at", { ascending: true });
+
+    for (const r of eReactions ?? []) {
+      let entry = eventReactionMap.get(r.event_id);
+      if (!entry) {
+        entry = { likes: 0, userLiked: false, comments: [] };
+        eventReactionMap.set(r.event_id, entry);
+      }
+      if (r.type === "like") {
+        entry.likes += 1;
+        if (r.user_id === user.id) entry.userLiked = true;
+      } else if (r.type === "comment" && r.body) {
+        entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, parent_id: r.parent_id ?? null, created_at: r.created_at, replies: [] });
+      }
+    }
+
+    for (const entry of eventReactionMap.values()) {
+      const topLevel: CommentRow[] = [];
+      const byId = new Map<string, CommentRow>();
+      for (const c of entry.comments) byId.set(c.id, c);
+      for (const c of entry.comments) {
+        if (c.parent_id && byId.has(c.parent_id)) {
+          byId.get(c.parent_id)!.replies.push(c);
+        } else {
+          topLevel.push(c);
+        }
+      }
+      entry.comments = topLevel;
+    }
+  }
+
   const commentAuthorIds = new Set<string>();
   for (const entry of reactionMap.values()) {
+    for (const c of entry.comments) {
+      commentAuthorIds.add(c.user_id);
+      for (const r of c.replies) commentAuthorIds.add(r.user_id);
+    }
+  }
+  for (const entry of eventReactionMap.values()) {
     for (const c of entry.comments) {
       commentAuthorIds.add(c.user_id);
       for (const r of c.replies) commentAuthorIds.add(r.user_id);
@@ -113,10 +158,27 @@ export async function GET() {
     }
   }
 
+  function serializeComments(comments: CommentRow[]) {
+    return comments.map((c) => ({
+      id: c.id,
+      author: makeAuthor(c.user_id),
+      body: c.body,
+      createdAt: c.created_at,
+      replies: c.replies.map((reply) => ({
+        id: reply.id,
+        author: makeAuthor(reply.user_id),
+        body: reply.body,
+        createdAt: reply.created_at,
+        replies: [],
+      })),
+    }));
+  }
+
   type Item = { kind: string; createdAt: string; [key: string]: unknown };
   const items: Item[] = [];
 
   for (const e of events ?? []) {
+    const er = eventReactionMap.get(e.id);
     items.push({
       kind: "event",
       id: e.id,
@@ -130,6 +192,9 @@ export async function GET() {
       sentiment: e.sentiment ?? null,
       derivedScore: e.derived_score ?? null,
       notes: e.notes ?? "",
+      likes: er?.likes ?? 0,
+      userLiked: er?.userLiked ?? false,
+      comments: serializeComments(er?.comments ?? []),
       createdAt: e.created_at,
     });
   }
@@ -147,19 +212,7 @@ export async function GET() {
       bookCoverUrl: p.book_cover_url ?? null,
       likes: r?.likes ?? 0,
       userLiked: r?.userLiked ?? false,
-      comments: (r?.comments ?? []).map((c) => ({
-        id: c.id,
-        author: makeAuthor(c.user_id),
-        body: c.body,
-        createdAt: c.created_at,
-        replies: c.replies.map((reply) => ({
-          id: reply.id,
-          author: makeAuthor(reply.user_id),
-          body: reply.body,
-          createdAt: reply.created_at,
-          replies: [],
-        })),
-      })),
+      comments: serializeComments(r?.comments ?? []),
       createdAt: p.created_at,
     });
   }
