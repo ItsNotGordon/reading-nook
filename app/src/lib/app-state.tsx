@@ -99,12 +99,57 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       moveBookToShelf: (bookId, shelf) => {
         dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf });
       },
-      updateExactProgress: (bookId, currentPage) =>
-        dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage }),
-      updateReadingExactProgress: (bookId, totalPages, currentPage) =>
-        dispatch({ type: "UPDATE_READING_EXACT_PROGRESS", bookId, totalPages, currentPage }),
-      updateEstimatedProgress: (bookId, estimatedRange) =>
-        dispatch({ type: "UPDATE_ESTIMATED_PROGRESS", bookId, estimatedRange }),
+      updateExactProgress: (bookId, currentPage) => {
+        dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage });
+        const cat = stateRef.current.catalog[bookId];
+        if (cat && cat.totalPages > 0) {
+          const pct = Math.round((currentPage / cat.totalPages) * 100);
+          postFeedEvent({
+            eventType: "progress",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "reading",
+            notes: `Page ${currentPage} of ${cat.totalPages} (${pct}%)`,
+          });
+        }
+      },
+      updateReadingExactProgress: (bookId, totalPages, currentPage) => {
+        dispatch({ type: "UPDATE_READING_EXACT_PROGRESS", bookId, totalPages, currentPage });
+        if (totalPages > 0) {
+          const cat = stateRef.current.catalog[bookId];
+          if (cat) {
+            const pct = Math.round((currentPage / totalPages) * 100);
+            postFeedEvent({
+              eventType: "progress",
+              bookId,
+              bookTitle: cat.title,
+              bookAuthor: cat.author,
+              bookCoverUrl: cat.coverUrl,
+              shelf: "reading",
+              notes: `Page ${currentPage} of ${totalPages} (${pct}%)`,
+            });
+          }
+        }
+      },
+      updateEstimatedProgress: (bookId, estimatedRange) => {
+        dispatch({ type: "UPDATE_ESTIMATED_PROGRESS", bookId, estimatedRange });
+        const cat = stateRef.current.catalog[bookId];
+        if (cat) {
+          const lo = Math.round(estimatedRange[0] * 100);
+          const hi = Math.round(estimatedRange[1] * 100);
+          postFeedEvent({
+            eventType: "progress",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "reading",
+            notes: lo === hi ? `~${lo}% done` : `~${lo}–${hi}% done`,
+          });
+        }
+      },
       markFinished: (bookId) => {
         dispatch({ type: "MARK_FINISHED", bookId });
         const cat = stateRef.current.catalog[bookId];

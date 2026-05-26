@@ -178,13 +178,15 @@ export function FeedCard({ item, onRefresh }: FeedCardProps) {
 
   if (item.kind === "event") {
     const verb =
-      item.eventType === "finished"
-        ? "finished"
-        : item.shelf === "reading"
-          ? "started reading"
-          : item.shelf === "want_to_read"
-            ? "wants to read"
-            : `added to ${shelfLabel(item.shelf)}`;
+      item.eventType === "progress"
+        ? "is reading"
+        : item.eventType === "finished"
+          ? "finished"
+          : item.shelf === "reading"
+            ? "started reading"
+            : item.shelf === "want_to_read"
+              ? "wants to read"
+              : `added to ${shelfLabel(item.shelf)}`;
 
     return (
       <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
