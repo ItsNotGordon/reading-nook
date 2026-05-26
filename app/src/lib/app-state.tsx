@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
-import type { AppState, Book, BookId, SentimentBucket, Shelf, UserProfile } from "./types";
+import { APP_THEMES, type AppState, type Book, type BookId, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 
 export type ReadingNookActions = {
@@ -49,6 +49,8 @@ export type ReadingNookActions = {
 type ReadingNookContextValue = {
   state: AppState;
   actions: ReadingNookActions;
+  /** True once localStorage state has been loaded (avoids SSR hydration mismatch). */
+  ready: boolean;
 };
 
 const ReadingNookContext = createContext<ReadingNookContextValue | null>(null);
@@ -61,6 +63,9 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
     const loaded = loadState();
     if (loaded) {
       dispatch({ type: "HYDRATE", payload: loaded });
+    } else {
+      const randomTheme = APP_THEMES[Math.floor(Math.random() * APP_THEMES.length)];
+      dispatch({ type: "UPDATE_PROFILE", theme: randomTheme });
     }
     queueMicrotask(() => {
       setReady(true);
@@ -114,8 +119,8 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, actions }),
-    [state, actions],
+    () => ({ state, actions, ready }),
+    [state, actions, ready],
   );
 
   return (

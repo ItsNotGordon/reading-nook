@@ -60,9 +60,9 @@ export const SENTIMENT_BUCKETS: SentimentBucket[] = [
 
 export const SHELVES: Shelf[] = ["want_to_read", "reading", "finished"];
 
-export type AppTheme = "plant" | "coffee" | "matcha" | "cats";
+export type AppTheme = "plant" | "coffee" | "matcha" | "cats" | "galaxy" | "raindrops" | "sakura" | "vinyl";
 
-export const APP_THEMES: AppTheme[] = ["plant", "coffee", "matcha", "cats"];
+export const APP_THEMES: AppTheme[] = ["plant", "coffee", "matcha", "cats", "galaxy", "raindrops", "sakura", "vinyl"];
 
 /** Local name + tagline; `displayName` maps to `display_name` in cloud profiles. */
 export type UserProfile = {
