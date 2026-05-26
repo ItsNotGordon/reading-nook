@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import {
   buildAppNativeRecommendations,
@@ -16,10 +16,16 @@ import { normalizeGenreList } from "@/lib/genreNormalize";
 import type { SearchBookResult } from "@/lib/bookProviders/types";
 
 /** Max ranked recommendations kept in the client pool. */
-export const RECS_POOL_MAX = 60;
+export const RECS_POOL_MAX = 120;
 
 /** How many recommendation cards the UI shows at once. */
 export const RECS_VISIBLE_COUNT = 10;
+
+/** When the usable pool drops below this, fetch the next page of discover results. */
+const REFILL_THRESHOLD = 20;
+
+/** Don't fetch more than this many pages (0-indexed). */
+const MAX_DISCOVER_PAGES = 3;
 
 export type Recommendation = {
   bookId: string;
@@ -84,9 +90,12 @@ function sampleRandomBookIds(pool: Recommendation[], count: number): string[] {
   return shuffled.slice(0, Math.min(count, shuffled.length)).map((r) => r.bookId);
 }
 
-async function fetchDiscoverBooks(genres: string[]): Promise<SearchBookResult[]> {
+async function fetchDiscoverBooks(
+  genres: string[],
+  page = 0,
+): Promise<SearchBookResult[]> {
   if (genres.length === 0) return [];
-  const params = new URLSearchParams({ genres: genres.join(",") });
+  const params = new URLSearchParams({ genres: genres.join(","), page: String(page) });
   const res = await fetch(`/api/books/discover?${params.toString()}`, { cache: "no-store" });
   if (!res.ok) return [];
   const data: unknown = await res.json();
@@ -108,7 +117,10 @@ export function useRecommendationsPool(
   const [discoverCache, setDiscoverCache] = useState<{
     genreKey: string;
     books: SearchBookResult[];
-  }>({ genreKey: "", books: [] });
+    nextPage: number;
+  }>({ genreKey: "", books: [], nextPage: 0 });
+
+  const fetchingRef = useRef(false);
 
   const [selectedGenreLowerKeys, setSelectedGenreLowerKeys] = useState<string[]>([]);
   const [shuffleSample, setShuffleSample] = useState<{
@@ -133,14 +145,21 @@ export function useRecommendationsPool(
     Boolean(discoverGenreKey) &&
     discoverCache.genreKey !== discoverGenreKey;
 
+  // Initial fetch when genres change (page 0)
   useEffect(() => {
     if (!shouldFetchDiscover || !discoverGenreKey) return;
     if (discoverCache.genreKey === discoverGenreKey) return;
 
+    fetchingRef.current = true;
     let cancelled = false;
-    void fetchDiscoverBooks(topGenresForDiscover).then((books) => {
+    void fetchDiscoverBooks(topGenresForDiscover, 0).then((books) => {
+      fetchingRef.current = false;
       if (!cancelled) {
-        setDiscoverCache({ genreKey: discoverGenreKey, books });
+        setDiscoverCache({
+          genreKey: discoverGenreKey,
+          books,
+          nextPage: 1,
+        });
       }
     });
 
@@ -186,6 +205,45 @@ export function useRecommendationsPool(
       ),
     [rows, state.userBooks, state.dismissedRecIds],
   );
+
+  // Auto-refill: fetch next page when pool shrinks below threshold
+  useEffect(() => {
+    if (!shouldFetchDiscover) return;
+    if (discoverCache.genreKey !== discoverGenreKey) return;
+    if (fetchingRef.current) return;
+    if (discoverCache.nextPage >= MAX_DISCOVER_PAGES) return;
+    if (notShelvedRecs.length >= REFILL_THRESHOLD) return;
+
+    const page = discoverCache.nextPage;
+    fetchingRef.current = true;
+
+    let cancelled = false;
+    void fetchDiscoverBooks(topGenresForDiscover, page).then((newBooks) => {
+      fetchingRef.current = false;
+      if (cancelled) return;
+      setDiscoverCache((prev) => {
+        if (prev.genreKey !== discoverGenreKey) return prev;
+        const existingIds = new Set(prev.books.map((b) => b.id));
+        const deduped = newBooks.filter((b) => !existingIds.has(b.id));
+        return {
+          ...prev,
+          books: [...prev.books, ...deduped],
+          nextPage: page + 1,
+        };
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    shouldFetchDiscover,
+    discoverGenreKey,
+    discoverCache.genreKey,
+    discoverCache.nextPage,
+    notShelvedRecs.length,
+    topGenresForDiscover,
+  ]);
 
   const personalizationActive = tasteActive;
 
@@ -295,7 +353,8 @@ export function useRecommendationsPool(
   const poolExhausted = rows.length > 0 && notShelvedRecs.length === 0;
 
   const retryLoad = useCallback(() => {
-    setDiscoverCache({ genreKey: "", books: [] });
+    fetchingRef.current = false;
+    setDiscoverCache({ genreKey: "", books: [], nextPage: 0 });
   }, []);
 
   return {

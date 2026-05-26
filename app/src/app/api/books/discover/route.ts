@@ -6,10 +6,13 @@ export const dynamic = "force-dynamic";
 
 const MAX_GENRES = 4;
 const PER_GENRE_LIMIT = 40;
+/** Each "page" fetches 2 batches of 40 per genre (80 books per genre per page). */
+const BATCHES_PER_PAGE = 2;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const raw = searchParams.get("genres")?.trim() ?? "";
+  const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10) || 0);
   const genreLabels = raw
     .split(",")
     .map((g) => g.trim())
@@ -23,19 +26,28 @@ export async function GET(request: Request) {
     );
   }
 
+  const baseOffset = page * BATCHES_PER_PAGE * PER_GENRE_LIMIT;
   const seen = new Set<string>();
   const books = [];
   for (const genre of genreLabels) {
-    try {
-      const batch = await discoverGoogleBooksByGenre(genre, PER_GENRE_LIMIT, "discover");
-      for (const book of batch) {
-        if (seen.has(book.id)) continue;
-        seen.add(book.id);
-        books.push(book);
+    for (let batch = 0; batch < BATCHES_PER_PAGE; batch++) {
+      const startIndex = baseOffset + batch * PER_GENRE_LIMIT;
+      try {
+        const results = await discoverGoogleBooksByGenre(
+          genre,
+          PER_GENRE_LIMIT,
+          "discover",
+          startIndex,
+        );
+        for (const book of results) {
+          if (seen.has(book.id)) continue;
+          seen.add(book.id);
+          books.push(book);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        console.warn(`[discover] genre="${genre}" batch=${batch} failed: ${msg}`);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      console.warn(`[discover] genre="${genre}" failed: ${msg}`);
     }
   }
 

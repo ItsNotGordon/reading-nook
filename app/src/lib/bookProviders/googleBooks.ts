@@ -302,6 +302,7 @@ export async function discoverGoogleBooksByGenre(
   genre: string,
   limit = 40,
   context = "discover",
+  startIndex = 0,
 ): Promise<SearchBookResult[]> {
   const cap = Math.min(Math.max(1, limit), 40);
   const url = new URL(GB_API_BASE);
@@ -311,6 +312,7 @@ export async function discoverGoogleBooksByGenre(
   url.searchParams.set("printType", "books");
   url.searchParams.set("orderBy", "relevance");
   url.searchParams.set("fields", SEARCH_FIELDS);
+  if (startIndex > 0) url.searchParams.set("startIndex", String(startIndex));
   const key = apiKey();
   if (key) url.searchParams.set("key", key);
 

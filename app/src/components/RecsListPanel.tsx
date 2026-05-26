@@ -225,7 +225,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
       {discoverLoading ? (
         <div className="space-y-2">
           <p className="rounded-2xl border border-border bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
-            Finding popular Open Library picks in your genres…
+            Finding popular Google Books picks in your genres…
           </p>
         </div>
       ) : null}
@@ -233,7 +233,7 @@ export function RecsListPanel({ model }: RecsListPanelProps) {
       {rows.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
             {appNativeEmptyReason ??
-              "Finish and rate a book, then search Open Library on Add to build recommendations from your catalog."}
+              "Finish and rate a book, then search Google Books on Add to build recommendations from your catalog."}
           </p>
         ) : poolExhausted && !filterActive ? (
           <p className="rounded-2xl border border-dashed border-border/80 bg-card-surface/60 px-4 py-8 text-center text-sm text-foreground-muted">
