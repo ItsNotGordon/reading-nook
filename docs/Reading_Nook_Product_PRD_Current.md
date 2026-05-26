@@ -4,8 +4,8 @@
 **Project:** Reading Nook  
 **Primary platform:** Mobile-first web  
 **Stack:** Next.js App Router, React, TypeScript, Tailwind CSS  
-**Backend:** **Supabase** is the active platform for auth, library sync, profiles (including `@username` and avatars), friendships, and Row Level Security — not a future-only option when the project is configured with valid env vars.  
-**Canonical purpose:** Track books, rank finished reads by taste (not stars), discover titles via Google Books, and optionally connect with a small circle of friends.
+**Backend:** **Supabase** is the **required** platform for auth, library sync, profiles (including `@username` and avatars), friendships, social feed, and Row Level Security.  
+**Canonical purpose:** Track books, rank finished reads by taste (not stars), discover titles via Google Books, and connect with a small circle of friends.
 
 Reading Nook should feel like a cozy reading companion, not a social feed and not a machine-learning demo.
 
@@ -22,11 +22,11 @@ It combines:
 - **Google Books API** for live search, work enrichment, and recommendation candidates (migrated from Open Library due to persistent 403 errors)  
 - **Client-side, app-state recommendations** ("For You") from catalog + Google Books discover — **not** the legacy Goodbooks JSON pool as the live source
 
-The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks CSVs, and offline Python recommenders remain **legacy/reference only** (see §13).
+The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks CSVs, and offline Python recommenders remain **legacy/reference only** (see §14).
 
 **Philosophy (ratings):** No star ratings. Users express **how a finished book felt** and **which book they liked more** in pairwise steps; numeric scores are derived from bucket + rank.
 
-**Philosophy (social):** Friends are lightweight — no public feed, followers, or viral mechanics. Friend libraries are visible only in the context of accepted friendships and server-enforced policies.
+**Philosophy (social):** Friends are lightweight — a personal home feed of shelf activity and user posts, but no followers or viral mechanics. Friend libraries are visible only in the context of accepted friendships and server-enforced policies.
 
 ---
 
@@ -38,24 +38,27 @@ The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks
 | Area                                                     | Role                                                                                          |
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `app/`                                                   | **Next.js product app** — all shipped UI, API routes, and client state                        |
-| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**four** migration files: `001`–`004`) |
+| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**six** migration files: `001`–`006`) |
 | `docs/`                                                  | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD)                  |
-| `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §13)                                                                  |
+| `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §14)                                                                  |
 
 
 ### Runtime model
 
 - **Client app state** lives in React (`ReadingNookProvider` + reducer). Canonical TypeScript types are in `app/src/lib/types.ts`.  
-- **Persistence:** `localStorage` key `**reading-nook-v1`** — load on startup, save after changes. Each browser profile holds a copy until sync merges.  
+- **Persistence (server-authoritative):** Supabase is the **source of truth**. `localStorage` key `**reading-nook-v1`** serves as a **write-through cache** for fast startup renders — on page load, cached state is displayed immediately, then the server copy overwrites it. All mutations are optimistic (dispatched locally for instant UI), then pushed to the server within 500ms.  
 - **Hydration safety:** `ReadingNookProvider` exposes a `**ready`** flag (`false` during SSR, `true` after localStorage state is loaded). `ThemedPageShell` defers rendering children and the decoration backdrop until `ready` to prevent SSR/client hydration mismatches.  
-- **Cloud:** When Supabase env vars are present and the user signs in, `**/api/sync`** reads/writes a per-user JSON `**libraries.state**` row and merges `**profiles**` fields (`display_name`, `tagline`; username and avatar via dedicated APIs). Sync UX is driven by `SyncStatusProvider` / `SyncStatusLine`.  
-- **Friends:** Friendship rows in `**public.friendships`**; profile discovery and friend library/taste via `**/api/friends**`, `**/api/users/***`, and related routes under `app/src/app/api/`.
+- **Cloud sync:** `**/api/sync`** reads/writes a per-user JSON `**libraries.state**` row and merges `**profiles**` fields (`display_name`, `tagline`; username and avatar via dedicated APIs). On login/page load, `SyncStatusProvider` always fetches from the server and hydrates (server wins — no conflict dialog). If the server is empty but local data exists, it auto-pushes.  
+- **Friends:** Friendship rows in `**public.friendships`**; profile discovery and friend library/taste via `**/api/friends**`, `**/api/users/***`, and related routes under `app/src/app/api/`.  
+- **Social feed:** Feed events (`feed_events`) and user posts (`posts`) with reactions (`post_reactions`) — shelving activity, progress updates, finished-with-rating events, and free-form posts. Feed is visible on the Home tab (`/home`).
 
 ### Main navigation (bottom tabs)
 
 ```txt
 Home | Library | Add | Ratings | Profile
 ```
+
+**Home tab** shows the social feed (§5). All other tabs remain as documented below.
 
 **Nested highlighting:** `BottomNav` treats a tab as active when `pathname === href` **or** `pathname.startsWith(href + "/")`, so e.g. `/friends/alice` highlights **Friends**, and `/profile/settings` highlights **Profile**.
 
@@ -64,21 +67,23 @@ Home | Library | Add | Ratings | Profile
 
 | Path                  | Behavior                                                                                            |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
-| `/`                   | Redirects to `/library`                                                                             |
+| `/`                   | Redirects to `/home`                                                                                |
+| `/home`               | Home feed — social activity from friends and self, new post composer                                |
 | `/library`            | Library shelves                                                                                     |
 | `/ratings`            | Finished books, filters, derived scores, detail sheets                                              |
 | `/add`                | **Unified** Google Books search + "For You" recommendations + shelf picker + finish flow            |
+| `/clubs`              | **Placeholder** — "Coming soon" stub for future book clubs feature                                  |
 | `/friends`            | Friends list, requests, discovery (Supabase-backed when configured)                                 |
 | `/friends/[username]` | **Route-based friend profile** (not a modal sheet); invalid usernames show a minimal error state    |
 | `/profile`            | Profile stats, hero, insights — **not** the primary home for account backup or full account UI      |
 | `/profile/settings`   | **Settings** shell: account-oriented actions and **library backup** import/export where implemented |
-| `/login`              | Sign-in entry (Supabase auth UI)                                                                    |
+| `/login`              | Sign-in entry (Google OAuth only — mandatory before accessing any other route)                       |
 | `/auth/callback`      | OAuth / auth callback handler                                                                       |
 | `/recs`               | **Not a product surface** — immediately `**redirect("/add")`**                                      |
 | `/leaderboard`        | Client `**router.replace("/ratings")**` — legacy path only                                          |
 
 
-API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `books/isbn`, `books/work`, `books/discover`, `friends`, `friends/[friendId]/library`, `friends/[friendId]/profile`, `friends/[friendId]/taste`, `profile/username`, `profile/avatar`, `users/[username]`, `users/search`.
+API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `books/isbn`, `books/work`, `books/discover`, `feed`, `feed/events`, `feed/posts`, `feed/posts/[postId]`, `feed/posts/[postId]/react`, `friends`, `friends/[friendId]/library`, `friends/[friendId]/profile`, `friends/[friendId]/taste`, `profile/username`, `profile/avatar`, `users/[username]`, `users/search`.
 
 ---
 
@@ -86,20 +91,22 @@ API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `bo
 
 ### Supabase status
 
-Supabase is **first-class** for this product: profiles, library JSON sync, friendships, storage (avatars), and RLS policies are defined in migrations `**001_reading_nook.sql`** through `**004_friends_always_share_library.sql**`.
+Supabase is **required** for this product: profiles, library JSON sync, friendships, social feed, storage (avatars), and RLS policies are defined in migrations `**001_reading_nook.sql`** through `**006_posts_update.sql**`.
 
 ### Sign-in
 
-- **Google OAuth** (`signInWithOAuth` with Google provider) is the **preferred** sign-in path in the UI (`MagicLinkAuthForm` leads with "Continue with Google").  
-- **Email magic link** (`signInWithOtp`) remains in code for flexibility but is **de-emphasized in product direction**: Supabase's built-in email quotas and deliverability limits make email OTP a poor primary growth or onboarding strategy. Product copy and future UX should steer users toward **Google**; treat magic link as ancillary or removable later.
+- **Google OAuth only** (`signInWithOAuth` with Google provider) is the sole sign-in method. Email magic link was removed due to Supabase free tier's 3 email/day limit.  
+- **Login is mandatory** — middleware redirects all unauthenticated requests to `/login`. There is no "continue without signing in" option.
 
-### Sync behavior (high level)
+### Sync behavior (server-authoritative)
 
 - **GET `/api/sync`:** Returns merged library `AppState` (and `updated_at`) for the signed-in user, overlaying profile name/tagline from `profiles` when needed.  
 - **POST `/api/sync`:** Persists updated library JSON for the user.  
-- When Supabase is **not** configured, sync routes return **503** and the app behaves **local-only** (still valid for forks and local dev).
+- **On page load:** `SyncStatusProvider` always fetches from the server and hydrates local state (server wins). If the server is empty but local data exists (first login migration), it auto-pushes local to cloud.  
+- **On state change:** Local mutations are pushed to the server with a **500ms debounce** for near-real-time persistence.  
+- **No conflict dialog:** The server is always authoritative. The old `SyncConflictSheet` was removed.
 
-Details: `docs/SUPABASE_SETUP.md`, `app/src/components/SyncStatusProvider.tsx`, `app/src/lib/storage.ts` (merge helpers).
+Details: `docs/SUPABASE_SETUP.md`, `app/src/components/SyncStatusProvider.tsx`, `app/src/lib/cloudSync.ts`.
 
 ---
 
@@ -143,14 +150,48 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 
 ### Supabase tables (migrations)
 
-- `**profiles`:** `id` (auth user), `display_name`, `tagline`, `username`, `avatar_url`, `share_shelves` (see §9 — policy evolution)  
+- `**profiles`:** `id` (auth user), `display_name`, `tagline`, `username`, `avatar_url`, `share_shelves` (see §10 — policy evolution)  
 - `**libraries`:** `user_id`, `state` (jsonb app snapshot), `updated_at`  
 - `**friendships`:** `requester_id`, `addressee_id`, `status` (`pending` | `accepted`)  
+- `**feed_events`:** `user_id`, `event_type` (`shelved` | `progress` | `finished`), `book_id`, `book_title`, `book_cover_url`, `shelf`, `sentiment`, `derived_score`, `progress`, `created_at` — auto-generated from user library actions  
+- `**posts`:** `user_id`, `body`, `book_id`/`book_title`/`book_cover_url`/`book_author` (optional book attachment), `created_at`, `updated_at` — user-authored free-form posts  
+- `**post_reactions`:** `post_id`, `user_id`, `reaction` — emoji reactions on posts  
 - **Storage bucket `avatars`:** public read, user-scoped write policies (`003_profiles_avatar.sql`)
 
 ---
 
-## 5. Library
+## 5. Home Feed
+
+### Overview
+
+`/home` is the default landing tab — a merged, reverse-chronological feed of activity from the signed-in user and their accepted friends. The page also features **Friends** and **Clubs** quick-access buttons at the top (Clubs links to a "Coming soon" placeholder at `/clubs`).
+
+### Feed items
+
+| Type | Source | Display |
+| --- | --- | --- |
+| **Shelved** | User moves a book to a shelf | "[User] added [Book] to [Shelf]" with book card |
+| **Progress** | User updates reading progress | "[User] is reading [Book]" with visual progress bar (upserted — only the latest progress event per book is kept) |
+| **Finished** | User rates a finished book via pairwise ranking | "[User] finished [Book]" with numeric score circle (matching `/ratings` badge style, colored by sentiment bucket) |
+| **Post** | User writes a free-form post | Text body, optional attached book card, emoji reactions, edit/delete for own posts |
+
+### Feed cards
+
+- Author names link to `/friends/[username]` profile pages (clickable profile links for friend discovery).  
+- Author display shows `@username` when available, falling back to display name.  
+- Finished-book events show a **circular score badge** (e.g. "8.5") with sentiment-bucket coloring (green for liked, amber for okay, red for disliked), matching the visual style on the `/ratings` page.  
+- Book attachments on posts use the same visual card style as auto-generated events.  
+- Users can **edit** and **delete** their own posts from the feed.
+
+### Implementation
+
+- Events are **client-pushed** via `postFeedEvent()` in `app-state.tsx` whenever library actions fire (shelving, progress updates, pairwise ranking completion).  
+- Posts are managed via `/api/feed/posts` (CRUD) and `/api/feed/posts/[postId]/react` (reactions).  
+- The merged feed is fetched from `/api/feed` which combines `feed_events` and `posts` with profile data, sorted by `created_at`.
+
+---
+
+## 6. Library
 
 - **Sections:** Currently Reading → Finished → Want to Read (display order).  
 - **Cards:** Cover, title, author; reading progress for active reads; derived score / sentiment styling for finished items when present.  
@@ -160,7 +201,7 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 
 ---
 
-## 6. Add + Recommendations
+## 7. Add + Recommendations
 
 ### Add tab (`/add`)
 
@@ -206,7 +247,7 @@ The internal engine identifiers (`hybrid`, `tfidf`) and algorithm implementation
 
 ---
 
-## 7. Ratings
+## 8. Ratings
 
 `/ratings` is the personal finished-book view (not a public leaderboard): ranked lists, derived scores, sentiment styling, text search, genre/author filters, URL query params `**genre**`, `**author**`, `**q**`, `**bucket**` (`RatingsPageClient`), editable detail flows where implemented.
 
@@ -214,13 +255,13 @@ The internal engine identifiers (`hybrid`, `tfidf`) and algorithm implementation
 
 ---
 
-## 8. Profile + Settings
+## 9. Profile + Settings
 
 ### Profile (`/profile`)
 
 - **Hero (`ProfileHeroCard`):** **Display name** in the **upper corner**; when signed in with a username set, the **main heading** shows the **username without a literal `@` prefix**; otherwise prompts to set username or falls back to display name. Tagline, avatar (when signed in), **Edit profile** and **Settings** links.  
 - **Body:** Stats, favorite book, genres, authors, sentiment insights, shelf snapshot links, etc. — **without** pushing account management and **library backup** into the main scroll (those live under **Settings**).  
-- **Theming:** Profile page uses `**PageShell`** plus inline `**ProfileDecorationBackdrop**` for the same decorative themes as other tabs (see §10 — implementation detail differs from `ThemedPageShell` import but visuals align).
+- **Theming:** Profile page uses `**PageShell`** plus inline `**ProfileDecorationBackdrop**` for the same decorative themes as other tabs (see §11 — implementation detail differs from `ThemedPageShell` import but visuals align).
 
 ### Settings (`/profile/settings`)
 
@@ -232,7 +273,7 @@ Owns display name, tagline, theme picker (8 themes in a 4-column grid), cloud `@
 
 ---
 
-## 9. Friends
+## 10. Friends
 
 ### Data + access
 
@@ -251,7 +292,7 @@ Owns display name, tagline, theme picker (8 themes in a 4-column grid), cloud `@
 
 ---
 
-## 10. Theming
+## 11. Theming
 
 - User-selectable `**AppTheme`:** `plant`, `coffee`, `matcha`, `cats`, `galaxy`, `raindrops`, `sakura`, `vinyl` (8 themes).  
 - **New accounts** are assigned a **random theme** on first load (client-side, after hydration) to encourage discovery of theme options when comparing with friends.  
@@ -278,7 +319,7 @@ Key files: `ThemedPageShell.tsx`, `ProfileDecorationBackdrop.tsx`, `ProfileTheme
 
 ---
 
-## 11. Progress Tracking
+## 12. Progress Tracking
 
 Applies to **Currently Reading** (`shelf === "reading"`).
 
@@ -294,17 +335,17 @@ Progress bars elsewhere should remain readable on small screens (exact fill vs e
 
 ---
 
-## 12. Deployment / Env
+## 13. Deployment / Env
 
 - **Vercel (or similar):** Project **root directory = `app/`** (see `docs/DEPLOY.md`, `app/vercel.json`).  
 - **Build / verify (from `app/`):** `npm run dev`, `npm test`, `npm run lint`, `npm run build`.  
-- **Environment:** Copy `app/.env.example` → `app/.env.local` and set `**NEXT_PUBLIC_SUPABASE_URL`** and `**NEXT_PUBLIC_SUPABASE_ANON_KEY**` for cloud features; optional `**SUPABASE_SERVICE_ROLE_KEY**` server-only as documented. Set `**GOOGLE_BOOKS_API_KEY**` for book search and discover (free tier: 100 requests/minute, no daily cap).  
-- **Without Supabase env:** App runs **localStorage-only** — fine for demos, bad for multi-device continuity.  
+- **Environment:** Copy `app/.env.example` → `app/.env.local` and set `**NEXT_PUBLIC_SUPABASE_URL`** and `**NEXT_PUBLIC_SUPABASE_ANON_KEY**` (**required** — app enforces login). Optional `**SUPABASE_SERVICE_ROLE_KEY**` server-only as documented. Set `**GOOGLE_BOOKS_API_KEY**` for book search and discover (free tier: 100 requests/minute, no daily cap).  
+- **Without Supabase env:** App will **not function** — middleware forces login, and login requires Supabase + Google OAuth configuration.  
 - **LAN testing:** `npm run dev -- --hostname 0.0.0.0 --port 3000` then open the host machine's IP on a phone.
 
 ---
 
-## 13. Legacy / Reference Systems
+## 14. Legacy / Reference Systems
 
 Treat as **non-product sources** for live behavior:
 
@@ -315,6 +356,8 @@ Treat as **non-product sources** for live behavior:
 | `recommender/` (Python)                    | Offline / experiments                                                    |
 | `notebook.ipynb`                           | STAT course artifact                                                     |
 | `app/src/lib/bookProviders/openLibrary.ts` | **Deleted** — replaced by `googleBooks.ts`                               |
+| `app/src/components/MagicLinkAuthForm.tsx`  | **Deleted** — email sign-in removed in favor of Google OAuth only        |
+| `app/src/components/SyncConflictSheet.tsx`  | **Deleted** — server-authoritative model has no conflict resolution      |
 | `/recs` route                              | Redirect stub only                                                       |
 | `/leaderboard`                             | Redirect-only legacy                                                     |
 
@@ -323,19 +366,19 @@ Do not delete without explicit request; do not wire these back in as the primary
 
 ---
 
-## 14. Next Roadmap
+## 15. Next Roadmap
 
 Suggested ordering (product, not commitments):
 
-1. **Hardening:** Broader device testing, sync conflict UX polish, empty/error states for friends without usernames.
+1. **Hardening:** Broader device testing, empty/error states for friends without usernames, feed pagination for performance at scale.
 2. **Recommendations:** Tune discover thresholds and copy; optional future **recommendation "lenses"** (e.g. more discovery vs more comfort) **without** prescribing implementation algorithms in this PRD.
-3. **Account hygiene:** Clarify magic-link positioning (remove UI vs keep hidden); optional additional OAuth providers if demand exists.
-4. **Deploy + onboarding docs:** Ensure shared deploy URL users understand Google sign-in + sync.
-5. **Small social:** Taste summaries, mutual books, notifications **only** if explicitly scoped — default remains calm and opt-in.
+3. **Deploy + onboarding docs:** Ensure shared deploy URL users understand Google sign-in + sync.
+4. **Feed enhancements:** Notifications for reactions/comments, feed filtering, mute controls — **only** if explicitly scoped.
+5. **Additional OAuth providers:** Apple, GitHub, etc. if demand exists.
 
 ---
 
-## 15. Cursor / Agent Rules
+## 16. Cursor / Agent Rules
 
 When editing Reading Nook:
 
@@ -344,7 +387,7 @@ When editing Reading Nook:
 3. **No star ratings** in UI or product direction.
 4. **Add stays unified** — no standalone Recs product tab; `/recs` stays a redirect.
 5. **Recommendations** = app state + Google Books discover — see `appNativeRecommendations.ts`.
-6. **Supabase** = active backend when env is set; document and test both local-only and cloud modes.
+6. **Supabase** = **required** backend; login is mandatory, server is authoritative. No local-only mode.
 7. **Profile themes** = user motifs via `ProfileDecorationBackdrop` / `ThemedPageShell` patterns — do not reintroduce unrelated global theme systems.
 8. **Canonical genres only** in chips; manual genres optional, capped (see `genreVocabulary.ts` and pickers).
 9. **Shelf labels** exactly: Currently Reading, Finished, Want to Read.

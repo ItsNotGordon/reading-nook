@@ -56,12 +56,13 @@ export async function GET() {
   }
 
   const postIds = (posts ?? []).map((p) => p.id);
-  const reactionMap = new Map<string, { likes: number; userLiked: boolean; comments: { id: string; user_id: string; body: string; created_at: string }[] }>();
+  type CommentRow = { id: string; user_id: string; body: string; parent_id: string | null; created_at: string; replies: CommentRow[] };
+  const reactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
 
   if (postIds.length > 0) {
     const { data: reactions } = await supabase
       .from("post_reactions")
-      .select("id, post_id, user_id, type, body, created_at")
+      .select("id, post_id, user_id, type, body, parent_id, created_at")
       .in("post_id", postIds)
       .order("created_at", { ascending: true });
 
@@ -75,14 +76,31 @@ export async function GET() {
         entry.likes += 1;
         if (r.user_id === user.id) entry.userLiked = true;
       } else if (r.type === "comment" && r.body) {
-        entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, created_at: r.created_at });
+        entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, parent_id: r.parent_id ?? null, created_at: r.created_at, replies: [] });
       }
+    }
+
+    for (const entry of reactionMap.values()) {
+      const topLevel: CommentRow[] = [];
+      const byId = new Map<string, CommentRow>();
+      for (const c of entry.comments) byId.set(c.id, c);
+      for (const c of entry.comments) {
+        if (c.parent_id && byId.has(c.parent_id)) {
+          byId.get(c.parent_id)!.replies.push(c);
+        } else {
+          topLevel.push(c);
+        }
+      }
+      entry.comments = topLevel;
     }
   }
 
   const commentAuthorIds = new Set<string>();
   for (const entry of reactionMap.values()) {
-    for (const c of entry.comments) commentAuthorIds.add(c.user_id);
+    for (const c of entry.comments) {
+      commentAuthorIds.add(c.user_id);
+      for (const r of c.replies) commentAuthorIds.add(r.user_id);
+    }
   }
   if (commentAuthorIds.size > 0) {
     const missing = Array.from(commentAuthorIds).filter((id) => !profileMap.has(id));
@@ -134,6 +152,13 @@ export async function GET() {
         author: makeAuthor(c.user_id),
         body: c.body,
         createdAt: c.created_at,
+        replies: c.replies.map((reply) => ({
+          id: reply.id,
+          author: makeAuthor(reply.user_id),
+          body: reply.body,
+          createdAt: reply.created_at,
+          replies: [],
+        })),
       })),
       createdAt: p.created_at,
     });

@@ -10,6 +10,7 @@ export type FeedComment = {
   author: FeedAuthor;
   body: string;
   createdAt: string;
+  replies: FeedComment[];
 };
 
 export type FeedEvent = {
@@ -121,11 +122,20 @@ export async function toggleLike(postId: string): Promise<boolean> {
   return res.ok;
 }
 
-export async function addComment(postId: string, body: string): Promise<boolean> {
+export async function addComment(postId: string, body: string, parentId?: string): Promise<boolean> {
   const res = await fetch(`/api/feed/posts/${postId}/react`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "comment", body }),
+    body: JSON.stringify({ type: "comment", body, ...(parentId ? { parentId } : {}) }),
+  });
+  return res.ok;
+}
+
+export async function deleteComment(postId: string, reactionId: string): Promise<boolean> {
+  const res = await fetch(`/api/feed/posts/${postId}/react`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reactionId }),
   });
   return res.ok;
 }

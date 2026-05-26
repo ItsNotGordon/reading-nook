@@ -57,15 +57,73 @@ export async function POST(
       return NextResponse.json({ error: "Comment body is required." }, { status: 400 });
     }
 
+    const parentId = typeof b.parentId === "string" ? b.parentId : null;
+
+    if (parentId) {
+      const { data: parent } = await supabase
+        .from("post_reactions")
+        .select("id, post_id, parent_id")
+        .eq("id", parentId)
+        .maybeSingle();
+
+      if (!parent || parent.post_id !== postId) {
+        return NextResponse.json({ error: "Invalid parent comment." }, { status: 400 });
+      }
+      if (parent.parent_id) {
+        return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 400 });
+      }
+    }
+
     const { error } = await supabase.from("post_reactions").insert({
       post_id: postId,
       user_id: user.id,
       type: "comment",
       body: commentBody,
+      parent_id: parentId,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Invalid type." }, { status: 400 });
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ postId: string }> },
+) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false }, { status: 503 });
+  }
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return NextResponse.json({ ok: false }, { status: 503 });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  }
+
+  const { postId } = await params;
+  const raw: unknown = await request.json().catch(() => null);
+  if (!raw || typeof raw !== "object") {
+    return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+  }
+
+  const b = raw as Record<string, unknown>;
+  const reactionId = typeof b.reactionId === "string" ? b.reactionId : "";
+  if (!reactionId) {
+    return NextResponse.json({ error: "reactionId is required." }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("post_reactions")
+    .delete()
+    .eq("id", reactionId)
+    .eq("user_id", user.id)
+    .eq("post_id", postId);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
 }

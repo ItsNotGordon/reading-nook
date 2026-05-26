@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
-import { toggleLike, addComment, deletePost, editPost } from "@/lib/feedClient";
+import { toggleLike, addComment, deleteComment, deletePost, editPost } from "@/lib/feedClient";
 import { sentimentTextColor } from "@/lib/sentiment-display";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
@@ -84,29 +84,54 @@ function BookThumbnail({ coverUrl, title }: { coverUrl: string; title: string })
 function CommentSection({
   postId,
   comments,
+  currentUserId,
   onCommentAdded,
 }: {
   postId: string;
   comments: FeedCommentType[];
+  currentUserId: string | null;
   onCommentAdded: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
+  const inputRef = useState<HTMLInputElement | null>(null);
+
+  const totalCount = comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
+
+  function handleReply(comment: FeedCommentType) {
+    const label = authorLabel(comment.author);
+    setReplyingTo({ id: comment.id, username: label });
+    setText(`${label} `);
+    setExpanded(true);
+    setTimeout(() => inputRef[0]?.focus(), 0);
+  }
+
+  function cancelReply() {
+    setReplyingTo(null);
+    setText("");
+  }
+
+  async function handleDeleteComment(reactionId: string) {
+    const ok = await deleteComment(postId, reactionId);
+    if (ok) onCommentAdded();
+  }
 
   async function handleSend() {
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
-    const ok = await addComment(postId, t);
+    const ok = await addComment(postId, t, replyingTo?.id);
     setSending(false);
     if (ok) {
       setText("");
+      setReplyingTo(null);
       onCommentAdded();
     }
   }
 
-  if (!expanded && comments.length === 0) {
+  if (!expanded && totalCount === 0) {
     return (
       <button
         onClick={() => setExpanded(true)}
@@ -119,41 +144,105 @@ function CommentSection({
 
   return (
     <div className="mt-2 border-t border-border pt-2">
-      {comments.length > 0 && !expanded ? (
+      {totalCount > 0 && !expanded ? (
         <button
           onClick={() => setExpanded(true)}
           className="text-xs font-medium text-accent"
         >
-          View {comments.length} comment{comments.length !== 1 ? "s" : ""}
+          View {totalCount} comment{totalCount !== 1 ? "s" : ""}
         </button>
       ) : null}
 
-      {expanded || comments.length > 0 ? (
+      {expanded || totalCount > 0 ? (
         <div className="flex flex-col gap-1.5">
           {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2">
-              <AuthorLink author={c.author}>
-                <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
-              </AuthorLink>
-              <div className="min-w-0 flex-1">
+            <div key={c.id}>
+              <div className="flex items-start gap-2">
                 <AuthorLink author={c.author}>
-                  <span className="text-xs font-semibold text-foreground">
-                    {authorLabel(c.author)}
-                  </span>
+                  <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
                 </AuthorLink>
-                <span className="ml-1.5 text-xs text-foreground-muted">
-                  {c.body}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <AuthorLink author={c.author}>
+                    <span className="text-xs font-semibold text-foreground">
+                      {authorLabel(c.author)}
+                    </span>
+                  </AuthorLink>
+                  <span className="ml-1.5 text-xs text-foreground-muted">
+                    {c.body}
+                  </span>
+                  <button
+                    onClick={() => handleReply(c)}
+                    className="ml-2 text-[10px] font-medium text-foreground-muted/70 hover:text-accent"
+                  >
+                    Reply
+                  </button>
+                  {c.author.userId === currentUserId ? (
+                    <button
+                      onClick={() => handleDeleteComment(c.id)}
+                      className="ml-1 text-[10px] font-medium text-foreground-muted/70 hover:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </div>
               </div>
+
+              {c.replies?.length > 0 ? (
+                <div className="ml-10 mt-1 flex flex-col gap-1">
+                  {c.replies.map((r) => (
+                    <div key={r.id} className="flex items-start gap-1.5">
+                      <AuthorLink author={r.author}>
+                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft/40 text-[9px] font-semibold text-accent">
+                          {r.author.avatarUrl ? (
+                            <Image src={r.author.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" unoptimized />
+                          ) : (
+                            r.author.displayName.charAt(0).toUpperCase() || "?"
+                          )}
+                        </div>
+                      </AuthorLink>
+                      <div className="min-w-0 flex-1">
+                        <AuthorLink author={r.author}>
+                          <span className="text-[10px] font-semibold text-foreground">
+                            {authorLabel(r.author)}
+                          </span>
+                        </AuthorLink>
+                        <span className="ml-1 text-[10px] text-foreground-muted">
+                          {r.body}
+                        </span>
+                        {r.author.userId === currentUserId ? (
+                          <button
+                            onClick={() => handleDeleteComment(r.id)}
+                            className="ml-1 text-[10px] font-medium text-foreground-muted/70 hover:text-red-400"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
       ) : null}
 
+      {replyingTo ? (
+        <div className="mt-1 flex items-center gap-1.5">
+          <span className="text-[10px] text-foreground-muted">
+            Replying to {replyingTo.username}
+          </span>
+          <button onClick={cancelReply} className="text-[10px] font-medium text-foreground-muted/70 hover:text-red-400">
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
       <div className="mt-1.5 flex items-center gap-2">
         <input
+          ref={(el) => { inputRef[0] = el; }}
           type="text"
-          placeholder="Write a comment..."
+          placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -395,6 +484,7 @@ export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
             <CommentSection
               postId={item.id}
               comments={item.comments}
+              currentUserId={currentUserId}
               onCommentAdded={onRefresh}
             />
           </div>
