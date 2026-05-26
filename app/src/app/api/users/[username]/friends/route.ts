@@ -48,7 +48,8 @@ export async function GET(
   const targetId = profile.id;
 
   // Use service-role to bypass RLS and see all friendships for this user
-  let sb: ReturnType<typeof createClient>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let sb: any;
   try {
     sb = createClient(getSupabaseUrl(), getSupabaseServiceRoleKey());
   } catch {
@@ -69,8 +70,9 @@ export async function GET(
     return NextResponse.json({ friends: [] });
   }
 
-  // Collect the "other" user id from each friendship + direction relative to target
-  const friendEntries = links.map((link) => {
+  type FriendLink = { requester_id: string; addressee_id: string };
+
+  const friendEntries = (links as FriendLink[]).map((link) => {
     const isRequester = link.requester_id === targetId;
     return {
       friendId: isRequester ? link.addressee_id : link.requester_id,
@@ -86,8 +88,10 @@ export async function GET(
     .select("id, username, display_name, avatar_url, tagline")
     .in("id", friendIds);
 
+  type FriendProfile = { id: string; username: string | null; display_name: string | null; avatar_url: string | null; tagline: string | null };
+
   const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.id, p]),
+    ((profiles ?? []) as FriendProfile[]).map((p) => [p.id, p]),
   );
 
   const friends = friendEntries.map((entry) => {

@@ -11,7 +11,8 @@ type JoinClubSheetProps = {
 
 export function JoinClubSheet({ open, onClose, onJoined }: JoinClubSheetProps) {
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<"idle" | "resolving" | "found" | "joining" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "resolving" | "found" | "error">("idle");
+  const [joining, setJoining] = useState(false);
   const [resolved, setResolved] = useState<{ clubId: string; name: string; memberCount: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -32,8 +33,9 @@ export function JoinClubSheet({ open, onClose, onJoined }: JoinClubSheetProps) {
 
   async function handleJoin() {
     if (!resolved) return;
-    setStatus("joining");
+    setJoining(true);
     const ok = await joinClub(resolved.clubId, code.trim());
+    setJoining(false);
     if (ok) {
       setCode("");
       setResolved(null);
@@ -50,6 +52,7 @@ export function JoinClubSheet({ open, onClose, onJoined }: JoinClubSheetProps) {
     setCode("");
     setResolved(null);
     setStatus("idle");
+    setJoining(false);
     setErrorMsg("");
     onClose();
   }
@@ -112,10 +115,10 @@ export function JoinClubSheet({ open, onClose, onJoined }: JoinClubSheetProps) {
             </p>
             <button
               onClick={handleJoin}
-              disabled={status === "joining"}
+              disabled={joining}
               className="mt-3 w-full rounded-xl border border-accent bg-accent py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-50"
             >
-              {status === "joining" ? "Joining..." : "Join Club"}
+              {joining ? "Joining..." : "Join Club"}
             </button>
           </div>
         ) : null}
