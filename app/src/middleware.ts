@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { REAUTH_COOKIE_NAME, REAUTH_COOKIE_VALUE } from "@/lib/authSession";
 import { getSupabaseAnonKey, getSupabaseUrl, isSupabaseConfigured } from "@/lib/supabase/config";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
@@ -42,10 +41,7 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const requiresReauth =
-    request.cookies.get(REAUTH_COOKIE_NAME)?.value === REAUTH_COOKIE_VALUE;
-
-  if (requiresReauth && !user) {
+  if (!user) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set("next", pathname);

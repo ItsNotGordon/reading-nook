@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { REAUTH_COOKIE_NAME } from "@/lib/authSession";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function sanitizeNextPath(raw: string | null): string {
@@ -34,7 +33,5 @@ export async function GET(request: Request) {
     }
   }
 
-  const response = NextResponse.redirect(`${origin}${next}`);
-  response.cookies.set(REAUTH_COOKIE_NAME, "", { path: "/", maxAge: 0 });
-  return response;
+  return NextResponse.redirect(`${origin}${next}`);
 }

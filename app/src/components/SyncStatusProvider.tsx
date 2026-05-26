@@ -10,28 +10,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { AppState } from "@/lib/types";
 import { useReadingNook } from "@/lib/app-state";
-import { isAccountSwitch, setLastAuthUserId } from "@/lib/authSession";
 import {
-  decideInitialSync,
   fetchCloudLibrary,
   formatSyncTime,
   pushCloudLibrary,
-  type SyncMergeDecision,
 } from "@/lib/cloudSync";
+import { countShelvedBooks } from "@/lib/tasteComparison";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
-import { SyncConflictSheet } from "./SyncConflictSheet";
 
 export type SyncStatus = "offline" | "idle" | "syncing" | "synced" | "error";
-
-type ConflictState = {
-  local: AppState;
-  cloud: AppState;
-  localCount: number;
-  cloudCount: number;
-  cloudUpdatedAt: string;
-};
 
 type SyncStatusContextValue = {
   status: SyncStatus;
@@ -43,13 +31,14 @@ type SyncStatusContextValue = {
 
 export const SyncStatusContext = createContext<SyncStatusContextValue | null>(null);
 
+const PUSH_DEBOUNCE_MS = 500;
+
 export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const { state, actions } = useReadingNook();
   const { user, configured } = useSupabaseAuth();
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<ConflictState | null>(null);
   const stateRef = useRef(state);
   const pulledForUser = useRef<string | null>(null);
   const readyToPush = useRef(false);
@@ -58,74 +47,45 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     stateRef.current = state;
   }, [state]);
 
-  const applyDecision = useCallback(
-    async (decision: SyncMergeDecision) => {
-      if (decision.action === "noop") {
-        setStatus("synced");
-        setLastSyncedAt(new Date().toISOString());
-        readyToPush.current = true;
-        return;
-      }
-      if (decision.action === "hydrate") {
-        actions.hydrateLibrary(decision.cloud);
-        setStatus("synced");
-        setLastSyncedAt(new Date().toISOString());
-        readyToPush.current = true;
-        return;
-      }
-      if (decision.action === "push") {
-        setStatus("syncing");
-        const result = await pushCloudLibrary(decision.local);
-        if (result.ok) {
-          setStatus("synced");
-          setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-          setStatusMessage(null);
-        } else {
-          setStatus("error");
-          setStatusMessage(result.error ?? "Upload failed.");
-        }
-        readyToPush.current = true;
-        return;
-      }
-      setConflict({
-        local: decision.local,
-        cloud: decision.cloud,
-        localCount: decision.localCount,
-        cloudCount: decision.cloudCount,
-        cloudUpdatedAt: decision.cloudUpdatedAt,
-      });
-      setStatus("idle");
-      readyToPush.current = false;
-    },
-    [actions],
-  );
-
   const runInitialPull = useCallback(
-    async (userId: string) => {
+    async () => {
       setStatus("syncing");
       setStatusMessage(null);
-      const preventAutoPush = isAccountSwitch(userId);
       const pull = await fetchCloudLibrary();
+
       if (pull.kind === "error") {
         setStatus("error");
         setStatusMessage(pull.message);
         readyToPush.current = true;
-        setLastAuthUserId(userId);
         return;
       }
-      const local = stateRef.current;
-      const syncOptions = { preventAutoPush };
-      if (pull.kind === "empty") {
-        await applyDecision(decideInitialSync(local, null, null, syncOptions));
-        setLastAuthUserId(userId);
+
+      if (pull.kind === "cloud") {
+        actions.hydrateLibrary(pull.state);
+        setStatus("synced");
+        setLastSyncedAt(pull.updatedAt);
+        readyToPush.current = true;
         return;
       }
-      await applyDecision(
-        decideInitialSync(local, pull.state, pull.updatedAt, syncOptions),
-      );
-      setLastAuthUserId(userId);
+
+      // Cloud is empty -- push local data if any
+      const localCount = countShelvedBooks(stateRef.current);
+      if (localCount > 0) {
+        const result = await pushCloudLibrary(stateRef.current);
+        if (result.ok) {
+          setStatus("synced");
+          setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
+        } else {
+          setStatus("error");
+          setStatusMessage(result.error ?? "Upload failed.");
+        }
+      } else {
+        setStatus("synced");
+        setLastSyncedAt(new Date().toISOString());
+      }
+      readyToPush.current = true;
     },
-    [applyDecision],
+    [actions],
   );
 
   useEffect(() => {
@@ -133,7 +93,6 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       pulledForUser.current = null;
       readyToPush.current = false;
       const resetTimer = window.setTimeout(() => {
-        setConflict(null);
         setStatus("idle");
         setLastSyncedAt(null);
       }, 0);
@@ -143,8 +102,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     pulledForUser.current = user.id;
     readyToPush.current = false;
     const startTimer = window.setTimeout(() => {
-      setConflict(null);
-      void runInitialPull(user.id);
+      void runInitialPull();
     }, 0);
     return () => window.clearTimeout(startTimer);
   }, [configured, user, runInitialPull]);
@@ -164,7 +122,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    if (!configured || !user || !readyToPush.current || conflict) return;
+    if (!configured || !user || !readyToPush.current) return;
     setStatus("syncing");
     const timer = window.setTimeout(() => {
       void pushCloudLibrary(stateRef.current).then((result) => {
@@ -177,35 +135,9 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
           setStatusMessage(result.error ?? "Sync failed.");
         }
       });
-    }, 2000);
+    }, PUSH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [configured, user, state, conflict]);
-
-  const resolveConflict = useCallback(
-    async (choice: "local" | "cloud") => {
-      if (!conflict) return;
-      setConflict(null);
-      if (choice === "cloud") {
-        actions.hydrateLibrary(conflict.cloud);
-        setStatus("synced");
-        setLastSyncedAt(conflict.cloudUpdatedAt);
-        readyToPush.current = true;
-        return;
-      }
-      setStatus("syncing");
-      const result = await pushCloudLibrary(conflict.local);
-      if (result.ok) {
-        setStatus("synced");
-        setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-        setStatusMessage(null);
-      } else {
-        setStatus("error");
-        setStatusMessage(result.error ?? "Upload failed.");
-      }
-      readyToPush.current = true;
-    },
-    [actions, conflict],
-  );
+  }, [configured, user, state]);
 
   const value = useMemo(
     () => ({
@@ -221,15 +153,6 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   return (
     <SyncStatusContext.Provider value={value}>
       {children}
-      {conflict ? (
-        <SyncConflictSheet
-          localCount={conflict.localCount}
-          cloudCount={conflict.cloudCount}
-          cloudUpdatedAt={conflict.cloudUpdatedAt}
-          onChooseCloud={() => void resolveConflict("cloud")}
-          onChooseLocal={() => void resolveConflict("local")}
-        />
-      ) : null}
     </SyncStatusContext.Provider>
   );
 }

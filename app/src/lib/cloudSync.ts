@@ -1,27 +1,4 @@
 import type { AppState } from "./types";
-import { SENTIMENT_BUCKETS } from "./types";
-import { getInitialState } from "./storage";
-import { countShelvedBooks } from "./tasteComparison";
-
-/** Stable fingerprint for conflict detection (not cryptographic). */
-export function libraryFingerprint(state: AppState): string {
-  const parts: string[] = [];
-  const bookIds = Object.keys(state.userBooks).sort();
-  for (const id of bookIds) {
-    const ub = state.userBooks[id as keyof typeof state.userBooks];
-    if (!ub) continue;
-    parts.push(`${id}:${ub.shelf}:${ub.sentimentBucket ?? ""}:${ub.currentPage ?? ""}`);
-  }
-  for (const bucket of SENTIMENT_BUCKETS) {
-    parts.push(`${bucket}:${(state.bucketRankings[bucket] ?? []).join(",")}`);
-  }
-  parts.push(`profile:${state.profile.displayName}:${state.profile.tagline}:${state.profile.theme ?? "plant"}`);
-  return parts.join("|");
-}
-
-export function librariesDiffer(local: AppState, cloud: AppState): boolean {
-  return libraryFingerprint(local) !== libraryFingerprint(cloud);
-}
 
 export type SyncPullResult =
   | { kind: "empty" }
@@ -66,85 +43,6 @@ export async function pushCloudLibrary(state: AppState): Promise<{ ok: boolean; 
   } catch {
     return { ok: false, error: "Could not reach the server." };
   }
-}
-
-export type SyncMergeDecision =
-  | { action: "hydrate"; cloud: AppState }
-  | { action: "push"; local: AppState }
-  | { action: "noop" }
-  | {
-      action: "conflict";
-      local: AppState;
-      cloud: AppState;
-      localCount: number;
-      cloudCount: number;
-      cloudUpdatedAt: string;
-    };
-
-export type DecideInitialSyncOptions = {
-  /** When true, never upload local data without explicit user choice (account switch). */
-  preventAutoPush?: boolean;
-};
-
-export function decideInitialSync(
-  local: AppState,
-  cloud: AppState | null,
-  cloudUpdatedAt: string | null,
-  options?: DecideInitialSyncOptions,
-): SyncMergeDecision {
-  const localCount = countShelvedBooks(local);
-  const preventAutoPush = options?.preventAutoPush ?? false;
-
-  if (!cloud) {
-    if (localCount > 0) {
-      if (preventAutoPush) {
-        return {
-          action: "conflict",
-          local,
-          cloud: getInitialState(),
-          localCount,
-          cloudCount: 0,
-          cloudUpdatedAt: cloudUpdatedAt ?? new Date().toISOString(),
-        };
-      }
-      return { action: "push", local };
-    }
-    return { action: "noop" };
-  }
-
-  const cloudCount = countShelvedBooks(cloud);
-  if (localCount === 0 && cloudCount > 0) {
-    return { action: "hydrate", cloud };
-  }
-  if (cloudCount === 0 && localCount > 0) {
-    if (preventAutoPush) {
-      return {
-        action: "conflict",
-        local,
-        cloud,
-        localCount,
-        cloudCount,
-        cloudUpdatedAt: cloudUpdatedAt ?? new Date().toISOString(),
-      };
-    }
-    return { action: "push", local };
-  }
-  if (localCount === 0 && cloudCount === 0) {
-    return { action: "noop" };
-  }
-
-  if (!librariesDiffer(local, cloud)) {
-    return { action: "noop" };
-  }
-
-  return {
-    action: "conflict",
-    local,
-    cloud,
-    localCount,
-    cloudCount,
-    cloudUpdatedAt: cloudUpdatedAt ?? new Date().toISOString(),
-  };
 }
 
 export function formatSyncTime(iso: string | null): string {

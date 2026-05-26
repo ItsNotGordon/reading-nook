@@ -15,8 +15,8 @@ export function LibraryBackupSection() {
     <section className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
       <p className="text-sm font-semibold text-foreground">Library backup</p>
       <p className="mt-1 text-xs text-foreground-muted">
-        Export a JSON backup or import on another device. Import replaces your current library on
-        this device. With cloud sign-in, import also uploads to your account after you confirm.
+        Export a JSON backup or import from a file. Import replaces your current library and syncs
+        the change to your account.
       </p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
@@ -45,11 +45,11 @@ export function LibraryBackupSection() {
             void readLibraryBackupFile(file)
               .then((next) => {
                 const ok = window.confirm(
-                  "Replace your library on this device with this backup? This cannot be undone.",
+                  "Replace your library with this backup? This cannot be undone.",
                 );
                 if (!ok) return;
                 actions.hydrateLibrary(next);
-                setImportMessage("Library imported on this device.");
+                setImportMessage("Library imported and syncing to cloud.");
                 if (cloudConfigured && cloudUser) {
                   void fetch("/api/sync", {
                     method: "POST",
@@ -71,12 +71,8 @@ export function LibraryBackupSection() {
           Delete library
         </p>
         <p className="mt-2 text-xs leading-relaxed text-foreground-muted">
-          Remove every book from your shelves, clear progress and ratings, and drop cached book
-          metadata on this device.
-          {cloudConfigured && cloudUser
-            ? " Your cloud library may still exist — export a backup first, then sign in again to overwrite cloud if needed."
-            : " Data is not sent to a server unless you use cloud sign-in."}{" "}
-          You cannot undo this.
+          Remove every book from your shelves, clear progress and ratings. This will also clear your
+          cloud library. Export a backup first if you might need it later. You cannot undo this.
         </p>
         <button
           type="button"
@@ -89,11 +85,11 @@ export function LibraryBackupSection() {
           type="button"
           onClick={() => {
             const ok = window.confirm(
-              "Clear all library data from this device? Export a backup first if you might need it later. This cannot be undone.",
+              "Clear all library data? This will also clear your cloud copy. Export a backup first. This cannot be undone.",
             );
             if (!ok) return;
             const exported = window.confirm(
-              "Did you export a backup? Choose OK only if you are sure you want to clear everything on this device.",
+              "Did you export a backup? Choose OK only if you are sure you want to clear everything.",
             );
             if (exported) actions.resetLibrary();
           }}

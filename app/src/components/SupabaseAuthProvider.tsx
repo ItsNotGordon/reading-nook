@@ -11,7 +11,6 @@ import {
   type ReactNode,
 } from "react";
 import type { User } from "@supabase/supabase-js";
-import { clearRequiresReauth } from "@/lib/authSession";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -25,10 +24,6 @@ type SupabaseAuthContextValue = {
   configured: boolean;
   loading: boolean;
   user: User | null;
-  signInWithEmail: (
-    email: string,
-    redirectPath?: string,
-  ) => Promise<{ ok: boolean; message: string }>;
   signInWithGoogle: (redirectPath?: string) => Promise<{ ok: boolean; message: string }>;
   signOut: () => Promise<void>;
 };
@@ -60,44 +55,15 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     }
     const client = createSupabaseBrowserClient();
     client.auth.getSession().then(({ data }) => {
-      const sessionUser = data.session?.user ?? null;
-      if (sessionUser) clearRequiresReauth();
-      setUser(sessionUser);
+      setUser(data.session?.user ?? null);
       setLoading(false);
     });
     const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
-      const sessionUser = session?.user ?? null;
-      if (sessionUser) clearRequiresReauth();
-      setUser(sessionUser);
+      setUser(session?.user ?? null);
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
   }, [configured]);
-
-  const signInWithEmail = useCallback(
-    async (email: string, redirectPath = "/profile") => {
-      if (!configured) {
-        return { ok: false, message: "Cloud sign-in is not configured on this deployment." };
-      }
-      const trimmed = email.trim();
-      if (!trimmed.includes("@")) {
-        return { ok: false, message: "Enter a valid email address." };
-      }
-      const safePath = redirectPath.startsWith("/") ? redirectPath : "/profile";
-      const client = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safePath)}`;
-      const { error } = await client.auth.signInWithOtp({
-        email: trimmed,
-        options: { emailRedirectTo: redirectTo },
-      });
-      if (error) return { ok: false, message: error.message };
-      return {
-        ok: true,
-        message: "Check your email for a sign-in link.",
-      };
-    },
-    [configured],
-  );
 
   const signInWithGoogle = useCallback(
     async (redirectPath = "/profile") => {
@@ -135,11 +101,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       configured,
       loading,
       user,
-      signInWithEmail,
       signInWithGoogle,
       signOut,
     }),
-    [configured, loading, user, signInWithEmail, signInWithGoogle, signOut],
+    [configured, loading, user, signInWithGoogle, signOut],
   );
 
   return (
