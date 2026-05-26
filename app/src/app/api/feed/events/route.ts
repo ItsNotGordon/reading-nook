@@ -36,6 +36,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
+  if (eventType === "progress") {
+    await supabase
+      .from("feed_events")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("book_id", bookId)
+      .eq("event_type", "progress");
+  }
+
+  if (eventType === "finished") {
+    await supabase
+      .from("feed_events")
+      .delete()
+      .eq("user_id", user.id)
+      .eq("book_id", bookId)
+      .in("event_type", ["finished", "shelved"]);
+  }
+
   const { error } = await supabase.from("feed_events").insert({
     user_id: user.id,
     event_type: eventType,

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import type { FeedItem, FeedComment as FeedCommentType } from "@/lib/feedClient";
-import { toggleLike, addComment } from "@/lib/feedClient";
+import Link from "next/link";
+import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
+import { toggleLike, addComment, deletePost, editPost } from "@/lib/feedClient";
+import { ProgressBar } from "./ProgressBar";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -26,13 +28,28 @@ function shelfLabel(shelf: string): string {
   }
 }
 
-function sentimentEmoji(sentiment: string | null): string {
+function sentimentLabel(sentiment: string | null): string {
   switch (sentiment) {
-    case "liked": return "\u2764\uFE0F";
-    case "okay": return "\uD83D\uDE10";
-    case "disliked": return "\uD83D\uDC4E";
+    case "liked": return "\u2764\uFE0F Liked";
+    case "okay": return "\uD83D\uDE10 Okay";
+    case "disliked": return "\uD83D\uDC4E Disliked";
     default: return "";
   }
+}
+
+function authorLabel(author: FeedAuthor): string {
+  return author.username ? `@${author.username}` : author.displayName;
+}
+
+function AuthorLink({ author, children }: { author: FeedAuthor; children: React.ReactNode }) {
+  if (author.username) {
+    return (
+      <Link href={`/friends/${encodeURIComponent(author.username)}`} className="inline-flex items-center gap-1.5">
+        {children}
+      </Link>
+    );
+  }
+  return <span className="inline-flex items-center gap-1.5">{children}</span>;
 }
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
@@ -121,11 +138,15 @@ function CommentSection({
         <div className="flex flex-col gap-1.5">
           {comments.map((c) => (
             <div key={c.id} className="flex items-start gap-2">
-              <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
+              <AuthorLink author={c.author}>
+                <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
+              </AuthorLink>
               <div className="min-w-0 flex-1">
-                <span className="text-xs font-semibold text-foreground">
-                  {c.author.displayName}
-                </span>
+                <AuthorLink author={c.author}>
+                  <span className="text-xs font-semibold text-foreground">
+                    {authorLabel(c.author)}
+                  </span>
+                </AuthorLink>
                 <span className="ml-1.5 text-xs text-foreground-muted">
                   {c.body}
                 </span>
@@ -160,12 +181,18 @@ function CommentSection({
 
 type FeedCardProps = {
   item: FeedItem;
+  currentUserId: string | null;
   onRefresh: () => void;
 };
 
-export function FeedCard({ item, onRefresh }: FeedCardProps) {
+export function FeedCard({ item, currentUserId, onRefresh }: FeedCardProps) {
   const [liked, setLiked] = useState(item.kind === "post" ? item.userLiked : false);
   const [likeCount, setLikeCount] = useState(item.kind === "post" ? item.likes : 0);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(item.kind === "post" ? item.body : "");
+  const [saving, setSaving] = useState(false);
+
+  const isOwn = item.author.userId === currentUserId;
 
   async function handleToggleLike() {
     if (item.kind !== "post") return;
@@ -173,6 +200,24 @@ export function FeedCard({ item, onRefresh }: FeedCardProps) {
     if (ok) {
       setLiked((prev) => !prev);
       setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete this post?")) return;
+    const ok = await deletePost(item.id);
+    if (ok) onRefresh();
+  }
+
+  async function handleSaveEdit() {
+    const t = editText.trim();
+    if (!t || saving) return;
+    setSaving(true);
+    const ok = await editPost(item.id, t);
+    setSaving(false);
+    if (ok) {
+      setEditing(false);
+      onRefresh();
     }
   }
 
@@ -188,27 +233,70 @@ export function FeedCard({ item, onRefresh }: FeedCardProps) {
               ? "wants to read"
               : `added to ${shelfLabel(item.shelf)}`;
 
+    let progressFraction =
+      item.eventType === "progress" && typeof item.derivedScore === "number"
+        ? item.derivedScore
+        : null;
+    if (progressFraction === null && item.eventType === "progress" && item.notes) {
+      const m = item.notes.match(/\((\d+)%\)/);
+      if (m) progressFraction = parseInt(m[1], 10) / 100;
+    }
+
     return (
       <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
         <div className="flex items-start gap-2.5">
-          <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
+          <AuthorLink author={item.author}>
+            <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
+          </AuthorLink>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-foreground">
-              <span className="font-semibold">{item.author.displayName}</span>{" "}
-              {verb}{" "}
-              <span className="font-semibold">&ldquo;{item.bookTitle}&rdquo;</span>
-              {item.sentiment ? ` ${sentimentEmoji(item.sentiment)}` : ""}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm text-foreground">
+                <AuthorLink author={item.author}>
+                  <span className="font-semibold">{authorLabel(item.author)}</span>
+                </AuthorLink>{" "}
+                {verb}{" "}
+                <span className="font-semibold">&ldquo;{item.bookTitle}&rdquo;</span>
+              </p>
+            </div>
             <p className="mt-0.5 text-[10px] text-foreground-muted">
-              {item.bookAuthor} &middot; {timeAgo(item.createdAt)}
+              {timeAgo(item.createdAt)}
             </p>
-            {item.notes ? (
+
+            <div className="mt-2 flex items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5">
+              <BookThumbnail coverUrl={item.bookCoverUrl} title={item.bookTitle} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-foreground">
+                  {item.bookTitle}
+                </p>
+                <p className="truncate text-[10px] text-foreground-muted">
+                  {item.bookAuthor}
+                </p>
+                {progressFraction !== null ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <ProgressBar
+                      mode="exact"
+                      value={progressFraction}
+                      trackClassName="relative h-1.5 w-full overflow-hidden rounded-full border border-border bg-progress-unread"
+                    />
+                    <span className="shrink-0 text-[10px] font-medium text-foreground-muted">
+                      {Math.round(progressFraction * 100)}%
+                    </span>
+                  </div>
+                ) : null}
+                {item.sentiment ? (
+                  <p className="mt-1 text-xs font-medium text-foreground-muted">
+                    {sentimentLabel(item.sentiment)}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            {item.notes && !progressFraction ? (
               <p className="mt-1.5 text-xs italic text-foreground-muted">
                 &ldquo;{item.notes}&rdquo;
               </p>
             ) : null}
           </div>
-          <BookThumbnail coverUrl={item.bookCoverUrl} title={item.bookTitle} />
         </div>
       </div>
     );
@@ -217,17 +305,69 @@ export function FeedCard({ item, onRefresh }: FeedCardProps) {
   return (
     <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
       <div className="flex items-start gap-2.5">
-        <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
+        <AuthorLink author={item.author}>
+          <Avatar name={item.author.displayName} url={item.author.avatarUrl} />
+        </AuthorLink>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-foreground">
-              {item.author.displayName}
-            </span>
-            <span className="text-[10px] text-foreground-muted">
-              {timeAgo(item.createdAt)}
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <AuthorLink author={item.author}>
+                <span className="text-sm font-semibold text-foreground">
+                  {authorLabel(item.author)}
+                </span>
+              </AuthorLink>
+              <span className="text-[10px] text-foreground-muted">
+                {timeAgo(item.createdAt)}
+              </span>
+            </div>
+            {isOwn ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditing(true);
+                    setEditText(item.body);
+                  }}
+                  className="text-[10px] font-medium text-foreground-muted"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="text-[10px] font-medium text-red-400"
+                >
+                  Delete
+                </button>
+              </div>
+            ) : null}
           </div>
-          <p className="mt-1 text-sm text-foreground">{item.body}</p>
+
+          {editing ? (
+            <div className="mt-1">
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                rows={2}
+                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={!editText.trim() || saving}
+                  className="text-xs font-semibold text-accent disabled:opacity-40"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => setEditing(false)}
+                  className="text-xs font-medium text-foreground-muted"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-sm text-foreground">{item.body}</p>
+          )}
 
           {item.bookTitle ? (
             <div className="mt-2 flex items-center gap-2 rounded-lg bg-accent-soft/10 px-2.5 py-1.5">

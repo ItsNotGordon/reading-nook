@@ -141,5 +141,5 @@ export async function GET() {
 
   items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json({ items: items.slice(0, 50) });
+  return NextResponse.json({ items: items.slice(0, 50), currentUserId: user.id });
 }

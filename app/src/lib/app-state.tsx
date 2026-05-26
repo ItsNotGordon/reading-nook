@@ -13,7 +13,7 @@ import {
 import { appReducer } from "./app-reducer";
 import { APP_THEMES, type AppState, type Book, type BookId, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
-import { postFeedEvent } from "./feedClient";
+import { postFeedEvent, debouncedPostFeedEvent } from "./feedClient";
 
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
@@ -103,15 +103,15 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage });
         const cat = stateRef.current.catalog[bookId];
         if (cat && cat.totalPages > 0) {
-          const pct = Math.round((currentPage / cat.totalPages) * 100);
-          postFeedEvent({
+          const fraction = Math.min(1, currentPage / cat.totalPages);
+          debouncedPostFeedEvent({
             eventType: "progress",
             bookId,
             bookTitle: cat.title,
             bookAuthor: cat.author,
             bookCoverUrl: cat.coverUrl,
             shelf: "reading",
-            notes: `Page ${currentPage} of ${cat.totalPages} (${pct}%)`,
+            derivedScore: fraction,
           });
         }
       },
@@ -120,15 +120,15 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         if (totalPages > 0) {
           const cat = stateRef.current.catalog[bookId];
           if (cat) {
-            const pct = Math.round((currentPage / totalPages) * 100);
-            postFeedEvent({
+            const fraction = Math.min(1, currentPage / totalPages);
+            debouncedPostFeedEvent({
               eventType: "progress",
               bookId,
               bookTitle: cat.title,
               bookAuthor: cat.author,
               bookCoverUrl: cat.coverUrl,
               shelf: "reading",
-              notes: `Page ${currentPage} of ${totalPages} (${pct}%)`,
+              derivedScore: fraction,
             });
           }
         }
@@ -137,16 +137,15 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "UPDATE_ESTIMATED_PROGRESS", bookId, estimatedRange });
         const cat = stateRef.current.catalog[bookId];
         if (cat) {
-          const lo = Math.round(estimatedRange[0] * 100);
-          const hi = Math.round(estimatedRange[1] * 100);
-          postFeedEvent({
+          const mid = (estimatedRange[0] + estimatedRange[1]) / 2;
+          debouncedPostFeedEvent({
             eventType: "progress",
             bookId,
             bookTitle: cat.title,
             bookAuthor: cat.author,
             bookCoverUrl: cat.coverUrl,
             shelf: "reading",
-            notes: lo === hi ? `~${lo}% done` : `~${lo}–${hi}% done`,
+            derivedScore: mid,
           });
         }
       },

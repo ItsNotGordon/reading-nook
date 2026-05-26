@@ -45,14 +45,20 @@ export type FeedPost = {
 
 export type FeedItem = FeedEvent | FeedPost;
 
-export async function fetchFeed(): Promise<FeedItem[]> {
+export type FeedResponse = {
+  items: FeedItem[];
+  currentUserId: string | null;
+};
+
+export async function fetchFeed(): Promise<FeedResponse> {
   const res = await fetch("/api/feed", { cache: "no-store" });
-  if (!res.ok) return [];
+  if (!res.ok) return { items: [], currentUserId: null };
   const data: unknown = await res.json();
-  if (!data || typeof data !== "object") return [];
-  const items = (data as { items?: unknown }).items;
-  if (!Array.isArray(items)) return [];
-  return items as FeedItem[];
+  if (!data || typeof data !== "object") return { items: [], currentUserId: null };
+  const d = data as { items?: unknown; currentUserId?: unknown };
+  const items = Array.isArray(d.items) ? (d.items as FeedItem[]) : [];
+  const currentUserId = typeof d.currentUserId === "string" ? d.currentUserId : null;
+  return { items, currentUserId };
 }
 
 export type PostFeedEventInput = {
@@ -73,6 +79,20 @@ export function postFeedEvent(input: PostFeedEventInput): void {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   }).catch(() => {});
+}
+
+const DEBOUNCE_MS = 30_000;
+let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingEvent: PostFeedEventInput | null = null;
+
+export function debouncedPostFeedEvent(input: PostFeedEventInput): void {
+  _pendingEvent = input;
+  if (_debounceTimer) clearTimeout(_debounceTimer);
+  _debounceTimer = setTimeout(() => {
+    if (_pendingEvent) postFeedEvent(_pendingEvent);
+    _pendingEvent = null;
+    _debounceTimer = null;
+  }, DEBOUNCE_MS);
 }
 
 export type CreatePostInput = {
@@ -106,6 +126,15 @@ export async function addComment(postId: string, body: string): Promise<boolean>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ type: "comment", body }),
+  });
+  return res.ok;
+}
+
+export async function editPost(postId: string, body: string): Promise<boolean> {
+  const res = await fetch(`/api/feed/posts/${postId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
   });
   return res.ok;
 }

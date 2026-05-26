@@ -8,6 +8,7 @@ import { NewPostComposer } from "./NewPostComposer";
 
 export function HomeFeed() {
   const [items, setItems] = useState<FeedItem[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [trigger, setTrigger] = useState(0);
   const mountedRef = useRef(true);
@@ -15,9 +16,10 @@ export function HomeFeed() {
   useEffect(() => {
     mountedRef.current = true;
     let cancelled = false;
-    fetchFeed().then((data) => {
+    fetchFeed().then((resp) => {
       if (cancelled || !mountedRef.current) return;
-      setItems(data);
+      setItems(resp.items);
+      setCurrentUserId(resp.currentUserId);
       setLoading(false);
     });
     return () => {
@@ -56,7 +58,12 @@ export function HomeFeed() {
         </div>
       ) : (
         items.map((item) => (
-          <FeedCard key={item.id} item={item} onRefresh={reload} />
+          <FeedCard
+            key={item.id}
+            item={item}
+            currentUserId={currentUserId}
+            onRefresh={reload}
+          />
         ))
       )}
     </section>
