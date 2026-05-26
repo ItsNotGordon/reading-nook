@@ -22,10 +22,10 @@ export const RECS_POOL_MAX = 120;
 export const RECS_VISIBLE_COUNT = 10;
 
 /** When the usable pool drops below this, fetch the next page of discover results. */
-const REFILL_THRESHOLD = 20;
+const REFILL_THRESHOLD = 10;
 
 /** Don't fetch more than this many pages (0-indexed). */
-const MAX_DISCOVER_PAGES = 3;
+const MAX_DISCOVER_PAGES = 1;
 
 export type Recommendation = {
   bookId: string;
@@ -131,7 +131,7 @@ export function useRecommendationsPool(
   const tasteActive = useMemo(() => buildTasteSignals(state).active, [state]);
   const unshelvedCatalogCount = useMemo(() => countUnshelvedCatalog(state), [state]);
   const topGenresForDiscover = useMemo(
-    () => getWeightedTopGenres(state, 4),
+    () => getWeightedTopGenres(state, 2),
     [state],
   );
 

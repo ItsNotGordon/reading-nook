@@ -212,6 +212,8 @@ function dedupeBooks(items: GBVolumeItem[]): SearchBookResult[] {
   return books;
 }
 
+const FALLBACK_THRESHOLD = 3;
+
 /** Search Google Books by title/author/keyword. */
 export async function searchGoogleBooks(
   query: string,
@@ -219,8 +221,10 @@ export async function searchGoogleBooks(
   context = "search",
 ): Promise<SearchBookResult[]> {
   const cap = Math.min(Math.max(1, limit), 40);
+  const trimmed = query.trim();
+
   const url = new URL(GB_API_BASE);
-  url.searchParams.set("q", query.trim());
+  url.searchParams.set("q", trimmed);
   url.searchParams.set("langRestrict", "en");
   url.searchParams.set("maxResults", String(cap));
   url.searchParams.set("printType", "books");
@@ -232,7 +236,31 @@ export async function searchGoogleBooks(
   if (!res.ok) throw new Error(`Google Books HTTP ${res.status}`);
 
   const data = (await res.json()) as GBSearchResponse;
-  return dedupeBooks(data.items ?? []);
+  const books = dedupeBooks(data.items ?? []);
+
+  if (books.length >= FALLBACK_THRESHOLD) return books;
+
+  const fallbackUrl = new URL(GB_API_BASE);
+  fallbackUrl.searchParams.set("q", trimmed);
+  fallbackUrl.searchParams.set("maxResults", String(cap));
+  fallbackUrl.searchParams.set("printType", "books");
+  fallbackUrl.searchParams.set("fields", SEARCH_FIELDS);
+  if (key) fallbackUrl.searchParams.set("key", key);
+
+  const fallbackRes = await gbFetch(fallbackUrl.toString(), `${context}-fallback`);
+  if (!fallbackRes.ok) return books;
+
+  const fallbackData = (await fallbackRes.json()) as GBSearchResponse;
+  const fallbackBooks = dedupeBooks(fallbackData.items ?? []);
+
+  const seen = new Set(books.map((b) => b.id));
+  for (const b of fallbackBooks) {
+    if (!seen.has(b.id)) {
+      seen.add(b.id);
+      books.push(b);
+    }
+  }
+  return books;
 }
 
 /** Look up a single book by ISBN. */
