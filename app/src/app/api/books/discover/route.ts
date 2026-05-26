@@ -21,7 +21,8 @@ function getServiceClient() {
 }
 
 async function getCached(
-  sb: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
   genre: string,
   page: number,
 ): Promise<SearchBookResult[] | null> {
@@ -34,14 +35,16 @@ async function getCached(
 
   if (!data) return null;
 
-  const age = Date.now() - new Date(data.fetched_at).getTime();
+  const row = data as { results: unknown; fetched_at: string };
+  const age = Date.now() - new Date(row.fetched_at).getTime();
   if (age > CACHE_TTL_MS) return null;
 
-  return data.results as SearchBookResult[];
+  return row.results as SearchBookResult[];
 }
 
 async function setCache(
-  sb: ReturnType<typeof createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
   genre: string,
   page: number,
   results: SearchBookResult[],
