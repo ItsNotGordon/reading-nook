@@ -38,7 +38,7 @@ It combines:
 | Area                                                     | Role                                                                                            |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `app/`                                                   | **Next.js product app** — all shipped UI, API routes, and client state                          |
-| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**twelve** migration files: `001`–`012`) |
+| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**fourteen** migration files: `001`–`014`) |
 | `docs/`                                                  | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD)                    |
 | `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §16)                                                                    |
 
@@ -113,9 +113,12 @@ Home | Library | Add | Ratings | Profile
 | `/api/users/search`                    | GET                | Search for users by username prefix                                                                           |
 | `/api/users/[username]`                | GET                | Fetch public profile info for a user by username (includes follower/following counts via service-role client) |
 | `/api/users/[username]/friends`        | GET                | Fetch a user's full list of accepted friends (service-role client to bypass RLS)                              |
+| `/api/notifications/summary`           | GET                | In-app badge counts: `friends` (pending incoming requests), `clubs` (unread invites + unread club feed posts)   |
 | `/api/clubs`                           | GET, POST          | List user's clubs / create a new club                                                                         |
 | `/api/clubs/[clubId]`                  | GET, PATCH, DELETE | Fetch club detail / update club info (admin) / delete club (creator)                                          |
 | `/api/clubs/[clubId]/join`             | POST               | Join a public club or validate invite code for private clubs                                                  |
+| `/api/clubs/[clubId]/members`          | POST               | Invite a user to the club by @username (admins always; members when `members_can_invite` is enabled)            |
+| `/api/clubs/[clubId]/seen`             | POST               | Mark club feed read (`last_feed_seen_at`) and dismiss `club_added` notifications for that club                  |
 | `/api/clubs/[clubId]/leave`            | DELETE             | Leave a club                                                                                                  |
 | `/api/clubs/[clubId]/feed`             | GET                | Fetch a club's feed (posts filtered by `club_id`, enriched with profiles/reactions/comments)                  |
 | `/api/clubs/join/[code]`               | GET                | Resolve an invite code to club information                                                                    |
@@ -136,6 +139,9 @@ Home | Library | Add | Ratings | Profile
 | `ClubPickerSheet`         | Bottom sheet to select a club to attach to a post                                                                                                                                                                                                           |
 | `ClubCard`                | Club summary card — name, description preview, member count, current book thumbnail, public/private badge                                                                                                                                                   |
 | `JoinClubSheet`           | Sheet for joining a club via invite code — lookup, preview, and join flow                                                                                                                                                                                   |
+| `InviteClubMemberSection` | Username search + invite on club detail (uses `/api/users/search` and `POST /api/clubs/[clubId]/members`)                                                                                                                                                     |
+| `NotificationBadge`       | Red count pill (`9+` cap) on Home Friends/Clubs quick-access buttons                                                                                                                                                                                        |
+| `NotificationCountsProvider` | Polls `/api/notifications/summary` every 45s + on window focus; wraps tab layout                                                                                                                                                                          |
 | `BookCard`                | Individual book card in library shelves — cover, title, author, progress/score info, click opens `BookDetailSheet`, hover-expand effect, drag-safe                                                                                                          |
 | `ShelfSection`            | Horizontal shelf row with drag-to-scroll, left/right arrow buttons, `data-dragging` attribute for interaction safety                                                                                                                                        |
 | `LibraryShelves`          | Library page body — all three shelf sections with unified book detail sheet integration and first-time finish flow                                                                                                                                          |
@@ -240,7 +246,7 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 
 ### Overview
 
-`/home` is the default landing tab — a merged, reverse-chronological feed of activity from the signed-in user and their accepted friends. The page also features **Friends** and **Clubs** quick-access buttons at the top.
+`/home` is the default landing tab — a merged, reverse-chronological feed of activity from the signed-in user and their accepted friends. The page also features **Friends** and **Clubs** quick-access buttons at the top, each with an **in-app notification badge** (red count + subtle ring when &gt; 0): **Friends** = pending incoming friend requests; **Clubs** = unread club invites (`club_added`) plus new club feed posts since `last_feed_seen_at`. Counts poll via `GET /api/notifications/summary` (no push notifications).
 
 ### Feed items
 
@@ -427,8 +433,9 @@ Book clubs are a social feature allowing users to create themed reading groups, 
 
 ### Data model
 
-- `**clubs` table:** `id`, `name`, `description`, `creator_id`, `is_public` (boolean), `invite_code` (auto-generated 8-char unique string), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author` (nullable), `created_at`.  
-- `**club_members` table:** `club_id`, `user_id`, `role` (`member` | `admin` — creator is auto-added as admin), `joined_at`. Unique constraint on `(club_id, user_id)`.  
+- `**clubs` table:** `id`, `name`, `description`, `creator_id`, `is_public` (boolean), `members_can_invite` (boolean, default false — creator can allow any member to invite by username), `invite_code` (auto-generated 8-char unique string), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author` (nullable), `created_at`.  
+- `**club_members` table:** `club_id`, `user_id`, `role` (`member` | `admin` — creator is auto-added as admin), `joined_at`, `last_feed_seen_at` (for unread club feed badge). Unique constraint on `(club_id, user_id)`.  
+- `**notifications` table:** `user_id`, `type` (`club_added`), `club_id`, `actor_id`, `read_at`, `created_at` — in-app alerts when added to a club by another member.  
 - `**posts.club_id`:** Optional foreign key to `clubs(id)` with `ON DELETE SET NULL`, allowing posts to be cross-posted to a club feed.
 
 ### RLS and security
@@ -443,7 +450,7 @@ Book clubs are a social feature allowing users to create themed reading groups, 
 1. **Clubs page (`/clubs`):** Lists the user's clubs as `ClubCard` components (name, description preview, member count, current book thumbnail, public/private badge). Two action buttons: "Create Club" (links to `/clubs/create`) and "Join Club" (opens `JoinClubSheet`).
 2. **Create club (`/clubs/create`):** Form with club name, description, public/private toggle, and optional book picker for setting the initial current book.
 3. **Join club (`JoinClubSheet`):** Enter an invite code → lookup → preview (name + member count) → join. Works for both public and private clubs.
-4. **Club detail (`/clubs/[clubId]`):** Header (name, description, member count, privacy badge), current book section (with admin book-change controls via `BookPickerSheet`), members list (collapsible), invite code (copyable), leave/delete buttons, and club-scoped feed with `NewPostComposer` and `FeedCard`s (including clickable books).
+4. **Club detail (`/clubs/[clubId]`):** Header (name, description, member count, privacy badge), current book section (with admin book-change controls via `BookPickerSheet`), members list (collapsible) with `InviteClubMemberSection` (username search + invite for admins, or any member when creator enabled **Members can invite**), invite code (copyable), creator toggle for `members_can_invite`, leave/delete buttons, and club-scoped feed with `NewPostComposer` and `FeedCard`s (including clickable books).
 
 ### Cross-posting
 
@@ -525,6 +532,8 @@ All migrations live in `supabase/migrations/`. They must be run in order against
 | `010_comment_likes.sql`                | Create `comment_likes` table for liking individual comments/replies on both posts and events                                                                  |
 | `011_clubs.sql`                        | Create `clubs` and `club_members` tables, add `club_id` to `posts`, RLS policies, `is_club_member` function, indexes                                          |
 | `012_clubs_fix_recursion.sql`          | Hotfix: recreate `is_club_member` as `SECURITY DEFINER` function and drop/recreate RLS policies to fix infinite recursion in `club_members` policy evaluation |
+| `013_club_members_can_invite.sql`      | Add `members_can_invite` on `clubs` — creator can let non-admin members invite others by @username                                                           |
+| `014_in_app_notifications.sql`         | `notifications` table (`club_added`), `club_members.last_feed_seen_at`, RLS for in-app badges on Home Friends/Clubs                                            |
 
 
 ---

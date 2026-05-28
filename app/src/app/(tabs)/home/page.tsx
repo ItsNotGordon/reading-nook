@@ -6,6 +6,8 @@ import { useMemo } from "react";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { HomeFeed } from "@/components/HomeFeed";
+import { NotificationBadge } from "@/components/NotificationBadge";
+import { useNotificationCounts } from "@/components/NotificationCountsProvider";
 import { useReadingNook } from "@/lib/app-state";
 import { formatEstimatedPercentRange } from "@/lib/progress";
 import { itemsForShelf, type ShelfItem } from "@/lib/shelfItems";
@@ -77,6 +79,7 @@ function ContinueReadingCard({ item }: { item: ShelfItem }) {
 
 export default function HomePage() {
   const { state } = useReadingNook();
+  const { friends: friendBadgeCount, clubs: clubBadgeCount } = useNotificationCounts();
 
   const reading = useMemo(
     () => itemsForShelf(state.userBooks, state.catalog, "reading"),
@@ -90,9 +93,12 @@ export default function HomePage() {
         <div className="flex gap-3">
           <Link
             href="/friends"
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
+            className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 backdrop-blur-[1px] active:bg-accent-soft/20 ${
+              friendBadgeCount > 0 ? "ring-accent/40 ring-2" : "ring-black/[0.03]"
+            }`}
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+              <NotificationBadge count={friendBadgeCount} />
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle cx="8.5" cy="8" r="2.75" stroke="currentColor" strokeWidth="1.75" />
                 <path d="M4 19v-.5a4.5 4.5 0 0 1 9 0V19" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
@@ -105,9 +111,12 @@ export default function HomePage() {
 
           <Link
             href="/clubs"
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
+            className={`flex flex-1 items-center justify-center gap-2 rounded-2xl border border-border bg-card-surface/95 px-4 py-3 shadow-sm ring-1 backdrop-blur-[1px] active:bg-accent-soft/20 ${
+              clubBadgeCount > 0 ? "ring-accent/40 ring-2" : "ring-black/[0.03]"
+            }`}
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
+              <NotificationBadge count={clubBadgeCount} />
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />

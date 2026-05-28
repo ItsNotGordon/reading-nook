@@ -54,6 +54,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     description: club.description,
     creatorId: club.creator_id,
     isPublic: club.is_public,
+    membersCanInvite: Boolean(club.members_can_invite),
     inviteCode: club.invite_code,
     currentBook: club.current_book_id
       ? { id: club.current_book_id, title: club.current_book_title ?? "", author: club.current_book_author ?? "", coverUrl: club.current_book_cover_url ?? "" }
@@ -88,6 +89,9 @@ export async function PATCH(request: Request, ctx: Ctx) {
   const sb = getServiceClient();
   if (!sb) return NextResponse.json({ ok: false }, { status: 503 });
 
+  const { data: club } = await sb.from("clubs").select("creator_id").eq("id", clubId).single();
+  if (!club) return NextResponse.json({ error: "Club not found." }, { status: 404 });
+
   const { data: membership } = await sb
     .from("club_members")
     .select("role")
@@ -95,31 +99,49 @@ export async function PATCH(request: Request, ctx: Ctx) {
     .eq("user_id", user.id)
     .single();
 
-  if (!membership || membership.role !== "admin") {
-    return NextResponse.json({ error: "Admin only." }, { status: 403 });
-  }
-
   const raw: unknown = await request.json().catch(() => null);
   if (!raw || typeof raw !== "object") return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   const b = raw as Record<string, unknown>;
 
   const updates: Record<string, unknown> = {};
-  if (typeof b.name === "string" && b.name.trim()) updates.name = b.name.trim();
-  if (typeof b.description === "string") updates.description = b.description.trim();
-  if (typeof b.isPublic === "boolean") updates.is_public = b.isPublic;
 
-  if ("currentBook" in b) {
-    if (b.currentBook === null) {
-      updates.current_book_id = null;
-      updates.current_book_title = null;
-      updates.current_book_author = null;
-      updates.current_book_cover_url = null;
-    } else if (typeof b.currentBook === "object" && b.currentBook) {
-      const cb = b.currentBook as Record<string, unknown>;
-      updates.current_book_id = typeof cb.id === "string" ? cb.id : null;
-      updates.current_book_title = typeof cb.title === "string" ? cb.title : null;
-      updates.current_book_author = typeof cb.author === "string" ? cb.author : null;
-      updates.current_book_cover_url = typeof cb.coverUrl === "string" ? cb.coverUrl : null;
+  if ("membersCanInvite" in b) {
+    if (user.id !== club.creator_id) {
+      return NextResponse.json({ error: "Only the club creator can change invite settings." }, { status: 403 });
+    }
+    if (typeof b.membersCanInvite !== "boolean") {
+      return NextResponse.json({ error: "Invalid membersCanInvite." }, { status: 400 });
+    }
+    updates.members_can_invite = b.membersCanInvite;
+  }
+
+  const adminFields =
+    typeof b.name === "string" ||
+    typeof b.description === "string" ||
+    typeof b.isPublic === "boolean" ||
+    "currentBook" in b;
+
+  if (adminFields) {
+    if (!membership || membership.role !== "admin") {
+      return NextResponse.json({ error: "Admin only." }, { status: 403 });
+    }
+    if (typeof b.name === "string" && b.name.trim()) updates.name = b.name.trim();
+    if (typeof b.description === "string") updates.description = b.description.trim();
+    if (typeof b.isPublic === "boolean") updates.is_public = b.isPublic;
+
+    if ("currentBook" in b) {
+      if (b.currentBook === null) {
+        updates.current_book_id = null;
+        updates.current_book_title = null;
+        updates.current_book_author = null;
+        updates.current_book_cover_url = null;
+      } else if (typeof b.currentBook === "object" && b.currentBook) {
+        const cb = b.currentBook as Record<string, unknown>;
+        updates.current_book_id = typeof cb.id === "string" ? cb.id : null;
+        updates.current_book_title = typeof cb.title === "string" ? cb.title : null;
+        updates.current_book_author = typeof cb.author === "string" ? cb.author : null;
+        updates.current_book_cover_url = typeof cb.coverUrl === "string" ? cb.coverUrl : null;
+      }
     }
   }
 

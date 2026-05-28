@@ -11,7 +11,10 @@ import { BookPickerSheet } from "@/components/BookPickerSheet";
 import { BookDetailSheet } from "@/components/BookDetailSheet";
 import { FeedBookPreviewSheet } from "@/components/FeedBookPreviewSheet";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
+import { InviteClubMemberSection } from "@/components/InviteClubMemberSection";
+import { useNotificationCounts } from "@/components/NotificationCountsProvider";
 import { fetchClubDetail, fetchClubFeed, updateClub, leaveClub, deleteClub, type ClubDetail, type ClubMember } from "@/lib/clubClient";
+import { markClubSeen } from "@/lib/notificationClient";
 import { useReadingNook } from "@/lib/app-state";
 import type { FeedItem } from "@/lib/feedClient";
 import type { Book, BookId, SentimentBucket } from "@/lib/types";
@@ -43,6 +46,7 @@ export default function ClubDetailPage() {
   const clubId = params.clubId as string;
 
   const { state: appState } = useReadingNook();
+  const { refresh: refreshNotificationCounts } = useNotificationCounts();
   const [club, setClub] = useState<ClubDetail | null>(null);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -71,8 +75,11 @@ export default function ClubDetailPage() {
       if (!mountedRef.current) return;
       setClub(data);
       setLoading(false);
+      if (data) {
+        void markClubSeen(clubId).then(() => refreshNotificationCounts());
+      }
     });
-  }, [clubId]);
+  }, [clubId, refreshNotificationCounts]);
 
   const loadFeed = useCallback(() => {
     fetchClubFeed(clubId).then((resp) => {
@@ -147,6 +154,14 @@ export default function ClubDetailPage() {
 
   const isAdmin = club.role === "admin";
   const isCreator = currentUserId === club.creatorId;
+  const canInvite = isAdmin || Boolean(club.membersCanInvite);
+  const existingMemberIds = club.members.map((m) => m.userId);
+
+  async function handleMembersCanInviteChange(enabled: boolean) {
+    if (!club) return;
+    const ok = await updateClub(club.id, { membersCanInvite: enabled });
+    if (ok) loadClub();
+  }
 
   return (
     <ThemedPageShell>
@@ -185,10 +200,10 @@ export default function ClubDetailPage() {
           </div>
 
           {/* Invite code */}
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-col gap-3">
             <button
               onClick={handleCopyInvite}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors active:bg-accent-soft/20"
+              className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors active:bg-accent-soft/20"
             >
               <svg className="h-3.5 w-3.5 text-accent" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
@@ -196,6 +211,27 @@ export default function ClubDetailPage() {
               </svg>
               {copied ? "Copied!" : `Invite: ${club.inviteCode}`}
             </button>
+            {isCreator ? (
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">Members can invite</p>
+                  <p className="text-[10px] text-foreground-muted">
+                    Let any member add people by @username (admins always can)
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={club.membersCanInvite}
+                  onClick={() => void handleMembersCanInviteChange(!club.membersCanInvite)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${club.membersCanInvite ? "bg-accent" : "bg-foreground-muted/30"}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${club.membersCanInvite ? "translate-x-5" : "translate-x-0"}`}
+                  />
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* Actions */}
@@ -279,6 +315,14 @@ export default function ClubDetailPage() {
           </button>
           {showMembers ? (
             <div className="mt-2 flex flex-col gap-1">
+              {canInvite ? (
+                <InviteClubMemberSection
+                  clubId={club.id}
+                  existingMemberIds={existingMemberIds}
+                  currentUserId={currentUserId}
+                  onInvited={loadClub}
+                />
+              ) : null}
               {club.members.map((m) => (
                 <div key={m.userId} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5">
                   <MemberAvatar member={m} />

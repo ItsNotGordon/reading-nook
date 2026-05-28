@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ProfileAvatar } from "./ProfileAvatar";
+import { useNotificationCounts } from "./NotificationCountsProvider";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 import { normalizeUsername } from "@/lib/username";
 
@@ -39,6 +40,7 @@ async function patchFriendship(friendshipId: string, action: "accept" | "decline
 export function FriendsPanel() {
   const router = useRouter();
   const { configured, loading, user } = useSupabaseAuth();
+  const { refresh: refreshNotificationCounts } = useNotificationCounts();
   const [friends, setFriends] = useState<FriendRow[]>([]);
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [myUsername, setMyUsername] = useState<string | null>(null);
@@ -231,7 +233,10 @@ export function FriendsPanel() {
                     type="button"
                     onClick={() =>
                       void patchFriendship(f.friendshipId, "accept")
-                        .then(() => loadFriends())
+                        .then(() => {
+                          loadFriends();
+                          refreshNotificationCounts();
+                        })
                         .catch((err: Error) => setStatus(err.message))
                     }
                     className="rounded-lg border border-accent bg-accent px-3 py-1.5 text-xs font-semibold text-white"
@@ -242,7 +247,10 @@ export function FriendsPanel() {
                     type="button"
                     onClick={() =>
                       void patchFriendship(f.friendshipId, "decline")
-                        .then(() => loadFriends())
+                        .then(() => {
+                          loadFriends();
+                          refreshNotificationCounts();
+                        })
                         .catch((err: Error) => setStatus(err.message))
                     }
                     className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold"
@@ -286,7 +294,10 @@ export function FriendsPanel() {
                   type="button"
                   onClick={() =>
                     void patchFriendship(f.friendshipId, "cancel")
-                      .then(() => loadFriends())
+                      .then(() => {
+                        loadFriends();
+                        refreshNotificationCounts();
+                      })
                       .catch((err: Error) => setStatus(err.message))
                   }
                   className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold"

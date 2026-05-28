@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/BottomNav";
+import { NotificationCountsProvider } from "@/components/NotificationCountsProvider";
 
 export default function TabsLayout({
   children,
@@ -6,9 +7,9 @@ export default function TabsLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <>
+    <NotificationCountsProvider>
       {children}
       <BottomNav />
-    </>
+    </NotificationCountsProvider>
   );
 }

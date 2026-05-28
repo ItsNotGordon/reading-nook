@@ -13,6 +13,7 @@ export type Club = {
   description: string;
   creatorId: string;
   isPublic: boolean;
+  membersCanInvite: boolean;
   inviteCode: string;
   currentBook: ClubBook | null;
   memberCount: number;
@@ -68,6 +69,7 @@ export async function updateClub(
     name?: string;
     description?: string;
     isPublic?: boolean;
+    membersCanInvite?: boolean;
     currentBook?: ClubBook | null;
   },
 ): Promise<boolean> {
@@ -91,6 +93,26 @@ export async function joinClub(clubId: string, inviteCode?: string): Promise<boo
     body: JSON.stringify({ inviteCode }),
   });
   return res.ok;
+}
+
+export async function inviteClubMember(
+  clubId: string,
+  username: string,
+): Promise<{ ok: boolean; error?: string; username?: string }> {
+  const res = await fetch(`/api/clubs/${clubId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
+    error?: string;
+    username?: string;
+  };
+  if (!res.ok) {
+    return { ok: false, error: data.error ?? "Could not invite member." };
+  }
+  return { ok: true, username: data.username };
 }
 
 export async function leaveClub(clubId: string): Promise<boolean> {
