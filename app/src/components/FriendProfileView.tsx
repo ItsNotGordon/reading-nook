@@ -342,11 +342,7 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
       {socialSheet === "followers" ? (
         <SocialConnectionsSheet
           title="Followers"
-          users={
-            friendsList
-              ? friendsList.filter((f) => f.direction === "incoming")
-              : []
-          }
+          users={friendsList ?? []}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}

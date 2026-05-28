@@ -87,13 +87,10 @@ export default function ProfilePage() {
       .catch(() => setFriends(null));
   }, [canLoadSocial]);
 
-  const followingList = useMemo(() => friends ?? [], [friends]);
-  const followersList = useMemo(
-    () => (friends ?? []).filter((f) => f.direction === "incoming"),
-    [friends],
-  );
-  const followingCount = canLoadSocial ? (friends == null ? null : followingList.length) : null;
-  const followersCount = canLoadSocial ? (friends == null ? null : followersList.length) : null;
+  const acceptedFriends = useMemo(() => friends ?? [], [friends]);
+  const friendCount = canLoadSocial ? (friends == null ? null : acceptedFriends.length) : null;
+  const followingCount = friendCount;
+  const followersCount = friendCount;
 
   const shelfCounts = useMemo(() => getShelfCounts(state), [state]);
   const shelfRows = useMemo(() => profileShelfBarRows(shelfCounts), [shelfCounts]);
@@ -239,14 +236,14 @@ export default function ProfilePage() {
       {socialSheet === "following" ? (
         <SocialConnectionsSheet
           title="Following"
-          users={followingList}
+          users={acceptedFriends}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}
       {socialSheet === "followers" ? (
         <SocialConnectionsSheet
           title="Followers"
-          users={followersList}
+          users={acceptedFriends}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}
