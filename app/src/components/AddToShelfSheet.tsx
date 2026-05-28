@@ -63,6 +63,29 @@ export function AddToShelfSheet({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [editingGenres, setEditingGenres] = useState(false);
   const [activeShelf, setActiveShelf] = useState<Shelf | null>(initialShelf);
+  const [didEditGenres, setDidEditGenres] = useState(false);
+
+  useEffect(() => {
+    if (!open || !book) return;
+    queueMicrotask(() => {
+      setSelectedGenres([...(book.genres ?? [])]);
+      setMakePrivate(initialVisibility === "private");
+      setShowFullDescription(false);
+      setEditingGenres(false);
+      setActiveShelf(initialShelf);
+      setDidEditGenres(false);
+    });
+  }, [open, book?.id, initialVisibility, initialShelf]);
+
+  useEffect(() => {
+    if (!open || !book) return;
+    if (didEditGenres) return;
+    const incoming = book.genres ?? [];
+    if (incoming.length === 0 || selectedGenres.length > 0) return;
+    queueMicrotask(() => {
+      setSelectedGenres([...incoming]);
+    });
+  }, [open, book?.id, (book?.genres ?? []).join("|"), didEditGenres, selectedGenres.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,7 +111,7 @@ export function AddToShelfSheet({
     <div className="fixed inset-0 z-[110] flex flex-col justify-end bg-black/45 p-0 sm:p-4 sm:items-center sm:justify-center">
       <button
         type="button"
-        className="min-h-[20%] flex-1 cursor-default sm:min-h-0 sm:absolute sm:inset-0"
+        className="absolute inset-0 cursor-default"
         aria-label="Dismiss add to shelf sheet"
         onClick={onClose}
       />
@@ -96,10 +119,10 @@ export function AddToShelfSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-to-shelf-title"
-        className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-t-[1.25rem] border border-border bg-background shadow-2xl sm:max-w-md sm:rounded-2xl"
+        className="relative z-10 w-full max-h-[calc(100dvh-0.35rem)] overflow-hidden rounded-t-[1.25rem] border border-border bg-background shadow-2xl sm:max-h-[min(90dvh,760px)] sm:max-w-md sm:rounded-2xl"
       >
-        <div className="px-3.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3.5">
-          <div className="flex items-start justify-between gap-3">
+        <div className="max-h-[calc(100dvh-0.35rem)] overflow-y-auto overscroll-contain px-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3.5 sm:max-h-[min(90dvh,760px)]">
+          <div className="sticky top-0 z-10 -mx-3.5 mb-2 flex items-start justify-between gap-3 border-b border-border/60 bg-background/95 px-3.5 pb-2.5 pt-0.5 backdrop-blur-sm">
             <h2 id="add-to-shelf-title" className="font-serif text-2xl font-semibold text-foreground">
               Add to shelf
             </h2>
@@ -242,7 +265,10 @@ export function AddToShelfSheet({
               <div className="mt-2 rounded-2xl border border-border bg-card-surface p-2">
                 <GenreChipPicker
                   value={selectedGenres}
-                  onChange={setSelectedGenres}
+                  onChange={(next) => {
+                    setDidEditGenres(true);
+                    setSelectedGenres(next);
+                  }}
                   searchable
                   variant="shelfPicker"
                 />

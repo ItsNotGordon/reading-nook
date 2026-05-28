@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddToShelfSheet } from "@/components/AddToShelfSheet";
 import { useReadingNook } from "@/lib/app-state";
 import { enrichBook } from "@/lib/enrichOpenLibraryBook";
@@ -20,6 +20,10 @@ const EMPTY_BOOK_META: Pick<Book, "genres" | "description"> = {
 
 export function FeedBookPreviewSheet({ book, onClose }: FeedBookPreviewSheetProps) {
   const { actions, state } = useReadingNook();
+  const [bookMeta, setBookMeta] = useState<Pick<Book, "genres" | "description">>(() => ({
+    genres: state.catalog[book.bookId]?.genres ?? [],
+    description: state.catalog[book.bookId]?.description ?? "",
+  }));
 
   const baseBook = useMemo<Book>(() => {
     const fromCatalog = state.catalog[book.bookId];
@@ -36,14 +40,40 @@ export function FeedBookPreviewSheet({ book, onClose }: FeedBookPreviewSheetProp
   }, [state.catalog, book.bookId, book.title, book.author, book.coverUrl]);
 
   const resolvedMeta = useMemo<Pick<Book, "genres" | "description">>(() => {
+    if ((bookMeta.genres?.length ?? 0) > 0 || bookMeta.description.trim()) {
+      return bookMeta;
+    }
     if ((baseBook.genres?.length ?? 0) > 0 || baseBook.description.trim()) {
       return { genres: baseBook.genres ?? [], description: baseBook.description ?? "" };
     }
-    const cached = EMPTY_BOOK_META;
-    void enrichBook(baseBook).then(() => {
-      // Keep this sheet purely presentational; enrich populates cache for future opens.
+    return EMPTY_BOOK_META;
+  }, [bookMeta, baseBook]);
+
+  useEffect(() => {
+    let active = true;
+    const baseMeta = {
+      genres: baseBook.genres ?? [],
+      description: baseBook.description ?? "",
+    };
+    queueMicrotask(() => {
+      if (!active) return;
+      setBookMeta(baseMeta);
     });
-    return cached;
+    void enrichBook(baseBook).then((enriched) => {
+      if (!active) return;
+      const nextGenres = enriched.genres ?? [];
+      const nextDescription = enriched.description ?? "";
+      if (nextGenres.length === 0 && !nextDescription.trim() && (baseMeta.genres.length > 0 || baseMeta.description.trim())) {
+        return;
+      }
+      setBookMeta({
+        genres: nextGenres.length > 0 ? nextGenres : baseMeta.genres,
+        description: nextDescription.trim() ? nextDescription : baseMeta.description,
+      });
+    });
+    return () => {
+      active = false;
+    };
   }, [baseBook]);
 
   const addToShelf = (shelf: Shelf, genres: string[], visibility: "public" | "private") => {
