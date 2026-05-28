@@ -117,10 +117,10 @@ export default function HomePage() {
           >
             <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft/30 text-accent">
               <NotificationBadge count={clubBadgeCount} />
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />
-                <path d="M9 7h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="3.5" y="5.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
+                <rect x="9.5" y="4.5" width="5" height="14" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
+                <rect x="15.5" y="6.5" width="5" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
               </svg>
             </span>
             <span className="text-sm font-semibold text-foreground">Clubs</span>

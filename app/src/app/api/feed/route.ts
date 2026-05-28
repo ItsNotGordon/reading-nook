@@ -57,7 +57,10 @@ export async function GET() {
 
   const postIds = (posts ?? []).map((p) => p.id);
   type CommentRow = { id: string; user_id: string; body: string; parent_id: string | null; created_at: string; replies: CommentRow[] };
-  const reactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
+  const reactionMap = new Map<
+    string,
+    { likes: number; userLiked: boolean; likeUserIds: string[]; comments: CommentRow[] }
+  >();
 
   if (postIds.length > 0) {
     const { data: reactions } = await supabase
@@ -69,11 +72,12 @@ export async function GET() {
     for (const r of reactions ?? []) {
       let entry = reactionMap.get(r.post_id);
       if (!entry) {
-        entry = { likes: 0, userLiked: false, comments: [] };
+        entry = { likes: 0, userLiked: false, likeUserIds: [], comments: [] };
         reactionMap.set(r.post_id, entry);
       }
       if (r.type === "like") {
         entry.likes += 1;
+        entry.likeUserIds.push(r.user_id);
         if (r.user_id === user.id) entry.userLiked = true;
       } else if (r.type === "comment" && r.body) {
         entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, parent_id: r.parent_id ?? null, created_at: r.created_at, replies: [] });
@@ -96,7 +100,10 @@ export async function GET() {
   }
 
   const eventIds = (events ?? []).map((e) => e.id);
-  const eventReactionMap = new Map<string, { likes: number; userLiked: boolean; comments: CommentRow[] }>();
+  const eventReactionMap = new Map<
+    string,
+    { likes: number; userLiked: boolean; likeUserIds: string[]; comments: CommentRow[] }
+  >();
 
   if (eventIds.length > 0) {
     const { data: eReactions } = await supabase
@@ -108,11 +115,12 @@ export async function GET() {
     for (const r of eReactions ?? []) {
       let entry = eventReactionMap.get(r.event_id);
       if (!entry) {
-        entry = { likes: 0, userLiked: false, comments: [] };
+        entry = { likes: 0, userLiked: false, likeUserIds: [], comments: [] };
         eventReactionMap.set(r.event_id, entry);
       }
       if (r.type === "like") {
         entry.likes += 1;
+        entry.likeUserIds.push(r.user_id);
         if (r.user_id === user.id) entry.userLiked = true;
       } else if (r.type === "comment" && r.body) {
         entry.comments.push({ id: r.id, user_id: r.user_id, body: r.body, parent_id: r.parent_id ?? null, created_at: r.created_at, replies: [] });
@@ -217,6 +225,14 @@ export async function GET() {
     });
   }
 
+  function likedByPreviewFor(likeUserIds: string[], totalLikes: number) {
+    const unique = Array.from(new Set(likeUserIds));
+    const names = unique
+      .slice(0, 2)
+      .map((id) => profileMap.get(id)?.display_name?.trim() || "Reader");
+    return { names, totalLikes };
+  }
+
   const clubIds = new Set<string>();
   for (const p of posts ?? []) {
     if (p.club_id) clubIds.add(p.club_id);
@@ -250,6 +266,7 @@ export async function GET() {
       notes: e.notes ?? "",
       likes: er?.likes ?? 0,
       userLiked: er?.userLiked ?? false,
+      likedByPreview: likedByPreviewFor(er?.likeUserIds ?? [], er?.likes ?? 0),
       comments: serializeComments(er?.comments ?? []),
       createdAt: e.created_at,
     });
@@ -270,6 +287,7 @@ export async function GET() {
       clubName: p.club_id ? (clubNameMap.get(p.club_id) ?? null) : null,
       likes: r?.likes ?? 0,
       userLiked: r?.userLiked ?? false,
+      likedByPreview: likedByPreviewFor(r?.likeUserIds ?? [], r?.likes ?? 0),
       comments: serializeComments(r?.comments ?? []),
       createdAt: p.created_at,
     });

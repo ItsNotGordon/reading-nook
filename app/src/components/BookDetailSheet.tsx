@@ -468,7 +468,13 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
               <ActionButton
                 icon={<PencilIcon />}
                 label="Edit details"
-                onClick={() => startGenreEdit()}
+                onClick={() => {
+                  if (shelf === "finished") {
+                    setFinishOpen(true);
+                    return;
+                  }
+                  startGenreEdit();
+                }}
               />
               <ActionButton
                 icon={<NoteIcon />}

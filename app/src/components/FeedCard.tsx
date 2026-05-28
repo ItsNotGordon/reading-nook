@@ -3,7 +3,12 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
+import type {
+  FeedItem,
+  FeedComment as FeedCommentType,
+  FeedAuthor,
+  LikedByPreview,
+} from "@/lib/feedClient";
 import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost, toggleCommentLike } from "@/lib/feedClient";
 import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
 import type { SentimentBucket } from "@/lib/types";
@@ -84,6 +89,21 @@ function BookThumbnail({ coverUrl, title, onClick }: { coverUrl: string; title: 
   );
 }
 
+function formatLikedByText(preview?: LikedByPreview | null): string | null {
+  if (!preview) return null;
+  const total = preview.totalLikes;
+  if (total <= 0 || preview.names.length === 0) return null;
+
+  const [first, second] = preview.names;
+  if (total === 1) return `Liked by ${first}`;
+  if (total === 2) {
+    if (second) return `Liked by ${first} and ${second}`;
+    return `Liked by ${first} and 1 other`;
+  }
+  if (total === 3 && second) return `Liked by ${first}, ${second} and 1 other`;
+  return `Liked by ${first}${second ? `, ${second}` : ""} and ${total - 2} others`;
+}
+
 function CommentLikeButton({ reactionId, source, initialCount, initialLiked }: {
   reactionId: string;
   source: "post" | "event";
@@ -125,6 +145,7 @@ function CommentSection({
   currentUserId,
   onCommentAdded,
   likeButton,
+  likedByText,
 }: {
   targetId: string;
   targetType?: "post" | "event";
@@ -132,14 +153,17 @@ function CommentSection({
   currentUserId: string | null;
   onCommentAdded: () => void;
   likeButton?: React.ReactNode;
+  likedByText?: string | null;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
 
   const totalCount = comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
+  const visibleTopLevel = showAllComments ? comments : comments.slice(0, 3);
+  const hasMoreTopLevel = comments.length > 3;
 
   const doAddComment = targetType === "event" ? addEventComment : addComment;
   const doDeleteComment = targetType === "event" ? deleteEventComment : deleteComment;
@@ -148,7 +172,6 @@ function CommentSection({
     const label = authorLabel(comment.author);
     setReplyingTo({ id: comment.id, username: label });
     setText(`${label} `);
-    setExpanded(true);
     setTimeout(() => inputRef[0]?.focus(), 0);
   }
 
@@ -175,127 +198,139 @@ function CommentSection({
     }
   }
 
-  const commentToggle = totalCount > 0 && !expanded ? (
-    <button
-      onClick={() => setExpanded(true)}
-      className="inline-flex items-center gap-1 text-xs font-medium text-foreground-muted hover:text-accent"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      View {totalCount} comment{totalCount !== 1 ? "s" : ""}
-    </button>
-  ) : !expanded ? (
-    <button
-      onClick={() => setExpanded(true)}
-      className="inline-flex items-center gap-1 text-xs font-medium text-foreground-muted"
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      Comment
-    </button>
-  ) : null;
-
   return (
     <div className="mt-2 border-t border-border pt-2 space-y-2">
-      <div className="flex items-center gap-4">
-        {likeButton}
-        {commentToggle}
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          {likeButton}
+          {likedByText ? (
+            <p className="mt-1 truncate text-xs font-medium text-foreground-muted">
+              {likedByText}
+            </p>
+          ) : null}
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-foreground-muted">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="opacity-60"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          {totalCount} comment{totalCount === 1 ? "" : "s"}
+        </span>
       </div>
 
-      {expanded ? (
-        <div className="flex flex-col gap-3">
-          {comments.map((c) => (
-            <div key={c.id}>
-              {/* Top-level comment */}
-              <div className="flex items-start gap-2.5">
-                <AuthorLink author={c.author} currentUserId={currentUserId}>
-                  <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
-                </AuthorLink>
-                <div className="min-w-0 flex-1">
-                  <div>
-                    <AuthorLink author={c.author} currentUserId={currentUserId}>
-                      <span className="text-xs font-semibold text-foreground">
-                        {authorLabel(c.author)}
-                      </span>
-                    </AuthorLink>
-                    <span className="ml-1.5 text-xs text-foreground/80">
-                      {c.body}
+      <div className="flex flex-col gap-3">
+        {visibleTopLevel.map((c) => (
+          <div key={c.id}>
+            {/* Top-level comment */}
+            <div className="flex items-start gap-2.5">
+              <AuthorLink author={c.author} currentUserId={currentUserId}>
+                <Avatar name={c.author.displayName} url={c.author.avatarUrl} />
+              </AuthorLink>
+              <div className="min-w-0 flex-1">
+                <div>
+                  <AuthorLink author={c.author} currentUserId={currentUserId}>
+                    <span className="text-xs font-semibold text-foreground">
+                      {authorLabel(c.author)}
                     </span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <span className="text-[10px] text-foreground-muted/60">{timeAgo(c.createdAt)}</span>
-                    <CommentLikeButton
-                      reactionId={c.id}
-                      source={targetType}
-                      initialCount={c.likeCount ?? 0}
-                      initialLiked={c.userLiked ?? false}
-                    />
+                  </AuthorLink>
+                  <span className="ml-1.5 text-xs text-foreground/80">
+                    {c.body}
+                  </span>
+                </div>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <span className="text-[10px] text-foreground-muted/60">{timeAgo(c.createdAt)}</span>
+                  <CommentLikeButton
+                    reactionId={c.id}
+                    source={targetType}
+                    initialCount={c.likeCount ?? 0}
+                    initialLiked={c.userLiked ?? false}
+                  />
+                  <button
+                    onClick={() => handleReply(c)}
+                    className="text-[10px] font-semibold text-foreground-muted/70 hover:text-accent"
+                  >
+                    Reply
+                  </button>
+                  {c.author.userId === currentUserId ? (
                     <button
-                      onClick={() => handleReply(c)}
-                      className="text-[10px] font-semibold text-foreground-muted/70 hover:text-accent"
+                      onClick={() => handleDeleteComment(c.id)}
+                      className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
                     >
-                      Reply
+                      Delete
                     </button>
-                    {c.author.userId === currentUserId ? (
-                      <button
-                        onClick={() => handleDeleteComment(c.id)}
-                        className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
-                      >
-                        Delete
-                      </button>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
               </div>
+            </div>
 
-              {/* Threaded replies */}
-              {c.replies?.length > 0 ? (
-                <div className="ml-6 mt-1.5 border-l-2 border-border/60 pl-4">
-                  {c.replies.map((r) => (
-                    <div key={r.id} className="flex items-start gap-2 py-1">
-                      <AuthorLink author={r.author} currentUserId={currentUserId}>
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft/40 text-[9px] font-semibold text-accent">
-                          {r.author.avatarUrl ? (
-                            <Image src={r.author.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" unoptimized />
-                          ) : (
-                            r.author.displayName.charAt(0).toUpperCase() || "?"
-                          )}
-                        </div>
-                      </AuthorLink>
-                      <div className="min-w-0 flex-1">
-                        <div>
-                          <AuthorLink author={r.author} currentUserId={currentUserId}>
-                            <span className="text-[11px] font-semibold text-foreground">
-                              {authorLabel(r.author)}
-                            </span>
-                          </AuthorLink>
-                          <span className="ml-1.5 text-[11px] text-foreground/80">
-                            {r.body}
+            {/* Threaded replies */}
+            {c.replies?.length > 0 ? (
+              <div className="ml-6 mt-1.5 border-l-2 border-border/60 pl-4">
+                {c.replies.map((r) => (
+                  <div key={r.id} className="flex items-start gap-2 py-1">
+                    <AuthorLink author={r.author} currentUserId={currentUserId}>
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft/40 text-[9px] font-semibold text-accent">
+                        {r.author.avatarUrl ? (
+                          <Image src={r.author.avatarUrl} alt="" width={20} height={20} className="h-5 w-5 rounded-full object-cover" unoptimized />
+                        ) : (
+                          r.author.displayName.charAt(0).toUpperCase() || "?"
+                        )}
+                      </div>
+                    </AuthorLink>
+                    <div className="min-w-0 flex-1">
+                      <div>
+                        <AuthorLink author={r.author} currentUserId={currentUserId}>
+                          <span className="text-[11px] font-semibold text-foreground">
+                            {authorLabel(r.author)}
                           </span>
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span className="text-[10px] text-foreground-muted/60">{timeAgo(r.createdAt)}</span>
-                          <CommentLikeButton
-                            reactionId={r.id}
-                            source={targetType}
-                            initialCount={r.likeCount ?? 0}
-                            initialLiked={r.userLiked ?? false}
-                          />
-                          {r.author.userId === currentUserId ? (
-                            <button
-                              onClick={() => handleDeleteComment(r.id)}
-                              className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
-                            >
-                              Delete
-                            </button>
-                          ) : null}
-                        </div>
+                        </AuthorLink>
+                        <span className="ml-1.5 text-[11px] text-foreground/80">
+                          {r.body}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="text-[10px] text-foreground-muted/60">{timeAgo(r.createdAt)}</span>
+                        <CommentLikeButton
+                          reactionId={r.id}
+                          source={targetType}
+                          initialCount={r.likeCount ?? 0}
+                          initialLiked={r.userLiked ?? false}
+                        />
+                        {r.author.userId === currentUserId ? (
+                          <button
+                            onClick={() => handleDeleteComment(r.id)}
+                            className="text-[10px] font-semibold text-foreground-muted/70 hover:text-red-400"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {hasMoreTopLevel ? (
+        <button
+          type="button"
+          onClick={() => setShowAllComments((prev) => !prev)}
+          className="text-xs font-medium text-foreground-muted hover:text-accent"
+        >
+          {showAllComments ? "Show less" : `View more comments (${comments.length - 3})`}
+        </button>
       ) : null}
 
       {replyingTo ? (
@@ -309,29 +344,27 @@ function CommentSection({
         </div>
       ) : null}
 
-      {expanded ? (
-        <div className="flex items-center gap-2">
-          <input
-            ref={(el) => { inputRef[0] = el; }}
-            type="text"
-            placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend();
-            }}
-            className="flex-1 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!text.trim() || sending}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm disabled:opacity-30"
-            aria-label="Send"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-          </button>
-        </div>
-      ) : null}
+      <div className="flex items-center gap-2">
+        <input
+          ref={(el) => { inputRef[0] = el; }}
+          type="text"
+          placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSend();
+          }}
+          className="flex-1 rounded-full border border-border bg-background px-3.5 py-1.5 text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent/40"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || sending}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-sm disabled:opacity-30"
+          aria-label="Send"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -366,6 +399,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
     if (ok) {
       setLiked((prev) => !prev);
       setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
+      onRefresh();
     }
   }
 
@@ -386,6 +420,8 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
       onRefresh();
     }
   }
+
+  const likedByText = formatLikedByText(item.likedByPreview ?? null);
 
   if (item.kind === "event") {
     const verb =
@@ -479,6 +515,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
         comments={item.comments}
         currentUserId={currentUserId}
         onCommentAdded={onRefresh}
+        likedByText={likedByText}
         likeButton={
           <button
             onClick={handleToggleLike}
@@ -605,6 +642,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
         comments={item.comments}
         currentUserId={currentUserId}
         onCommentAdded={onRefresh}
+        likedByText={likedByText}
         likeButton={
           <button
             onClick={handleToggleLike}

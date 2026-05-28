@@ -167,16 +167,28 @@ export function NewPostComposer({ onPosted, clubId }: NewPostComposerProps) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setPickerOpen(true)}
-            className="text-xs font-medium text-accent"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card-surface text-accent hover:bg-accent-soft/20"
+            aria-label="Attach a book"
+            title="Attach a book"
           >
-            Attach a book
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M9 7h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+            </svg>
           </button>
           {!clubId ? (
             <button
               onClick={() => setClubPickerOpen(true)}
-              className="text-xs font-medium text-accent"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card-surface text-accent hover:bg-accent-soft/20"
+              aria-label="Attach a club"
+              title="Attach a club"
             >
-              Attach a club
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <rect x="3.5" y="5.5" width="5" height="13" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
+                <rect x="9.5" y="4.5" width="5" height="14" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
+                <rect x="15.5" y="6.5" width="5" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.7" />
+              </svg>
             </button>
           ) : null}
         </div>

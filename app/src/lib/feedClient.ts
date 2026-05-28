@@ -15,6 +15,11 @@ export type FeedComment = {
   replies: FeedComment[];
 };
 
+export type LikedByPreview = {
+  names: string[];
+  totalLikes: number;
+};
+
 export type FeedEvent = {
   kind: "event";
   id: string;
@@ -30,6 +35,7 @@ export type FeedEvent = {
   notes: string;
   likes: number;
   userLiked: boolean;
+  likedByPreview: LikedByPreview;
   comments: FeedComment[];
   createdAt: string;
 };
@@ -47,6 +53,7 @@ export type FeedPost = {
   clubName: string | null;
   likes: number;
   userLiked: boolean;
+  likedByPreview: LikedByPreview;
   comments: FeedComment[];
   createdAt: string;
 };
