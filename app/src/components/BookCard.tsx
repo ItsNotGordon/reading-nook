@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import type { Book, UserBook, SentimentBucket } from "@/lib/types";
-import { sentimentLabel, sentimentTextColor } from "@/lib/sentiment-display";
+import { sentimentLabel } from "@/lib/sentiment-display";
 import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
 import { ProgressBar } from "./ProgressBar";
 import { ScoreBadge } from "./ScoreBadge";
@@ -97,10 +97,7 @@ export function BookCard({ book, userBook, variant, onOpenRatedDetail, onOpenDet
             {userBook.sentimentBucket && userBook.derivedScore != null ? (
               <>
                 <div className="flex items-center gap-1.5">
-                  <ScoreBadge
-                    score={userBook.derivedScore}
-                    scoreClassName={sentimentTextColor(userBook.sentimentBucket)}
-                  />
+                  <ScoreBadge score={userBook.derivedScore} bucket={userBook.sentimentBucket} />
                 </div>
                 <p className="text-[10px] font-medium text-foreground-muted">
                   {sentimentLabel(userBook.sentimentBucket)}

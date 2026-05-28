@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { FeedItem, FeedComment as FeedCommentType, FeedAuthor } from "@/lib/feedClient";
 import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost, toggleCommentLike } from "@/lib/feedClient";
-import { sentimentTextColor } from "@/lib/sentiment-display";
+import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 
@@ -455,11 +455,12 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
                 ) : null}
               </div>
               {item.sentiment && item.derivedScore != null ? (
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-semibold tabular-nums ${sentimentTextColor(item.sentiment as SentimentBucket)}`}
-                >
-                  {item.derivedScore.toFixed(1)}
-                </div>
+                <OpenBookScoreBadge
+                  score={item.derivedScore}
+                  bucket={item.sentiment as SentimentBucket}
+                  width={52}
+                  height={36}
+                />
               ) : null}
             </button>
 

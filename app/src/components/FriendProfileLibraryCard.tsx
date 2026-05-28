@@ -2,16 +2,12 @@
 
 import { CoverThumb } from "@/components/CoverThumb";
 import { FriendShelfBookRow } from "@/components/FriendShelfBookRow";
+import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
+import { RatingRankCircle } from "@/components/RatingRankCircle";
 import { profileShelfBarRows } from "@/components/ProfileShelfBars";
 import { groupFriendShelfBooks } from "@/lib/friendLibrary";
 import type { FriendProfileSummary, FriendRatingRow } from "@/lib/friendProfileSummary";
-import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
-
-function scoreColor(bucket: SentimentBucket): string {
-  if (bucket === "liked") return "text-[#426447]";
-  if (bucket === "okay") return "text-[#a27f00]";
-  return "text-[#b13d34]";
-}
+import type { BookId, Shelf } from "@/lib/types";
 
 const SUMMARY_CLASS =
   "flex w-full cursor-pointer list-none items-center justify-between gap-2 rounded-xl border border-border/80 bg-background px-3 py-2.5 text-left transition-colors hover:border-accent/40 hover:bg-accent-soft/20 active:bg-accent-soft/40 [&::-webkit-details-marker]:hidden";
@@ -54,32 +50,35 @@ export function FriendProfileLibraryCard({ summary, onBookPress }: FriendProfile
               <button
                 type="button"
                 onClick={() => onBookPress(row.id)}
-                className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/35"
+                className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/35"
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <CoverThumb
-                    src={row.coverUrl}
-                    alt=""
-                    sizes="36px"
-                    fallbackLetter={row.title}
-                    className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
+                <RatingRankCircle rank={idx + 1} />
+                <CoverThumb
+                  src={row.coverUrl}
+                  alt=""
+                  sizes="36px"
+                  fallbackLetter={row.title}
+                  className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-foreground">{row.title}</p>
+                  <p className="truncate text-xs text-foreground-muted">{row.author}</p>
+                </div>
+                {row.derivedScore != null && row.sentimentBucket ? (
+                  <OpenBookScoreBadge
+                    score={row.derivedScore}
+                    bucket={row.sentimentBucket}
+                    width={52}
+                    height={36}
                   />
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-foreground-muted">#{idx + 1}</p>
-                    <p className="truncate text-sm font-semibold text-foreground">{row.title}</p>
-                    <p className="truncate text-xs text-foreground-muted">{row.author}</p>
-                  </div>
-                </div>
-                <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-semibold tabular-nums ${scoreColor(
-                    row.sentimentBucket,
-                  )}`}
-                  aria-label={
-                    row.derivedScore != null ? `Rating ${row.derivedScore.toFixed(1)}` : "Unrated"
-                  }
-                >
-                  {row.derivedScore != null ? row.derivedScore.toFixed(1) : "—"}
-                </div>
+                ) : (
+                  <span
+                    className="flex h-[36px] w-[52px] shrink-0 items-center justify-center text-sm font-semibold text-foreground-muted"
+                    aria-label="Unrated"
+                  >
+                    —
+                  </span>
+                )}
               </button>
             </li>
           ))}

@@ -5,7 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { BookDetailSheet } from "@/components/BookDetailSheet";
+import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
+import { RatingRankCircle } from "@/components/RatingRankCircle";
+import { RatingsSentimentFilters } from "@/components/RatingsSentimentFilters";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { useReadingNook } from "@/lib/app-state";
 import { sentimentLabel } from "@/lib/sentiment-display";
@@ -205,6 +208,10 @@ export function RatingsPageClient() {
           }}
           className="min-h-11 w-full rounded-xl border border-border bg-card-surface px-3.5 py-2.5 text-base text-foreground shadow-inner outline-none focus:border-accent/50"
         />
+        <RatingsSentimentFilters
+          active={bucketFilter}
+          onChange={(bucket) => setQueryParam("bucket", bucket)}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -352,30 +359,30 @@ export function RatingsPageClient() {
                   <button
                     type="button"
                     onClick={() => setDetailBookId(vm.id)}
-                    className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/35"
+                    className="flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors hover:bg-accent-soft/25 active:bg-accent-soft/35"
                   >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CoverThumb
-                        src={vm.coverUrl}
-                        alt=""
-                        sizes="36px"
-                        fallbackLetter={vm.title}
-                        className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground-muted">#{idx + 1}</p>
-                        <p className="truncate text-sm font-semibold text-foreground">{vm.title}</p>
-                        <p className="truncate text-xs text-foreground-muted">{vm.author}</p>
-                      </div>
+                    <RatingRankCircle rank={idx + 1} />
+                    <CoverThumb
+                      src={vm.coverUrl}
+                      alt=""
+                      sizes="36px"
+                      fallbackLetter={vm.title}
+                      className="relative h-12 w-9 shrink-0 overflow-hidden rounded-lg bg-border"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">{vm.title}</p>
+                      <p className="truncate text-xs text-foreground-muted">{vm.author}</p>
                     </div>
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-semibold tabular-nums ${scoreColor(
-                        vm.bucket,
-                      )}`}
-                      aria-label={vm.score != null ? `Rating ${vm.score.toFixed(1)}` : "Unrated"}
-                    >
-                      {vm.score != null ? vm.score.toFixed(1) : "—"}
-                    </div>
+                    {vm.score != null ? (
+                      <OpenBookScoreBadge score={vm.score} bucket={vm.bucket} width={52} height={36} />
+                    ) : (
+                      <span
+                        className="flex h-[36px] w-[52px] shrink-0 items-center justify-center text-sm font-semibold text-foreground-muted"
+                        aria-label="Unrated"
+                      >
+                        —
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
