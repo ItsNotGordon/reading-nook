@@ -14,9 +14,42 @@ import type {
 import { APP_THEMES } from "./types";
 import { SENTIMENT_BUCKETS, SHELVES } from "./types";
 import { fractionToEstimatedRange, matchesCanonicalRange } from "./progress";
+import { reconcileRankingsState } from "./libraryRankings";
 import { computeDerivedScores } from "./ranking";
 import { normalizeGenreList } from "./genreNormalize";
 export const STORAGE_KEY = "reading-nook-v1";
+export const LOCAL_REVISION_KEY = "reading-nook-v1-local-revision";
+
+export function loadLocalRevision(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_REVISION_KEY);
+    return raw && raw.trim() !== "" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function touchLocalRevision(): string {
+  const iso = new Date().toISOString();
+  if (typeof window === "undefined") return iso;
+  try {
+    window.localStorage.setItem(LOCAL_REVISION_KEY, iso);
+  } catch {
+    /* ignore */
+  }
+  return iso;
+}
+
+/** True when `a` is strictly newer than `b` (ISO timestamps). */
+export function isRevisionNewer(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a) return false;
+  if (!b) return true;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  if (Number.isNaN(ta) || Number.isNaN(tb)) return false;
+  return ta > tb;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -391,7 +424,7 @@ export function parseStoredState(raw: string): AppState | null {
   const dismissedRecIds = parseDismissedRecIds(parsed.dismissedRecIds);
   const blacklistedTitleWords = parseBlacklistedTitleWords(parsed.blacklistedTitleWords);
 
-  return {
+  return reconcileRankingsState({
     version: 1,
     catalog,
     userBooks: nextUserBooks,
@@ -399,7 +432,7 @@ export function parseStoredState(raw: string): AppState | null {
     profile,
     dismissedRecIds,
     blacklistedTitleWords,
-  };
+  });
 }
 
 export function loadState(): AppState | null {
@@ -417,6 +450,7 @@ export function saveState(state: AppState): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    touchLocalRevision();
   } catch {
     /* quota / private mode — ignore */
   }

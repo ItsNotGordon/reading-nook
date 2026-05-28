@@ -16,6 +16,7 @@ import {
   formatSyncTime,
   pushCloudLibrary,
 } from "@/lib/cloudSync";
+import { isRevisionNewer, loadLocalRevision } from "@/lib/storage";
 import { countShelvedBooks } from "@/lib/tasteComparison";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 
@@ -51,6 +52,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     async () => {
       setStatus("syncing");
       setStatusMessage(null);
+      const revisionAtPullStart = loadLocalRevision();
       const pull = await fetchCloudLibrary();
 
       if (pull.kind === "error") {
@@ -61,6 +63,25 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       }
 
       if (pull.kind === "cloud") {
+        const localNow = stateRef.current;
+        const localCount = countShelvedBooks(localNow);
+        const localRevision = loadLocalRevision();
+        const editedDuringPull = isRevisionNewer(localRevision, revisionAtPullStart);
+        const localIsNewer = isRevisionNewer(localRevision, pull.updatedAt);
+
+        if (localCount > 0 && (editedDuringPull || localIsNewer)) {
+          const result = await pushCloudLibrary(localNow);
+          if (result.ok) {
+            setStatus("synced");
+            setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
+          } else {
+            setStatus("error");
+            setStatusMessage(result.error ?? "Upload failed.");
+          }
+          readyToPush.current = true;
+          return;
+        }
+
         actions.hydrateLibrary(pull.state);
         setStatus("synced");
         setLastSyncedAt(pull.updatedAt);

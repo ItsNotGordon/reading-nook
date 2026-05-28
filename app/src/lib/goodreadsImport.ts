@@ -503,7 +503,11 @@ export function mergeImportIntoState(
     for (const id of ordered) {
       const ub = nextUserBooks[id];
       if (!ub) continue;
-      nextUserBooks[id] = { ...ub, derivedScore: scores[id] ?? null };
+      nextUserBooks[id] = {
+        ...ub,
+        sentimentBucket: bucket,
+        derivedScore: scores[id] ?? null,
+      };
     }
   }
 

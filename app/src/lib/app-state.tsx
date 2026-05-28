@@ -11,10 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
+import { bookHasBucketRanking } from "./libraryRankings";
 import { APP_THEMES, type AppState, type Book, type BookId, type BookVisibility, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 import { postFeedEvent, debouncedPostFeedEvent } from "./feedClient";
-import { scoreForRankIndex } from "./ranking";
 
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
@@ -174,9 +174,15 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       updateAddedAt: (bookId, addedAt) =>
         dispatch({ type: "UPDATE_ADDED_AT", bookId, addedAt }),
       setSentimentBucket: (bookId, sentimentBucket) => {
-        dispatch({ type: "SET_SENTIMENT_BUCKET", bookId, sentimentBucket });
-        if (sentimentBucket) {
-          const cat = stateRef.current.catalog[bookId];
+        const before = stateRef.current;
+        const action = { type: "SET_SENTIMENT_BUCKET" as const, bookId, sentimentBucket };
+        const next = appReducer(before, action);
+        if (next === before) return;
+        const hadRanking = bookHasBucketRanking(before, bookId);
+        dispatch(action);
+        if (!hadRanking && sentimentBucket) {
+          const cat = next.catalog[bookId];
+          const ub = next.userBooks[bookId];
           if (cat) {
             postFeedEvent({
               eventType: "finished",
@@ -186,28 +192,39 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
               bookCoverUrl: cat.coverUrl,
               shelf: "finished",
               sentiment: sentimentBucket,
+              derivedScore: ub?.derivedScore ?? undefined,
             });
           }
         }
       },
       insertBookIntoBucketAtIndex: (bookId, bucket, index) => {
-        const prevRanking = stateRef.current.bucketRankings[bucket] ?? [];
-        const alreadyIn = prevRanking.includes(bookId);
-        const n = alreadyIn ? prevRanking.length : prevRanking.length + 1;
-        const score = scoreForRankIndex(bucket, index, n);
-        dispatch({ type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX", bookId, bucket, index });
-        const cat = stateRef.current.catalog[bookId];
-        if (cat) {
-          postFeedEvent({
-            eventType: "finished",
-            bookId,
-            bookTitle: cat.title,
-            bookAuthor: cat.author,
-            bookCoverUrl: cat.coverUrl,
-            shelf: "finished",
-            sentiment: bucket,
-            derivedScore: score,
-          });
+        const before = stateRef.current;
+        if (!before.userBooks[bookId]) return;
+        const action = {
+          type: "INSERT_BOOK_INTO_BUCKET_AT_INDEX" as const,
+          bookId,
+          bucket,
+          index,
+        };
+        const next = appReducer(before, action);
+        if (next === before) return;
+        const hadRanking = bookHasBucketRanking(before, bookId);
+        dispatch(action);
+        if (!hadRanking) {
+          const cat = next.catalog[bookId];
+          const ub = next.userBooks[bookId];
+          if (cat && ub?.sentimentBucket) {
+            postFeedEvent({
+              eventType: "finished",
+              bookId,
+              bookTitle: cat.title,
+              bookAuthor: cat.author,
+              bookCoverUrl: cat.coverUrl,
+              shelf: "finished",
+              sentiment: ub.sentimentBucket,
+              derivedScore: ub.derivedScore ?? undefined,
+            });
+          }
         }
       },
       updateBucketRankings: (bucket, orderedBookIds) =>

@@ -13,6 +13,7 @@ import { SENTIMENT_BUCKETS } from "./types";
 import { matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
 import { sanitizeCatalogGenres } from "./mergeCatalogGenres";
+import { reconcileRankingsState } from "./libraryRankings";
 import { getInitialState, defaultUserProfile } from "./storage";
 
 export type AppAction =
@@ -177,13 +178,15 @@ function applyDerivedScoresToUserBooks(
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case "HYDRATE":
-      return {
+    case "HYDRATE": {
+      const hydrated = reconcileRankingsState({
         ...action.payload,
         profile: action.payload.profile ?? defaultUserProfile(),
         dismissedRecIds: action.payload.dismissedRecIds ?? [],
         blacklistedTitleWords: action.payload.blacklistedTitleWords ?? [],
-      };
+      });
+      return hydrated;
+    }
 
     case "RESET_LIBRARY":
       // Clear shelves and cached catalog only; keep presenter profile for class demos.
