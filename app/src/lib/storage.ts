@@ -3,6 +3,7 @@ import type {
   AppTheme,
   Book,
   BookId,
+  BookVisibility,
   BucketRankings,
   ProgressMode,
   SentimentBucket,
@@ -36,6 +37,10 @@ function normalizeStoredSentiment(value: unknown): SentimentBucket | null {
 
 function isProgressMode(value: unknown): value is ProgressMode {
   return value === "exact" || value === "estimated";
+}
+
+function isBookVisibility(value: unknown): value is BookVisibility {
+  return value === "public" || value === "private";
 }
 
 function parseBook(value: unknown): Book | null {
@@ -113,6 +118,7 @@ function parseUserBook(value: unknown): UserBook | null {
     derivedScore,
     addedAt,
     notes: notesField,
+    visibility,
   } = value;
   if (typeof bookId !== "string" || !isShelf(shelf) || !isProgressMode(progressMode)) {
     return null;
@@ -161,6 +167,7 @@ function parseUserBook(value: unknown): UserBook | null {
   return {
     bookId,
     shelf,
+    visibility: isBookVisibility(visibility) ? visibility : "public",
     progressMode,
     currentPage: currentPage === null ? null : Math.floor(currentPage),
     estimatedRange: range,

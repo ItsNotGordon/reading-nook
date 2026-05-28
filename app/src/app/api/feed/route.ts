@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { PRIVATE_BOOK_PLACEHOLDER_COVER } from "@/lib/bookPrivacy";
+import { parseStoredState } from "@/lib/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -17,6 +19,7 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Sign in required." }, { status: 401 });
   }
+  const viewerId = user.id;
 
   const { data: events } = await supabase
     .from("feed_events")
@@ -53,6 +56,30 @@ export async function GET() {
       username: p?.username ?? null,
       avatarUrl: p?.avatar_url ?? null,
     };
+  }
+
+  const privateBooksByUser = new Map<string, Set<string>>();
+  if (authorIds.size > 0) {
+    const { data: libs } = await supabase
+      .from("libraries")
+      .select("user_id, state")
+      .in("user_id", Array.from(authorIds));
+    for (const lib of libs ?? []) {
+      const raw = typeof lib.state === "string" ? lib.state : JSON.stringify(lib.state);
+      const parsed = parseStoredState(raw);
+      if (!parsed) continue;
+      const privateIds = new Set<string>();
+      for (const [bookId, ub] of Object.entries(parsed.userBooks)) {
+        if (ub?.visibility === "private") privateIds.add(bookId);
+      }
+      privateBooksByUser.set(lib.user_id, privateIds);
+    }
+  }
+
+  function shouldHideBook(userId: string, bookId: string | null | undefined): boolean {
+    if (!bookId) return false;
+    if (userId === viewerId) return false;
+    return privateBooksByUser.get(userId)?.has(bookId) ?? false;
   }
 
   const postIds = (posts ?? []).map((p) => p.id);
@@ -251,6 +278,7 @@ export async function GET() {
 
   for (const e of events ?? []) {
     const er = eventReactionMap.get(e.id);
+    const hideBook = shouldHideBook(e.user_id, e.book_id);
     items.push({
       kind: "event",
       id: e.id,
@@ -258,12 +286,12 @@ export async function GET() {
       eventType: e.event_type,
       shelf: e.shelf ?? "",
       bookId: e.book_id,
-      bookTitle: e.book_title,
-      bookAuthor: e.book_author,
-      bookCoverUrl: e.book_cover_url,
-      sentiment: e.sentiment ?? null,
-      derivedScore: e.derived_score ?? null,
-      notes: e.notes ?? "",
+      bookTitle: hideBook ? "Private book" : e.book_title,
+      bookAuthor: hideBook ? "Hidden" : e.book_author,
+      bookCoverUrl: hideBook ? PRIVATE_BOOK_PLACEHOLDER_COVER : e.book_cover_url,
+      sentiment: hideBook ? null : (e.sentiment ?? null),
+      derivedScore: hideBook ? null : (e.derived_score ?? null),
+      notes: hideBook ? "" : (e.notes ?? ""),
       likes: er?.likes ?? 0,
       userLiked: er?.userLiked ?? false,
       likedByPreview: likedByPreviewFor(er?.likeUserIds ?? [], er?.likes ?? 0),
@@ -274,15 +302,16 @@ export async function GET() {
 
   for (const p of posts ?? []) {
     const r = reactionMap.get(p.id);
+    const hideBook = shouldHideBook(p.user_id, p.book_id);
     items.push({
       kind: "post",
       id: p.id,
       author: makeAuthor(p.user_id),
       body: p.body,
       bookId: p.book_id ?? null,
-      bookTitle: p.book_title ?? null,
-      bookAuthor: p.book_author ?? null,
-      bookCoverUrl: p.book_cover_url ?? null,
+      bookTitle: hideBook ? "Private book" : (p.book_title ?? null),
+      bookAuthor: hideBook ? "Hidden" : (p.book_author ?? null),
+      bookCoverUrl: hideBook ? PRIVATE_BOOK_PLACEHOLDER_COVER : (p.book_cover_url ?? null),
       clubId: p.club_id ?? null,
       clubName: p.club_id ? (clubNameMap.get(p.club_id) ?? null) : null,
       likes: r?.likes ?? 0,
@@ -295,5 +324,5 @@ export async function GET() {
 
   items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json({ items: items.slice(0, 50), currentUserId: user.id });
+  return NextResponse.json({ items: items.slice(0, 50), currentUserId: viewerId });
 }

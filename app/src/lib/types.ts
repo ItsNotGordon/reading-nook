@@ -26,11 +26,13 @@ export type SentimentBucket = "liked" | "okay" | "disliked";
 
 /** How the user tracks reading progress for a title. */
 export type ProgressMode = "exact" | "estimated";
+export type BookVisibility = "public" | "private";
 
 /** A book the user has added to their nook, keyed by `bookId` in `AppState.userBooks`. */
 export type UserBook = {
   bookId: BookId;
   shelf: Shelf;
+  visibility: BookVisibility;
   progressMode: ProgressMode;
   /** 1-based page when `progressMode` is `"exact"`; otherwise `null`. */
   currentPage: number | null;

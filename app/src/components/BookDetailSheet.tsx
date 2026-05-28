@@ -167,6 +167,7 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
   if (!book || !ub) return null;
 
   const score = ub.derivedScore;
+  const isPrivate = ub.visibility === "private";
 
   const saveNotes = (): void => {
     actions.updateUserBookNotes(bookId, draftNotes);
@@ -311,6 +312,11 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
                   <span>{dateLabel}</span>
                 </div>
               ) : null}
+              {isPrivate ? (
+                <span className="mt-2 inline-flex rounded-full border border-border bg-card-surface px-2.5 py-1 text-[11px] font-semibold text-foreground-muted">
+                  Only visible to you
+                </span>
+              ) : null}
             </div>
 
             {/* Sentiment picker (when changing feeling) */}
@@ -434,6 +440,26 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
                   </p>
                 </div>
               )}
+            </div>
+
+            <div className="px-6 py-3">
+              <label className="flex items-start justify-between gap-3 rounded-xl border border-border/80 bg-card-surface px-3 py-2.5">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">Private book</span>
+                  <span className="mt-0.5 block text-xs text-foreground-muted">
+                    Only you can see the title, cover, notes, and details.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) =>
+                    actions.setUserBookVisibility(bookId, e.target.checked ? "private" : "public")
+                  }
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border text-accent focus:ring-accent/35"
+                  aria-label="Private book"
+                />
+              </label>
             </div>
 
             {/* Action buttons row */}

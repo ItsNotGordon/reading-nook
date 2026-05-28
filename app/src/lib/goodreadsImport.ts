@@ -417,6 +417,7 @@ function buildUserBook(row: ImportRow): UserBook {
     return {
       bookId: row.catalogBook.id,
       shelf: "finished",
+      visibility: "public",
       progressMode: "estimated",
       currentPage: null,
       estimatedRange: [1, 1],
@@ -433,6 +434,7 @@ function buildUserBook(row: ImportRow): UserBook {
   return {
     bookId: row.catalogBook.id,
     shelf: row.shelf,
+    visibility: "public",
     progressMode: totalPages > 0 ? "exact" : "estimated",
     currentPage: totalPages > 0 ? 1 : null,
     estimatedRange: totalPages > 0 ? null : [0, 0.25],

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertAcceptedFriend } from "@/lib/friendAccess";
+import { redactStateForFriendView } from "@/lib/bookPrivacy";
 import type { AppState } from "@/lib/types";
 import { parseStoredState } from "@/lib/storage";
 import { buildTasteComparison, friendShelfCounts } from "@/lib/tasteComparison";
@@ -56,7 +57,8 @@ export async function GET(
   let friendState: AppState | null = null;
   if (lib?.state) {
     const raw = typeof lib.state === "string" ? lib.state : JSON.stringify(lib.state);
-    friendState = parseStoredState(raw);
+    const parsed = parseStoredState(raw);
+    friendState = parsed ? redactStateForFriendView(parsed) : null;
   }
 
   let yourState: AppState | null = null;

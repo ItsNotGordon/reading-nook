@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
-import { APP_THEMES, type AppState, type Book, type BookId, type SentimentBucket, type Shelf, type UserProfile } from "./types";
+import { APP_THEMES, type AppState, type Book, type BookId, type BookVisibility, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 import { postFeedEvent, debouncedPostFeedEvent } from "./feedClient";
 import { scoreForRankIndex } from "./ranking";
@@ -19,6 +19,7 @@ import { scoreForRankIndex } from "./ranking";
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
   moveBookToShelf: (bookId: BookId, shelf: Shelf) => void;
+  setUserBookVisibility: (bookId: BookId, visibility: BookVisibility) => void;
   updateExactProgress: (bookId: BookId, currentPage: number) => void;
   updateReadingExactProgress: (
     bookId: BookId,
@@ -99,6 +100,9 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
       },
       moveBookToShelf: (bookId, shelf) => {
         dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf });
+      },
+      setUserBookVisibility: (bookId, visibility) => {
+        dispatch({ type: "SET_USER_BOOK_VISIBILITY", bookId, visibility });
       },
       updateExactProgress: (bookId, currentPage) => {
         dispatch({ type: "UPDATE_EXACT_PROGRESS", bookId, currentPage });

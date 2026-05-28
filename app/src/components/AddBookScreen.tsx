@@ -200,7 +200,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
     return () => window.clearTimeout(t);
   }, [feedback]);
 
-  const chooseShelf = (shelf: Shelf, userGenres: string[]) => {
+  const chooseShelf = (shelf: Shelf, userGenres: string[], visibility: "public" | "private") => {
     if (!pickerBook) return;
     const picked = pickerBook;
     const existing = state.userBooks[picked.id];
@@ -217,8 +217,10 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
         genres: mergeCatalogGenres(enriched.genres, userGenres),
       };
       actions.addBookToShelf(book.id, shelf, book);
+      actions.setUserBookVisibility(book.id, visibility);
       const verb = existing ? "Moved to" : "Added to";
-      setFeedback(`${verb} ${shelfDisplayName(shelf)}.`);
+      const privacy = visibility === "private" ? " (private)" : "";
+      setFeedback(`${verb} ${shelfDisplayName(shelf)}${privacy}.`);
       if (shelf === "finished") {
         setFinishBookId(book.id);
       }
@@ -320,7 +322,13 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
         ) : null}
       </div>
 
-      <ShelfPickerSheet book={pickerBook} onClose={closePicker} onChooseShelf={chooseShelf} />
+      <ShelfPickerSheet
+        book={pickerBook}
+        onClose={closePicker}
+        onChooseShelf={chooseShelf}
+        initialVisibility={pickerBook && state.userBooks[pickerBook.id]?.visibility === "private" ? "private" : "public"}
+        initialShelf={pickerBook ? (state.userBooks[pickerBook.id]?.shelf ?? null) : null}
+      />
 
       {finishBookId && state.catalog[finishBookId] && state.userBooks[finishBookId] ? (
         <FinishBookSheet

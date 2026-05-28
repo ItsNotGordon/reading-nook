@@ -51,6 +51,7 @@ export function FinishBookSheet({
     return today.toISOString().slice(0, 10);
   })();
   const [dateValue, setDateValue] = useState<string>(initialDate);
+  const isPrivate = userBook.visibility === "private";
 
   function updateFinishedDateAndClose(): void {
     const chosen = dateValue && dateValue.trim() !== "" ? dateValue : initialDate;
@@ -186,6 +187,26 @@ export function FinishBookSheet({
                 onChange={(e) => setDateValue(e.target.value)}
                 className="w-full rounded-xl border border-border bg-card-surface px-3 py-2 text-sm text-foreground shadow-inner outline-none focus:border-accent/50 focus:shadow-[0_0_0_3px_rgba(66,100,71,0.22)]"
               />
+            </div>
+
+            <div className="rounded-xl border border-border/80 bg-card-surface/60 px-3 py-2.5">
+              <label className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">Private book</span>
+                  <span className="mt-0.5 block text-xs text-foreground-muted">
+                    Only you can see the title, cover, notes, and details.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={(e) =>
+                    actions.setUserBookVisibility(bookId, e.target.checked ? "private" : "public")
+                  }
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-border text-accent focus:ring-accent/35"
+                  aria-label="Private book"
+                />
+              </label>
             </div>
 
             <div className="border-t border-dashed border-border/70 pt-4">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertAcceptedFriend } from "@/lib/friendAccess";
+import { redactStateForFriendView } from "@/lib/bookPrivacy";
 import { buildFriendProfileSummary } from "@/lib/friendProfileSummary";
 import { getInitialState, parseStoredState } from "@/lib/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -57,7 +58,7 @@ export async function GET(
   if (lib?.state) {
     const raw = typeof lib.state === "string" ? lib.state : JSON.stringify(lib.state);
     const parsed = parseStoredState(raw);
-    if (parsed) friendState = parsed;
+    if (parsed) friendState = redactStateForFriendView(parsed);
   }
 
   return NextResponse.json({

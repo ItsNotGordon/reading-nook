@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertAcceptedFriend } from "@/lib/friendAccess";
 import { listFriendShelfBooks } from "@/lib/friendLibrary";
+import { redactStateForFriendView } from "@/lib/bookPrivacy";
 import { parseStoredState } from "@/lib/storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -50,7 +51,7 @@ export async function GET(
   if (lib?.state) {
     const raw = typeof lib.state === "string" ? lib.state : JSON.stringify(lib.state);
     const friendState = parseStoredState(raw);
-    if (friendState) books = listFriendShelfBooks(friendState);
+    if (friendState) books = listFriendShelfBooks(redactStateForFriendView(friendState));
   }
 
   return NextResponse.json({

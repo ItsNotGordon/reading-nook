@@ -2,6 +2,7 @@ import type {
   AppState,
   AppTheme,
   Book,
+  BookVisibility,
   BookId,
   BucketRankings,
   SentimentBucket,
@@ -20,6 +21,7 @@ export type AppAction =
   | { type: "RESET_SESSION" }
   | { type: "ADD_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf; catalogBook?: Book }
   | { type: "MOVE_BOOK_TO_SHELF"; bookId: BookId; shelf: Shelf }
+  | { type: "SET_USER_BOOK_VISIBILITY"; bookId: BookId; visibility: BookVisibility }
   | { type: "UPDATE_EXACT_PROGRESS"; bookId: BookId; currentPage: number }
   | {
       type: "UPDATE_READING_EXACT_PROGRESS";
@@ -86,6 +88,7 @@ function defaultUserBook(bookId: BookId, shelf: Shelf, totalPages: number): User
     return {
       bookId,
       shelf,
+      visibility: "public",
       progressMode: "exact",
       currentPage: 1,
       estimatedRange: null,
@@ -100,6 +103,7 @@ function defaultUserBook(bookId: BookId, shelf: Shelf, totalPages: number): User
   return {
     bookId,
     shelf,
+    visibility: "public",
     progressMode: "estimated",
     currentPage: null,
     estimatedRange: [0, 0.25],
@@ -332,6 +336,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         userBooks: { ...state.userBooks, [action.bookId]: nextUb },
         bucketRankings: rankings,
+      };
+    }
+
+    case "SET_USER_BOOK_VISIBILITY": {
+      const ub = state.userBooks[action.bookId];
+      if (!ub) return state;
+      if (ub.visibility === action.visibility) return state;
+      return {
+        ...state,
+        userBooks: {
+          ...state.userBooks,
+          [action.bookId]: { ...ub, visibility: action.visibility },
+        },
       };
     }
 
