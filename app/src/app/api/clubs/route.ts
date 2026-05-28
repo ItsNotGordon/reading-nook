@@ -52,7 +52,7 @@ export async function GET() {
 
   type ClubRow = {
     id: string; name: string; description: string; creator_id: string;
-    is_public: boolean; invite_code: string;
+    is_public: boolean; invite_code: string; icon_url: string | null;
     current_book_id: string | null; current_book_title: string | null;
     current_book_author: string | null; current_book_cover_url: string | null;
     created_at: string;
@@ -65,6 +65,7 @@ export async function GET() {
     creatorId: c.creator_id,
     isPublic: c.is_public,
     inviteCode: c.invite_code,
+    iconUrl: c.icon_url ?? null,
     currentBook: c.current_book_id
       ? { id: c.current_book_id, title: c.current_book_title ?? "", author: c.current_book_author ?? "", coverUrl: c.current_book_cover_url ?? "" }
       : null,

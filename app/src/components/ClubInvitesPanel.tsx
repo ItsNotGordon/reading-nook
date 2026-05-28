@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { ClubIcon } from "@/components/ClubIcon";
 import { useNotificationCounts } from "@/components/NotificationCountsProvider";
 import { fetchClubInvites, respondToClubInvite, type ClubInvite } from "@/lib/clubClient";
 
@@ -58,9 +58,9 @@ export function ClubInvitesPanel({ onChanged }: ClubInvitesPanelProps) {
             className="flex items-center justify-between gap-2 rounded-2xl border border-border/80 bg-background px-4 py-3"
           >
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <ProfileAvatar
-                name={invite.inviterDisplayName}
-                avatarUrl={invite.inviterAvatarUrl}
+              <ClubIcon
+                name={invite.clubName}
+                iconUrl={invite.clubIconUrl}
                 size="sm"
               />
               <span className="min-w-0">

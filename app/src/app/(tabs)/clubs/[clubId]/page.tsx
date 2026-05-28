@@ -12,6 +12,8 @@ import { BookDetailSheet } from "@/components/BookDetailSheet";
 import { FeedBookPreviewSheet } from "@/components/FeedBookPreviewSheet";
 import { PairwiseComparisonSheet } from "@/components/PairwiseComparisonSheet";
 import { InviteClubMemberSection } from "@/components/InviteClubMemberSection";
+import { ClubIcon } from "@/components/ClubIcon";
+import { ClubIconPicker } from "@/components/ClubIconPicker";
 import { useNotificationCounts } from "@/components/NotificationCountsProvider";
 import { fetchClubDetail, fetchClubFeed, updateClub, leaveClub, deleteClub, type ClubDetail, type ClubMember } from "@/lib/clubClient";
 import { markClubSeen } from "@/lib/notificationClient";
@@ -177,7 +179,19 @@ export default function ClubDetailPage() {
 
         {/* Club header */}
         <div className="rounded-2xl border border-border bg-card-surface/95 p-4 shadow-sm ring-1 ring-black/[0.03]">
-          <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            {isAdmin ? (
+              <ClubIconPicker
+                clubId={club.id}
+                name={club.name}
+                iconUrl={club.iconUrl ?? null}
+                onIconChange={(url) =>
+                  setClub((prev) => (prev ? { ...prev, iconUrl: url } : prev))
+                }
+              />
+            ) : (
+              <ClubIcon name={club.name} iconUrl={club.iconUrl ?? null} size="lg" />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <h1 className="font-serif text-xl font-semibold text-foreground">{club.name}</h1>

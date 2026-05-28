@@ -38,7 +38,7 @@ It combines:
 | Area                                                     | Role                                                                                            |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `app/`                                                   | **Next.js product app** — all shipped UI, API routes, and client state                          |
-| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**fifteen** migration files: `001`–`015`) |
+| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**sixteen** migration files: `001`–`016`) |
 | `docs/`                                                  | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD)                    |
 | `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §16)                                                                    |
 
@@ -116,6 +116,7 @@ Home | Library | Add | Ratings | Profile
 | `/api/notifications/summary`           | GET                | In-app badge counts: `friends` (pending incoming requests), `clubs` (unread invites + unread club feed posts)   |
 | `/api/clubs`                           | GET, POST          | List user's clubs / create a new club                                                                         |
 | `/api/clubs/[clubId]`                  | GET, PATCH, DELETE | Fetch club detail / update club info (admin) / delete club (creator)                                          |
+| `/api/clubs/[clubId]/icon`             | GET, PATCH, DELETE | Club icon URL (member read); upload/remove icon (admin) via `club-icons` Storage bucket                      |
 | `/api/clubs/[clubId]/join`             | POST               | Join a public club or validate invite code for private clubs                                                  |
 | `/api/clubs/[clubId]/members`          | POST               | Send a **pending** club invite by @username (admins always; members when `members_can_invite` is enabled)         |
 | `/api/clubs/invites`                   | GET                | List pending incoming club invitations for the signed-in user                                                   |
@@ -139,10 +140,12 @@ Home | Library | Add | Ratings | Profile
 | `NewPostComposer`         | Post creation with text body, optional book attachment (via `BookPickerSheet`), optional club attachment (via `ClubPickerSheet`)                                                                                                                            |
 | `BookPickerSheet`         | Bottom sheet to select a book from user's library — search box, categorized by shelf, explicit close button                                                                                                                                                 |
 | `ClubPickerSheet`         | Bottom sheet to select a club to attach to a post                                                                                                                                                                                                           |
-| `ClubCard`                | Club summary card — name, description preview, member count, current book thumbnail, public/private badge                                                                                                                                                   |
+| `ClubCard`                | Club summary card — optional club icon (else current book cover or default book icon), name, description, member count, public/private badge                                                                                                                |
+| `ClubIcon`                | Rounded-square club image with default book SVG fallback                                                                                                                                                                                                    |
+| `ClubIconPicker`          | Admin crop/upload flow for club icon (mirrors profile photo picker)                                                                                                                                                                                         |
 | `JoinClubSheet`           | Sheet for joining a club via invite code — lookup, preview, and join flow                                                                                                                                                                                   |
 | `InviteClubMemberSection` | Username search + send pending invite on club detail                                                                                                                                                                                                         |
-| `ClubInvitesPanel`        | Pending club invitations on `/clubs` with Accept / Decline                                                                                                                                                                                                    |
+| `ClubInvitesPanel`        | Pending club invitations on `/clubs` with club icon, Accept / Decline                                                                                                                                                                                         |
 | `NotificationBadge`       | Red count pill (`9+` cap) on Home Friends/Clubs quick-access buttons                                                                                                                                                                                        |
 | `NotificationCountsProvider` | Polls `/api/notifications/summary` every 45s + on window focus; wraps tab layout                                                                                                                                                                          |
 | `BookCard`                | Individual book card in library shelves — cover, title, author, progress/score info, click opens `BookDetailSheet`, hover-expand effect, drag-safe                                                                                                          |
@@ -436,7 +439,7 @@ Book clubs are a social feature allowing users to create themed reading groups, 
 
 ### Data model
 
-- `**clubs` table:** `id`, `name`, `description`, `creator_id`, `is_public` (boolean), `members_can_invite` (boolean, default false — creator can allow any member to invite by username), `invite_code` (auto-generated 8-char unique string), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author` (nullable), `created_at`.  
+- `**clubs` table:** `id`, `name`, `description`, `creator_id`, `is_public` (boolean), `members_can_invite` (boolean, default false — creator can allow any member to invite by username), `invite_code` (auto-generated 8-char unique string), `icon_url` (nullable — public `club-icons` Storage object), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author` (nullable), `created_at`.  
 - `**club_members` table:** `club_id`, `user_id`, `role` (`member` | `admin` — creator is auto-added as admin), `joined_at`, `last_feed_seen_at` (for unread club feed badge). Unique constraint on `(club_id, user_id)`.  
 - `**club_invites` table:** `club_id`, `inviter_id`, `invitee_id`, `status` (`pending` \| `accepted` \| `declined` \| `cancelled`), `created_at`. Username invites create `pending` rows; membership starts only after **accept**. Unique `(club_id, invitee_id)`.  
 - `**notifications` table:** `user_id`, `type` (`club_invite`, legacy `club_added`), `club_id`, `actor_id`, `read_at`, `created_at`.  
@@ -540,6 +543,7 @@ All migrations live in `supabase/migrations/`. They must be run in order against
 | `013_club_members_can_invite.sql`      | Add `members_can_invite` on `clubs` — creator can let non-admin members invite others by @username                                                           |
 | `014_in_app_notifications.sql`         | `notifications` table (`club_added`), `club_members.last_feed_seen_at`, RLS for in-app badges on Home Friends/Clubs                                            |
 | `015_club_invites.sql`                 | `club_invites` pending invitations; `club_invite` notification type; accept/decline before membership                                                           |
+| `016_club_icon.sql`                    | `clubs.icon_url`; public `club-icons` Storage bucket; admin-only upload RLS                                                                                     |
 
 
 ---

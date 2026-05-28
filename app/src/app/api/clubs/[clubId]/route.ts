@@ -62,6 +62,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     isPublic: club.is_public,
     membersCanInvite: Boolean(club.members_can_invite),
     inviteCode: club.invite_code,
+    iconUrl: club.icon_url ?? null,
     currentBook: club.current_book_id
       ? { id: club.current_book_id, title: club.current_book_title ?? "", author: club.current_book_author ?? "", coverUrl: club.current_book_cover_url ?? "" }
       : null,

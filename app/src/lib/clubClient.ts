@@ -15,6 +15,7 @@ export type Club = {
   isPublic: boolean;
   membersCanInvite: boolean;
   inviteCode: string;
+  iconUrl: string | null;
   currentBook: ClubBook | null;
   memberCount: number;
   role: "admin" | "member" | null;
@@ -38,6 +39,7 @@ export type ClubInvite = {
   inviteId: string;
   clubId: string;
   clubName: string;
+  clubIconUrl: string | null;
   inviterDisplayName: string;
   inviterUsername: string | null;
   inviterAvatarUrl: string | null;
@@ -75,6 +77,7 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   if (!club) return null;
   return {
     ...club,
+    iconUrl: club.iconUrl ?? null,
     pendingInviteUserIds: Array.isArray(club.pendingInviteUserIds)
       ? club.pendingInviteUserIds
       : [],

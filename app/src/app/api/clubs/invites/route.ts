@@ -46,7 +46,7 @@ export async function GET() {
   for (const row of rows ?? []) {
     const { data: club } = await sb
       .from("clubs")
-      .select("name")
+      .select("name, icon_url")
       .eq("id", row.club_id)
       .maybeSingle();
 
@@ -60,6 +60,7 @@ export async function GET() {
       inviteId: row.id,
       clubId: row.club_id,
       clubName: club?.name ?? "Club",
+      clubIconUrl: club?.icon_url ?? null,
       inviterDisplayName: inviter?.display_name ?? "Reader",
       inviterUsername: inviter?.username ?? null,
       inviterAvatarUrl: inviter?.avatar_url ?? null,

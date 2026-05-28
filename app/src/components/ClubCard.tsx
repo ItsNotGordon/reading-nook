@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { ClubIcon } from "@/components/ClubIcon";
 import type { Club } from "@/lib/clubClient";
 
 type ClubCardProps = {
@@ -14,7 +15,9 @@ export function ClubCard({ club }: ClubCardProps) {
       href={`/clubs/${club.id}`}
       className="flex items-center gap-3 rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px] active:bg-accent-soft/20"
     >
-      {club.currentBook?.coverUrl ? (
+      {club.iconUrl ? (
+        <ClubIcon name={club.name} iconUrl={club.iconUrl} size="md" className="shadow-sm" />
+      ) : club.currentBook?.coverUrl ? (
         <Image
           src={club.currentBook.coverUrl}
           alt=""
@@ -24,13 +27,7 @@ export function ClubCard({ club }: ClubCardProps) {
           unoptimized
         />
       ) : (
-        <div className="flex h-[60px] w-[40px] shrink-0 items-center justify-center rounded-lg bg-accent-soft/30">
-          <svg className="h-5 w-5 text-accent" viewBox="0 0 24 24" fill="none">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />
-            <path d="M9 7h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-          </svg>
-        </div>
+        <ClubIcon name={club.name} iconUrl={null} size="md" className="shadow-sm" />
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
