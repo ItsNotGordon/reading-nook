@@ -119,10 +119,10 @@ export function AddToShelfSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-to-shelf-title"
-        className="relative z-10 w-full max-h-[calc(100dvh-0.35rem)] overflow-hidden rounded-t-[1.25rem] border border-border bg-background shadow-2xl sm:max-h-[min(90dvh,760px)] sm:max-w-md sm:rounded-2xl"
+        className="relative z-10 flex w-full max-h-[calc(100dvh-0.35rem)] flex-col rounded-t-[1.25rem] border border-border bg-background shadow-2xl sm:max-h-[min(90dvh,760px)] sm:max-w-md sm:rounded-2xl"
       >
-        <div className="max-h-[calc(100dvh-0.35rem)] overflow-y-auto overscroll-contain px-3.5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3.5 sm:max-h-[min(90dvh,760px)]">
-          <div className="sticky top-0 z-10 -mx-3.5 mb-2 flex items-start justify-between gap-3 border-b border-border/60 bg-background/95 px-3.5 pb-2.5 pt-0.5 backdrop-blur-sm">
+        <div className="shrink-0 border-b border-border/60 bg-background/95 px-3.5 pb-2.5 pt-3.5">
+          <div className="flex items-start justify-between gap-3">
             <h2 id="add-to-shelf-title" className="font-serif text-2xl font-semibold text-foreground">
               Add to shelf
             </h2>
@@ -135,7 +135,9 @@ export function AddToShelfSheet({
               ×
             </button>
           </div>
+        </div>
 
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2.5">
           <div className="mt-2.5 flex items-start gap-2.5">
             <CoverThumb
               src={book.coverUrl}
