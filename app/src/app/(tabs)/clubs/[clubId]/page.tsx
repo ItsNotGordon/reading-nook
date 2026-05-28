@@ -156,6 +156,7 @@ export default function ClubDetailPage() {
   const isCreator = currentUserId === club.creatorId;
   const canInvite = isAdmin || Boolean(club.membersCanInvite);
   const existingMemberIds = club.members.map((m) => m.userId);
+  const pendingInviteUserIds = club.pendingInviteUserIds ?? [];
 
   async function handleMembersCanInviteChange(enabled: boolean) {
     if (!club) return;
@@ -319,6 +320,7 @@ export default function ClubDetailPage() {
                 <InviteClubMemberSection
                   clubId={club.id}
                   existingMemberIds={existingMemberIds}
+                  pendingInviteUserIds={pendingInviteUserIds}
                   currentUserId={currentUserId}
                   onInvited={loadClub}
                 />

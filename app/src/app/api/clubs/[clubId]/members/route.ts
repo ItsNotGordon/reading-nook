@@ -76,36 +76,65 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   if (targetProfile.id === user.id) {
-    return NextResponse.json({ error: "You are already in this club." }, { status: 400 });
+    return NextResponse.json({ error: "You cannot invite yourself." }, { status: 400 });
   }
 
-  const { data: existing } = await sb
+  const { data: existingMember } = await sb
     .from("club_members")
     .select("id")
     .eq("club_id", clubId)
     .eq("user_id", targetProfile.id)
     .maybeSingle();
 
-  if (existing) {
+  if (existingMember) {
     return NextResponse.json({ error: "Already a member." }, { status: 400 });
   }
 
-  const { error } = await sb.from("club_members").insert({
-    club_id: clubId,
-    user_id: targetProfile.id,
-    role: "member",
-  });
+  const { data: existingInvite } = await sb
+    .from("club_invites")
+    .select("id, status")
+    .eq("club_id", clubId)
+    .eq("invitee_id", targetProfile.id)
+    .maybeSingle();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (existingInvite?.status === "pending") {
+    return NextResponse.json({ error: "Invitation already pending." }, { status: 400 });
+  }
+
+  const now = new Date().toISOString();
+
+  if (existingInvite) {
+    const { error: updateError } = await sb
+      .from("club_invites")
+      .update({
+        status: "pending",
+        inviter_id: user.id,
+        created_at: now,
+      })
+      .eq("id", existingInvite.id);
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+  } else {
+    const { error: insertError } = await sb.from("club_invites").insert({
+      club_id: clubId,
+      inviter_id: user.id,
+      invitee_id: targetProfile.id,
+      status: "pending",
+    });
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
   }
 
   await sb.from("notifications").insert({
     user_id: targetProfile.id,
-    type: "club_added",
+    type: "club_invite",
     club_id: clubId,
     actor_id: user.id,
   });
 
-  return NextResponse.json({ ok: true, username: targetProfile.username });
+  return NextResponse.json({ ok: true, username: targetProfile.username, pending: true });
 }

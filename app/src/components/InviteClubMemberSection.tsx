@@ -16,6 +16,7 @@ type SearchUser = {
 type InviteClubMemberSectionProps = {
   clubId: string;
   existingMemberIds: string[];
+  pendingInviteUserIds?: string[];
   currentUserId: string | null;
   onInvited: () => void;
 };
@@ -23,6 +24,7 @@ type InviteClubMemberSectionProps = {
 export function InviteClubMemberSection({
   clubId,
   existingMemberIds,
+  pendingInviteUserIds = [],
   currentUserId,
   onInvited,
 }: InviteClubMemberSectionProps) {
@@ -33,7 +35,10 @@ export function InviteClubMemberSection({
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
-  const memberSet = useMemo(() => new Set(existingMemberIds), [existingMemberIds]);
+  const excludedIds = useMemo(
+    () => new Set([...existingMemberIds, ...pendingInviteUserIds]),
+    [existingMemberIds, pendingInviteUserIds],
+  );
   const searchTerm = normalizeUsername(searchQuery);
   const canSearch = searchTerm.length >= 2;
 
@@ -48,14 +53,14 @@ export function InviteClubMemberSection({
         .then((res) => res.json())
         .then((data: { users?: SearchUser[] }) => {
           const users = (data.users ?? []).filter(
-            (u) => !memberSet.has(u.id) && u.id !== currentUserId,
+            (u) => !excludedIds.has(u.id) && u.id !== currentUserId,
           );
           setSearchResults(users);
         })
         .finally(() => setSearchBusy(false));
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [searchTerm, canSearch, memberSet, currentUserId]);
+  }, [searchTerm, canSearch, excludedIds, currentUserId]);
 
   async function handleInvite(user: SearchUser) {
     if (invitingId) return;
@@ -64,7 +69,7 @@ export function InviteClubMemberSection({
     const result = await inviteClubMember(clubId, user.username);
     setInvitingId(null);
     if (result.ok) {
-      setStatus(`Added @${result.username ?? user.username} to the club.`);
+      setStatus(`Invitation sent to @${result.username ?? user.username}.`);
       setSearchQuery("");
       setSearchResults([]);
       onInvited();

@@ -48,6 +48,12 @@ export async function GET(_req: Request, ctx: Ctx) {
 
   const myMembership = (members ?? []).find((m) => m.user_id === user.id);
 
+  const { data: pendingInvites } = await sb
+    .from("club_invites")
+    .select("invitee_id")
+    .eq("club_id", clubId)
+    .eq("status", "pending");
+
   const result = {
     id: club.id,
     name: club.name,
@@ -72,6 +78,7 @@ export async function GET(_req: Request, ctx: Ctx) {
         role: m.role,
       };
     }),
+    pendingInviteUserIds: (pendingInvites ?? []).map((i) => i.invitee_id as string),
   };
 
   return NextResponse.json({ club: result });

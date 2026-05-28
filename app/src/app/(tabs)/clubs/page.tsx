@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
 import { ClubCard } from "@/components/ClubCard";
+import { ClubInvitesPanel } from "@/components/ClubInvitesPanel";
 import { JoinClubSheet } from "@/components/JoinClubSheet";
 import { fetchMyClubs, type Club } from "@/lib/clubClient";
 
@@ -46,6 +47,8 @@ export default function ClubsPage() {
             Join Club
           </button>
         </div>
+
+        <ClubInvitesPanel onChanged={load} />
 
         {/* Your Clubs */}
         <section>

@@ -41,15 +41,14 @@ export async function GET() {
     return NextResponse.json({ error: friendsError.message }, { status: 500 });
   }
 
-  const { count: clubAddedCount, error: clubAddedError } = await sb
-    .from("notifications")
+  const { count: pendingClubInvites, error: invitesError } = await sb
+    .from("club_invites")
     .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("type", "club_added")
-    .is("read_at", null);
+    .eq("invitee_id", user.id)
+    .eq("status", "pending");
 
-  if (clubAddedError) {
-    return NextResponse.json({ error: clubAddedError.message }, { status: 500 });
+  if (invitesError) {
+    return NextResponse.json({ error: invitesError.message }, { status: 500 });
   }
 
   const { data: memberships, error: membersError } = await sb
@@ -90,7 +89,7 @@ export async function GET() {
   }
 
   const friends = friendsCount ?? 0;
-  const clubs = (clubAddedCount ?? 0) + clubFeedUnread;
+  const clubs = (pendingClubInvites ?? 0) + clubFeedUnread;
 
   return NextResponse.json({ friends, clubs });
 }

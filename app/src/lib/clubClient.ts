@@ -31,6 +31,17 @@ export type ClubMember = {
 
 export type ClubDetail = Club & {
   members: ClubMember[];
+  pendingInviteUserIds: string[];
+};
+
+export type ClubInvite = {
+  inviteId: string;
+  clubId: string;
+  clubName: string;
+  inviterDisplayName: string;
+  inviterUsername: string | null;
+  inviterAvatarUrl: string | null;
+  createdAt: string;
 };
 
 export async function fetchMyClubs(): Promise<Club[]> {
@@ -60,7 +71,37 @@ export async function fetchClubDetail(clubId: string): Promise<ClubDetail | null
   const res = await fetch(`/api/clubs/${clubId}`, { cache: "no-store" });
   if (!res.ok) return null;
   const data = await res.json();
-  return data.club ?? null;
+  const club = data.club;
+  if (!club) return null;
+  return {
+    ...club,
+    pendingInviteUserIds: Array.isArray(club.pendingInviteUserIds)
+      ? club.pendingInviteUserIds
+      : [],
+  };
+}
+
+export async function fetchClubInvites(): Promise<ClubInvite[]> {
+  const res = await fetch("/api/clubs/invites", { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return Array.isArray(data.invites) ? data.invites : [];
+}
+
+export async function respondToClubInvite(
+  inviteId: string,
+  action: "accept" | "decline",
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`/api/clubs/invites/${inviteId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    return { ok: false, error: data.error ?? "Request failed." };
+  }
+  return { ok: true };
 }
 
 export async function updateClub(

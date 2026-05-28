@@ -57,7 +57,7 @@ export async function POST(_request: Request, ctx: Ctx) {
     .from("notifications")
     .update({ read_at: now })
     .eq("user_id", user.id)
-    .eq("type", "club_added")
+    .in("type", ["club_invite", "club_added"])
     .eq("club_id", clubId)
     .is("read_at", null);
 
