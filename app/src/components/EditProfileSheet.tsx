@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { themePreviewSrc } from "@/components/ProfileDecorationBackdrop";
+import { themePickerSelectedStyle } from "@/lib/profileTheme";
 import { useReadingNook } from "@/lib/app-state";
 import { ProfilePhotoPicker } from "@/components/ProfilePhotoPicker";
 import { normalizeUsername } from "@/lib/username";
@@ -261,9 +262,10 @@ export function EditProfileSheet({
                         onClick={() => actions.updateProfile({ theme })}
                         className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-colors ${
                           selected
-                            ? "border-accent bg-accent-soft/35 ring-1 ring-accent/30"
-                            : "border-border/80 bg-background hover:bg-accent-soft/20"
+                            ? "ring-1"
+                            : "border-border/80 bg-background hover:bg-foreground/[0.04]"
                         }`}
+                        style={selected ? themePickerSelectedStyle(theme) : undefined}
                       >
                         <span className="relative h-12 w-12">
                           <Image

@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { AppTheme } from "@/lib/types";
 
 export type DecorationSlot = {
@@ -24,14 +25,14 @@ export type ProfileThemeConfig = {
 export const PROFILE_THEMES: Record<AppTheme, ProfileThemeConfig> = {
   plant: {
     gradient:
-      "radial-gradient(circle at 82% 12%, rgba(56, 92, 62, 0.22), transparent 36%), radial-gradient(circle at 15% 55%, rgba(45, 78, 52, 0.18), transparent 42%)",
+      "radial-gradient(circle at 82% 12%, rgba(31, 74, 46, 0.24), transparent 36%), radial-gradient(circle at 15% 55%, rgba(22, 58, 38, 0.2), transparent 42%)",
     previewSrc: "/decorations/plant/monstera-deliciosa.png",
     nav: {
-      accent: "#355a40",
-      accentSoft: "#8fb896",
-      border: "#a8c4ad",
+      accent: "#1f4a2e",
+      accentSoft: "#5a8f6e",
+      border: "#6b9478",
       barBg: "rgba(251, 249, 249, 0.92)",
-      activeShadow: "0 8px 20px -6px rgba(45, 78, 52, 0.4)",
+      activeShadow: "0 8px 20px -6px rgba(26, 61, 42, 0.45)",
     },
     slots: [
       {
@@ -73,14 +74,14 @@ export const PROFILE_THEMES: Record<AppTheme, ProfileThemeConfig> = {
   },
   matcha: {
     gradient:
-      "radial-gradient(circle at 82% 12%, rgba(171, 196, 168, 0.28), transparent 36%), radial-gradient(circle at 15% 55%, rgba(127, 164, 131, 0.2), transparent 42%)",
+      "radial-gradient(circle at 82% 12%, rgba(197, 212, 195, 0.32), transparent 36%), radial-gradient(circle at 15% 55%, rgba(168, 188, 170, 0.22), transparent 42%)",
     previewSrc: "/decorations/matcha/matcha-tea.png",
     nav: {
-      accent: "#4a7350",
-      accentSoft: "#abd0ad",
-      border: "#b8c9b0",
+      accent: "#6f8572",
+      accentSoft: "#b5c9b8",
+      border: "#c0d0c2",
       barBg: "rgba(251, 249, 249, 0.92)",
-      activeShadow: "0 8px 20px -6px rgba(74, 115, 80, 0.38)",
+      activeShadow: "0 8px 20px -6px rgba(111, 133, 114, 0.35)",
     },
     slots: [
       {
@@ -383,4 +384,14 @@ export const PROFILE_THEMES: Record<AppTheme, ProfileThemeConfig> = {
 
 export function themePreviewSrc(theme: AppTheme): string {
   return PROFILE_THEMES[theme]?.previewSrc ?? PROFILE_THEMES.plant.previewSrc;
+}
+
+/** Selected-state styling for the Edit Profile theme picker grid. */
+export function themePickerSelectedStyle(theme: AppTheme): CSSProperties {
+  const { accent, accentSoft } = PROFILE_THEMES[theme].nav;
+  return {
+    borderColor: accent,
+    backgroundColor: `${accentSoft}59`,
+    boxShadow: `0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent)`,
+  };
 }

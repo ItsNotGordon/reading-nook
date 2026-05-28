@@ -3,9 +3,9 @@
 **Status:** Canonical product specification — aligned with the codebase in `app/`  
 **Project:** Reading Nook  
 **Primary platform:** Mobile-first web  
-**Stack:** Next.js App Router, React, TypeScript, Tailwind CSS  
-**Backend:** **Supabase** is the **required** platform for auth, library sync, profiles (including `@username` and avatars), friendships, social feed, and Row Level Security.  
-**Canonical purpose:** Track books, rank finished reads by taste (not stars), discover titles via Google Books, and connect with a small circle of friends.
+**Stack:** Next.js App Router (v16), React, TypeScript, Tailwind CSS  
+**Backend:** **Supabase** is the **required** platform for auth, library sync, profiles (including `@username` and avatars), friendships, social feed, book clubs, and Row Level Security.  
+**Canonical purpose:** Track books, rank finished reads by taste (not stars), discover titles via Google Books, connect with a small circle of friends, and participate in book clubs.
 
 Reading Nook should feel like a cozy reading companion, not a social feed and not a machine-learning demo.
 
@@ -20,9 +20,9 @@ It combines:
 - **Goodreads-style shelves** (Want to Read, Currently Reading, Finished)  
 - **Beli-style sentiment** (`liked` / `okay` / `disliked`) and **pairwise ranking** inside buckets to derive numeric scores  
 - **Google Books API** for live search, work enrichment, and recommendation candidates (migrated from Open Library due to persistent 403 errors)  
-- **Client-side, app-state recommendations** ("For You") from catalog + Google Books discover — **not** the legacy Goodbooks JSON pool as the live source
-
-The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks CSVs, and offline Python recommenders remain **legacy/reference only** (see §14).
+- **Client-side, app-state recommendations** ("For You") from catalog + Google Books discover — **not** the legacy Goodbooks JSON pool as the live source  
+- **Social feed** with posts, reactions, threaded comments, and comment likes  
+- **Book clubs** with invite-code joining, club feeds, and cross-posting from the home feed
 
 **Philosophy (ratings):** No star ratings. Users express **how a finished book felt** and **which book they liked more** in pairwise steps; numeric scores are derived from bucket + rank.
 
@@ -35,22 +35,24 @@ The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks
 ### Repository layout
 
 
-| Area                                                     | Role                                                                                          |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `app/`                                                   | **Next.js product app** — all shipped UI, API routes, and client state                        |
-| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**six** migration files: `001`–`006`) |
-| `docs/`                                                  | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD)                  |
-| `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §14)                                                                  |
+| Area                                                     | Role                                                                                            |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `app/`                                                   | **Next.js product app** — all shipped UI, API routes, and client state                          |
+| `supabase/migrations/`                                   | SQL migrations applied to the hosted Supabase project (**twelve** migration files: `001`–`012`) |
+| `docs/`                                                  | Product and setup documentation (`SUPABASE_SETUP.md`, `DEPLOY.md`, this PRD)                    |
+| `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy / reference (see §16)                                                                    |
 
 
 ### Runtime model
 
 - **Client app state** lives in React (`ReadingNookProvider` + reducer). Canonical TypeScript types are in `app/src/lib/types.ts`.  
-- **Persistence (server-authoritative):** Supabase is the **source of truth**. `localStorage` key `**reading-nook-v1`** serves as a **write-through cache** for fast startup renders — on page load, cached state is displayed immediately, then the server copy overwrites it. All mutations are optimistic (dispatched locally for instant UI), then pushed to the server within 500ms.  
-- **Hydration safety:** `ReadingNookProvider` exposes a `**ready`** flag (`false` during SSR, `true` after localStorage state is loaded). `ThemedPageShell` defers rendering children and the decoration backdrop until `ready` to prevent SSR/client hydration mismatches.  
-- **Cloud sync:** `**/api/sync`** reads/writes a per-user JSON `**libraries.state**` row and merges `**profiles**` fields (`display_name`, `tagline`; username and avatar via dedicated APIs). On login/page load, `SyncStatusProvider` always fetches from the server and hydrates (server wins — no conflict dialog). If the server is empty but local data exists, it auto-pushes.  
-- **Friends:** Friendship rows in `**public.friendships`**; profile discovery and friend library/taste via `**/api/friends**`, `**/api/users/***`, and related routes under `app/src/app/api/`.  
-- **Social feed:** Feed events (`feed_events`) and user posts (`posts`) with reactions (`post_reactions`) — shelving activity, progress updates, finished-with-rating events, and free-form posts. Feed is visible on the Home tab (`/home`).
+- **Persistence (server-authoritative):** Supabase is the **source of truth**. `localStorage` key `reading-nook-v1` serves as a **write-through cache** for fast startup renders — on page load, cached state is displayed immediately, then the server copy overwrites it. All mutations are optimistic (dispatched locally for instant UI), then pushed to the server within 500ms.  
+- **Hydration safety:** `ReadingNookProvider` exposes a `ready` flag (`false` during SSR, `true` after localStorage state is loaded). `ThemedPageShell` defers rendering children and the decoration backdrop until `ready` to prevent SSR/client hydration mismatches.  
+- **Cloud sync:** `/api/sync` reads/writes a per-user JSON `libraries.state` row and merges `profiles` fields (`display_name`, `tagline`; username and avatar via dedicated APIs). On login/page load, `SyncStatusProvider` always fetches from the server and hydrates (server wins — no conflict dialog). If the server is empty but local data exists, it auto-pushes.  
+- **Friends:** Friendship rows in `public.friendships`; profile discovery and friend library/taste via `/api/friends`, `/api/users/`*, and related routes under `app/src/app/api/`. Follower/following counts use a **service-role Supabase client** to bypass RLS for accurate counts across all users.  
+- **Social feed:** Feed events (`feed_events`) and user posts (`posts`) with reactions (`post_reactions`, `event_reactions`), one-level **threaded comments** (comments + replies via `parent_id`), and **comment likes** (`comment_likes`). Shelving activity, progress updates, finished-with-rating events, and free-form posts. Feed is visible on the Home tab (`/home`). Users can like and comment on both posts and events.  
+- **Book clubs:** Clubs (`clubs`) with members (`club_members`), invite-code joining, club-specific feeds, and cross-posting from the home feed via optional `club_id` on posts.  
+- **Google Books API rate limiting:** Server-side caching of discover results in `discover_cache` table (24-hour TTL) and client-side 5-minute cooldown to prevent hitting the 100 req/min rate limit.
 
 ### Main navigation (bottom tabs)
 
@@ -58,32 +60,95 @@ The app is no longer framed as a STAT 280 deliverable. STAT artifacts, Goodbooks
 Home | Library | Add | Ratings | Profile
 ```
 
-**Home tab** shows the social feed (§5). All other tabs remain as documented below.
+**Home tab** shows the social feed (§5). **Clubs tab** shows the user's book clubs with create/join functionality. All other tabs remain as documented below.
 
 **Nested highlighting:** `BottomNav` treats a tab as active when `pathname === href` **or** `pathname.startsWith(href + "/")`, so e.g. `/friends/alice` highlights **Friends**, and `/profile/settings` highlights **Profile**.
 
 ### Routes (shipped)
 
 
-| Path                  | Behavior                                                                                            |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `/`                   | Redirects to `/home`                                                                                |
-| `/home`               | Home feed — social activity from friends and self, new post composer                                |
-| `/library`            | Library shelves                                                                                     |
-| `/ratings`            | Finished books, filters, derived scores, detail sheets                                              |
-| `/add`                | **Unified** Google Books search + "For You" recommendations + shelf picker + finish flow            |
-| `/clubs`              | **Placeholder** — "Coming soon" stub for future book clubs feature                                  |
-| `/friends`            | Friends list, requests, discovery (Supabase-backed when configured)                                 |
-| `/friends/[username]` | **Route-based friend profile** (not a modal sheet); invalid usernames show a minimal error state    |
-| `/profile`            | Profile stats, hero, insights — **not** the primary home for account backup or full account UI      |
-| `/profile/settings`   | **Settings** shell: account-oriented actions and **library backup** import/export where implemented |
-| `/login`              | Sign-in entry (Google OAuth only — mandatory before accessing any other route)                       |
-| `/auth/callback`      | OAuth / auth callback handler                                                                       |
-| `/recs`               | **Not a product surface** — immediately `**redirect("/add")`**                                      |
-| `/leaderboard`        | Client `**router.replace("/ratings")**` — legacy path only                                          |
+| Path                  | Behavior                                                                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                   | Redirects to `/home`                                                                                                                    |
+| `/home`               | Home feed — social activity from friends and self, new post composer, clickable book cards                                              |
+| `/library`            | Library shelves with drag-to-scroll, arrow navigation, hover-expand book cards, unified book detail sheet                               |
+| `/ratings`            | Finished books, filters, derived scores, book detail sheets                                                                             |
+| `/add`                | **Unified** Google Books search + "For You" recommendations + shelf picker + finish flow                                                |
+| `/clubs`              | **Book clubs** — list of user's clubs, create club, join club by invite code                                                            |
+| `/clubs/create`       | Create a new book club with name, description, privacy setting, and optional current book                                               |
+| `/clubs/[clubId]`     | Club detail page — header, current book, members, club-scoped feed with post composer                                                   |
+| `/friends`            | Friends list, requests, discovery (Supabase-backed when configured)                                                                     |
+| `/friends/[username]` | **Route-based friend profile** (not a modal sheet); self-username redirects to `/profile`; invalid usernames show a minimal error state |
+| `/profile`            | Profile stats, hero, insights, viewable follower/following lists                                                                        |
+| `/profile/settings`   | **Settings** shell: account-oriented actions and **library backup** import/export where implemented                                     |
+| `/login`              | Sign-in entry (Google OAuth only — mandatory before accessing any other route)                                                          |
+| `/auth/callback`      | OAuth / auth callback handler                                                                                                           |
+| `/recs`               | **Not a product surface** — immediately `redirect("/add")`                                                                              |
+| `/leaderboard`        | Client `router.replace("/ratings")` — legacy path only                                                                                  |
 
 
-API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `books/isbn`, `books/work`, `books/discover`, `feed`, `feed/events`, `feed/posts`, `feed/posts/[postId]`, `feed/posts/[postId]/react`, `friends`, `friends/[friendId]/library`, `friends/[friendId]/profile`, `friends/[friendId]/taste`, `profile/username`, `profile/avatar`, `users/[username]`, `users/search`.
+### API routes (complete)
+
+
+| Route                                  | Method(s)          | Purpose                                                                                                       |
+| -------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `/api/sync`                            | GET, POST          | Read/write per-user library AppState JSON                                                                     |
+| `/api/books/search`                    | GET                | Search Google Books by query string                                                                           |
+| `/api/books/isbn`                      | GET                | Look up a book by ISBN via Google Books                                                                       |
+| `/api/books/work`                      | GET                | Fetch detailed work/edition info from Google Books                                                            |
+| `/api/books/discover`                  | GET                | Discover books by genre from Google Books with server-side caching (`discover_cache` table)                   |
+| `/api/feed`                            | GET                | Merged reverse-chronological feed of events + posts with profiles, reactions, comments, comment likes         |
+| `/api/feed/events`                     | POST               | Create feed events (shelved, progress, finished)                                                              |
+| `/api/feed/events/[eventId]/react`     | POST               | Toggle like reaction on a feed event                                                                          |
+| `/api/feed/posts`                      | POST               | Create a new post (with optional book attachment and optional `club_id` for cross-posting)                    |
+| `/api/feed/posts/[postId]`             | PATCH, DELETE      | Edit or delete own post                                                                                       |
+| `/api/feed/posts/[postId]/react`       | POST               | Toggle like reaction or add comment on a post (supports `parent_id` for threaded replies)                     |
+| `/api/feed/comments/[reactionId]/like` | POST               | Toggle like on an individual comment or reply                                                                 |
+| `/api/friends`                         | GET, POST          | List friends / send friend request                                                                            |
+| `/api/friends/[friendId]/library`      | GET                | Fetch friend's library JSON                                                                                   |
+| `/api/friends/[friendId]/profile`      | GET                | Fetch friend's profile info                                                                                   |
+| `/api/friends/[friendId]/taste`        | GET                | Fetch friend's taste/rating data                                                                              |
+| `/api/profile/username`                | GET, PATCH         | Get or set the user's @username                                                                               |
+| `/api/profile/avatar`                  | GET, POST          | Get or upload the user's avatar                                                                               |
+| `/api/users/search`                    | GET                | Search for users by username prefix                                                                           |
+| `/api/users/[username]`                | GET                | Fetch public profile info for a user by username (includes follower/following counts via service-role client) |
+| `/api/users/[username]/friends`        | GET                | Fetch a user's full list of accepted friends (service-role client to bypass RLS)                              |
+| `/api/clubs`                           | GET, POST          | List user's clubs / create a new club                                                                         |
+| `/api/clubs/[clubId]`                  | GET, PATCH, DELETE | Fetch club detail / update club info (admin) / delete club (creator)                                          |
+| `/api/clubs/[clubId]/join`             | POST               | Join a public club or validate invite code for private clubs                                                  |
+| `/api/clubs/[clubId]/leave`            | DELETE             | Leave a club                                                                                                  |
+| `/api/clubs/[clubId]/feed`             | GET                | Fetch a club's feed (posts filtered by `club_id`, enriched with profiles/reactions/comments)                  |
+| `/api/clubs/join/[code]`               | GET                | Resolve an invite code to club information                                                                    |
+
+
+### Key components
+
+
+| Component                 | Purpose                                                                                                                                                                                                                                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BookDetailSheet`         | **Unified** book detail view for all shelves — centered cover, title/author, sentiment pill or progress bar, genres, notes, icon action buttons (change feeling / update progress / start reading, move shelf, edit details, add note), remove from library |
+| `FeedCard`                | Renders individual feed items (events or posts) with author links, book thumbnails (clickable), timestamps, like/comment controls, threaded comment section                                                                                                 |
+| `CommentSection`          | Collapsible threaded comments with one-level replies, inline avatars, timestamps, comment likes, delete own, pill-shaped input with circular send button                                                                                                    |
+| `FeedBookPreviewSheet`    | Lightweight preview for books from the feed not in user's library — cover, title, author, add-to-shelf buttons                                                                                                                                              |
+| `HomeFeed`                | Home feed container with post composer, feed cards, book detail/preview sheet integration                                                                                                                                                                   |
+| `NewPostComposer`         | Post creation with text body, optional book attachment (via `BookPickerSheet`), optional club attachment (via `ClubPickerSheet`)                                                                                                                            |
+| `BookPickerSheet`         | Bottom sheet to select a book from user's library — search box, categorized by shelf, explicit close button                                                                                                                                                 |
+| `ClubPickerSheet`         | Bottom sheet to select a club to attach to a post                                                                                                                                                                                                           |
+| `ClubCard`                | Club summary card — name, description preview, member count, current book thumbnail, public/private badge                                                                                                                                                   |
+| `JoinClubSheet`           | Sheet for joining a club via invite code — lookup, preview, and join flow                                                                                                                                                                                   |
+| `BookCard`                | Individual book card in library shelves — cover, title, author, progress/score info, click opens `BookDetailSheet`, hover-expand effect, drag-safe                                                                                                          |
+| `ShelfSection`            | Horizontal shelf row with drag-to-scroll, left/right arrow buttons, `data-dragging` attribute for interaction safety                                                                                                                                        |
+| `LibraryShelves`          | Library page body — all three shelf sections with unified book detail sheet integration and first-time finish flow                                                                                                                                          |
+| `SocialConnectionsSheet`  | View following/followers list on any profile (own or friend's)                                                                                                                                                                                              |
+| `FriendProfileView`       | Full friend profile with social tallies, clickable follower/following counts, library, insights                                                                                                                                                             |
+| `RatedBookDetailSheet`    | **Legacy** — still exists in codebase but superseded by `BookDetailSheet` in all active views                                                                                                                                                               |
+| `FinishBookSheet`         | First-time rating flow when a finished book hasn't been rated yet (sentiment choice + pairwise trigger)                                                                                                                                                     |
+| `ProgressUpdateSheet`     | Update reading progress (estimated band or exact page count)                                                                                                                                                                                                |
+| `PairwiseComparisonSheet` | Pairwise comparison flow for ranking books within a sentiment bucket                                                                                                                                                                                        |
+| `MoveShelfSheet`          | Move a book between shelves                                                                                                                                                                                                                                 |
+| `SentimentPicker`         | Three-option sentiment selector (liked / okay / disliked)                                                                                                                                                                                                   |
+| `GenreChipPicker`         | Searchable genre chip selector with canonical vocabulary                                                                                                                                                                                                    |
+
 
 ---
 
@@ -91,7 +156,7 @@ API routes (non-exhaustive; see `app/src/app/api/`): `sync`, `books/search`, `bo
 
 ### Supabase status
 
-Supabase is **required** for this product: profiles, library JSON sync, friendships, social feed, storage (avatars), and RLS policies are defined in migrations `**001_reading_nook.sql`** through `**006_posts_update.sql**`.
+Supabase is **required** for this product: profiles, library JSON sync, friendships, social feed, book clubs, storage (avatars), and RLS policies are defined in migrations `001_reading_nook.sql` through `012_clubs_fix_recursion.sql`.
 
 ### Sign-in
 
@@ -112,11 +177,11 @@ Details: `docs/SUPABASE_SETUP.md`, `app/src/components/SyncStatusProvider.tsx`, 
 
 ## 4. Core Data Model
 
-Authoritative definitions: `**app/src/lib/types.ts`**. Summaries below are descriptive; if this PRD and code disagree, **code wins**.
+Authoritative definitions: `app/src/lib/types.ts`. Summaries below are descriptive; if this PRD and code disagree, **code wins**.
 
 ### `Book`
 
-Catalog metadata: `id`, `title`, `author`, `coverUrl`, `totalPages` (`**0` means unknown**), `genres`, `description`, optional API-derived fields (`publishedYear`, `averageRating`, `ratingsCount`, `readinglogCount`). Book IDs use a provider prefix: `**googlebooks:`** for Google Books entries, `**openlibrary:**` for legacy Open Library entries (both supported for backward compatibility).
+Catalog metadata: `id`, `title`, `author`, `coverUrl`, `totalPages` (`0` means unknown), `genres`, `description`, optional API-derived fields (`publishedYear`, `averageRating`, `ratingsCount`, `readinglogCount`). Book IDs use a provider prefix: `googlebooks:` for Google Books entries, `openlibrary:` for legacy Open Library entries (both supported for backward compatibility).
 
 ### `Shelf`
 
@@ -132,7 +197,7 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 
 ### `UserProfile` (local state)
 
-`displayName`, `tagline`, `theme` (`plant` | `coffee` | `matcha` | `cats` | `galaxy` | `raindrops` | `sakura` | `vinyl`). Cloud `profiles` row adds `**username`** and `**avatar_url**` (not duplicated inside `AppState` JSON — fetched via `/api/profile/username` and `/api/profile/avatar`).
+`displayName`, `tagline`, `theme` (`plant` | `coffee` | `matcha` | `cats` | `galaxy` | `raindrops` | `sakura` | `vinyl`). Cloud `profiles` row adds `username` and `avatar_url` (not duplicated inside `AppState` JSON — fetched via `/api/profile/username` and `/api/profile/avatar`).
 
 ### `AppState`
 
@@ -148,15 +213,26 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 }
 ```
 
-### Supabase tables (migrations)
+### Supabase tables (migrations 001–012)
 
-- `**profiles`:** `id` (auth user), `display_name`, `tagline`, `username`, `avatar_url`, `share_shelves` (see §10 — policy evolution)  
-- `**libraries`:** `user_id`, `state` (jsonb app snapshot), `updated_at`  
-- `**friendships`:** `requester_id`, `addressee_id`, `status` (`pending` | `accepted`)  
-- `**feed_events`:** `user_id`, `event_type` (`shelved` | `progress` | `finished`), `book_id`, `book_title`, `book_cover_url`, `shelf`, `sentiment`, `derived_score`, `progress`, `created_at` — auto-generated from user library actions  
-- `**posts`:** `user_id`, `body`, `book_id`/`book_title`/`book_cover_url`/`book_author` (optional book attachment), `created_at`, `updated_at` — user-authored free-form posts  
-- `**post_reactions`:** `post_id`, `user_id`, `reaction` — emoji reactions on posts  
+- `**profiles`:** `id` (auth user), `display_name`, `tagline`, `username`, `avatar_url`, `share_shelves` — user identity and display preferences  
+- `**libraries`:** `user_id`, `state` (jsonb app snapshot), `updated_at` — persisted AppState JSON  
+- `**friendships`:** `requester_id`, `addressee_id`, `status` (`pending` | `accepted`) — bidirectional friend relationships  
+- `**feed_events`:** `user_id`, `event_type` (`shelved` | `progress` | `finished`), `book_id`, `book_title`, `book_cover_url`, `book_author`, `shelf`, `sentiment`, `derived_score`, `progress`, `notes`, `created_at` — auto-generated from user library actions  
+- `**posts`:** `user_id`, `body`, `book_id`/`book_title`/`book_cover_url`/`book_author` (optional book attachment), `club_id` (optional club cross-post reference), `created_at`, `updated_at` — user-authored free-form posts  
+- `**post_reactions`:** `post_id`, `user_id`, `reaction`, `body` (for comments), `parent_id` (for threaded replies), `created_at` — reactions and comments on posts  
+- `**event_reactions`:** `event_id`, `user_id`, `reaction`, `body` (for comments), `parent_id` (for threaded replies), `created_at` — reactions and comments on feed events  
+- `**discover_cache`:** `genre`, `page`, `results` (jsonb), `fetched_at` — server-side cache for Google Books discover results (24-hour TTL). RLS enabled with no policies (service-role access only).  
+- `**comment_likes`:** `id`, `reaction_id`, `reaction_source` (`post` | `event`), `user_id`, `created_at` — per-comment/reply like tracking  
+- `**clubs`:** `id`, `name`, `description`, `creator_id`, `is_public`, `invite_code` (auto-generated 8-char), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author`, `created_at` — book club definitions  
+- `**club_members`:** `club_id`, `user_id`, `role` (`member` | `admin`), `joined_at` — club membership  
 - **Storage bucket `avatars`:** public read, user-scoped write policies (`003_profiles_avatar.sql`)
+
+### RLS policies and `SECURITY DEFINER` functions
+
+- All tables have **Row Level Security** enabled with appropriate policies.  
+- `**public.is_club_member(p_club_id, p_user_id)`** — a `SECURITY DEFINER` SQL function that checks club membership without triggering RLS recursion. Used in `clubs_select`, `club_members_select`, and `posts_select_club` policies. Created in migration `012_clubs_fix_recursion.sql` to fix an infinite recursion bug in the original `011_clubs.sql` policies.  
+- **Service-role client** is used server-side (via `SUPABASE_SERVICE_ROLE_KEY`) to bypass RLS for operations like: discover cache reads/writes, friendship count queries (accurate counts across all users), fetching friend lists for profile views, club feed fetching, and club member counts.
 
 ---
 
@@ -164,40 +240,87 @@ Per-user copy: `shelf`, `progressMode` (`exact` | `estimated`), `currentPage`, `
 
 ### Overview
 
-`/home` is the default landing tab — a merged, reverse-chronological feed of activity from the signed-in user and their accepted friends. The page also features **Friends** and **Clubs** quick-access buttons at the top (Clubs links to a "Coming soon" placeholder at `/clubs`).
+`/home` is the default landing tab — a merged, reverse-chronological feed of activity from the signed-in user and their accepted friends. The page also features **Friends** and **Clubs** quick-access buttons at the top.
 
 ### Feed items
 
-| Type | Source | Display |
-| --- | --- | --- |
-| **Shelved** | User moves a book to a shelf | "[User] added [Book] to [Shelf]" with book card |
-| **Progress** | User updates reading progress | "[User] is reading [Book]" with visual progress bar (upserted — only the latest progress event per book is kept) |
-| **Finished** | User rates a finished book via pairwise ranking | "[User] finished [Book]" with numeric score circle (matching `/ratings` badge style, colored by sentiment bucket) |
-| **Post** | User writes a free-form post | Text body, optional attached book card, emoji reactions, edit/delete for own posts |
+
+| Type         | Source                                          | Display                                                                                                                       |
+| ------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Shelved**  | User moves a book to a shelf                    | "[User] added [Book] to [Shelf]" with clickable book card                                                                     |
+| **Progress** | User updates reading progress                   | "[User] is reading [Book]" with visual progress bar (upserted — only the latest progress event per book is kept)              |
+| **Finished** | User rates a finished book via pairwise ranking | "[User] finished [Book]" with numeric score circle (matching `/ratings` badge style, colored by sentiment bucket)             |
+| **Post**     | User writes a free-form post                    | Text body, optional attached book card, optional club badge ("in ClubName"), like/comment controls, edit/delete for own posts |
+
 
 ### Feed cards
 
-- Author names link to `/friends/[username]` profile pages (clickable profile links for friend discovery).  
+- Author names link to `/friends/[username]` profile pages (clickable profile links for friend discovery). Clicking on your own username routes to `/profile` instead.  
 - Author display shows `@username` when available, falling back to display name.  
 - Finished-book events show a **circular score badge** (e.g. "8.5") with sentiment-bucket coloring (green for liked, amber for okay, red for disliked), matching the visual style on the `/ratings` page.  
-- Book attachments on posts use the same visual card style as auto-generated events.  
+- **Clickable book cards:** All book thumbnails/info areas in feed items are clickable buttons. Clicking opens the `**BookDetailSheet`** if the book is in the current user's library, or the `**FeedBookPreviewSheet**` (cover, title, author, add-to-shelf buttons) if it's not.  
+- Posts with a `club_id` display a pill badge linking to the club detail page (e.g. "in Book Lovers").  
 - Users can **edit** and **delete** their own posts from the feed.
+
+### Comments and reactions
+
+- **Likes:** Users can like both posts and events via heart icon toggle (`post_reactions` / `event_reactions` tables). Like count is displayed next to the heart.  
+- **Comments:** One-level **threaded comments** — top-level comments can have replies, but replies cannot have further replies. Comments have:  
+  - Collapsible thread display ("View N comments" toggle)  
+  - Inline avatar, username, and comment text on the same line  
+  - Timestamp ("2h ago") and action buttons below each comment  
+  - **Reply** button that sets reply context and focuses the input  
+  - **Delete** button on own comments/replies  
+  - **Comment likes** — each comment/reply can be individually liked (heart icon with count, via `comment_likes` table and `/api/feed/comments/[reactionId]/like`)  
+  - Pill-shaped input with circular send button  
+  - Threaded replies are indented with a left border, smaller avatars (20px vs 32px)
 
 ### Implementation
 
 - Events are **client-pushed** via `postFeedEvent()` in `app-state.tsx` whenever library actions fire (shelving, progress updates, pairwise ranking completion).  
-- Posts are managed via `/api/feed/posts` (CRUD) and `/api/feed/posts/[postId]/react` (reactions).  
-- The merged feed is fetched from `/api/feed` which combines `feed_events` and `posts` with profile data, sorted by `created_at`.
+- Posts are managed via `/api/feed/posts` (CRUD) and `/api/feed/posts/[postId]/react` (reactions/comments with `parent_id` for replies).  
+- Event reactions via `/api/feed/events/[eventId]/react`.  
+- The merged feed is fetched from `/api/feed` which combines `feed_events` and `posts` with profile data, reactions, comments (with nested replies), and comment like counts, sorted by `created_at`.  
+- The `NewPostComposer` supports attaching a book (via `BookPickerSheet`) and/or a club (via `ClubPickerSheet`) to any post.
 
 ---
 
 ## 6. Library
 
 - **Sections:** Currently Reading → Finished → Want to Read (display order).  
-- **Cards:** Cover, title, author; reading progress for active reads; derived score / sentiment styling for finished items when present.  
+- **Cards:** Cover, title, author; reading progress for active reads; derived score / sentiment styling for finished items when present. All cards are clickable and open the unified `BookDetailSheet`.  
 - **Sorting:** Finished by `finishedSortAt` / `finishedAt` / `addedAt`; other shelves newest `addedAt` first (see shelf helpers in codebase).  
-- **Actions:** Move shelves, open progress update for **Currently Reading**, start finish + pairwise flows from Library where wired (`LibraryShelves`, `FinishBookSheet`, `PairwiseComparisonSheet`).  
+- **Book Detail Sheet:** Unified detail view for all three shelves (see §6a below).  
+- **Unrated finished books:** Clicking a finished book without a sentiment rating opens the `FinishBookSheet` first (first-time rating flow with sentiment choice + pairwise trigger).  
 - **Deep link:** `/library?shelf=…` is used from profile shelf snapshots.
+
+### 6a. Book Detail Sheet (`BookDetailSheet`)
+
+A unified, centered-cover design replacing the old `RatedBookDetailSheet`. Opens when clicking any book card in the library, ratings page, or profile favorites. Layout top-to-bottom:
+
+1. **Close button** (×) — top-right corner
+2. **Large centered cover** — 148×220px, rounded corners, shadow
+3. **Title** — centered, serif font, large
+4. **Author** — centered, muted text
+5. **Sentiment pill** (finished only) — rounded pill showing heart icon + "Liked"/"It was okay"/"Didn't like it" label + numeric score (e.g. "9.4"), colored by sentiment bucket (green/amber/red)
+6. **Progress bar** (reading only) — horizontal bar with percentage label
+7. **Date line** — calendar icon + "Finished Jan 4, 2026" / "Started …" / "Added …" depending on shelf
+8. **Genres section** — "GENRES" uppercase label + "Edit" link, genre chips in a wrapping row, editable via `GenreChipPicker`
+9. **Notes section** — "NOTES" uppercase label + "Edit" link, styled dashed-border note card with placeholder "No notes yet. Tap Edit to add your thoughts."
+10. **Action buttons row** — 4 icon+label buttons adapting per shelf:
+  - **Finished:** Change feeling (smiley), Move to shelf (book), Edit details (pencil), Add note (clipboard)
+    - **Reading:** Update progress (bar chart), Move to shelf (book), Edit details (pencil), Add note (clipboard)
+    - **Want to Read:** Start reading (play), Move to shelf (book), Edit details (pencil), Add note (clipboard)
+11. **Remove from library** — red text button with trash icon at bottom
+
+### 6b. Shelf UX (drag-to-scroll)
+
+Library shelf rows support **horizontal drag-to-scroll** for desktop users (replacing traditional scrollbars):
+
+- Custom `useDragScroll` hook handles mouse-based dragging with `pointer-events: none` on children during drag to prevent interference from book cover images.  
+- **Left/right arrow buttons** appear on hover at shelf edges (visibility based on scroll position via `useScrollEdges` hook).  
+- **Book card hover effect** — cards scale up 5% with shadow on hover (`hover:scale-105 hover:shadow-lg`), suppressed during active drag via `[[data-dragging]_&]` CSS selectors.  
+- Hidden scrollbar (`scrollbar-none`) for clean appearance.
 
 ---
 
@@ -211,15 +334,17 @@ Search is **Google Books–first** (`app/src/app/api/books/search/route.ts`, `go
 
 ### "For You" recommendations (live)
 
-Built from `**app/src/lib/appNativeRecommendations.ts`** using `**hybridAprioriKnnRecommend**` (`app/src/lib/recommender/`) plus taste signals from finished books — candidates from **unshelved catalog** and **Google Books discover** when the catalog pool is small (`APP_NATIVE_SOURCE_DISCOVER`, threshold in `appNativeRecommendations.ts`).
+Built from `app/src/lib/appNativeRecommendations.ts` using `hybridAprioriKnnRecommend` (`app/src/lib/recommender/`) plus taste signals from finished books — candidates from **unshelved catalog** and **Google Books discover** when the catalog pool is small (`APP_NATIVE_SOURCE_DISCOVER`, threshold in `appNativeRecommendations.ts`).
 
 **Rules:** Hide shelved books and dismissed IDs (`dismissedRecIds`); do **not** depend on Goodbooks JSON for live UI.
 
 ### Discover pool and auto-refill
 
-The discover endpoint (`/api/books/discover`) fetches **2 batches of 40 books per genre** across the user's top 4 genres (8 Google Books API calls per page), producing ~70–100 quality candidates after filtering. Candidates are filtered for: `ratingsCount > 0` (when present), `publishedYear >= 1900`, non-empty description, and `totalPages >= 100` (to exclude children's picture books).
+The discover endpoint (`/api/books/discover`) fetches **1 batch of 40 books per genre** across the user's top 2 genres (2 Google Books API calls per page), producing quality candidates after filtering. Results are **cached server-side** in the `discover_cache` table with a 24-hour TTL to minimize API calls. The endpoint uses a service-role Supabase client for cache operations.
 
-The client pool (`useRecommendationsPool`) **auto-refills**: when `notShelvedRecs.length` drops below 20 (e.g. via dismissals), the hook fetches the next page of discover results and merges them in, up to 3 pages maximum. This ensures the recommendation pool stays populated as users interact. `RECS_POOL_MAX` is **120**; `RECS_VISIBLE_COUNT` is **10** (shuffled from the pool).
+Candidates are filtered for: `ratingsCount > 0` (when present), `publishedYear >= 1900`, non-empty description, and `totalPages >= 100` (to exclude children's picture books).
+
+The client pool (`useRecommendationsPool`) **auto-refills**: when `notShelvedRecs.length` drops below 10, the hook fetches the next page of discover results and merges them in, up to 2 pages maximum. A **client-side 5-minute cooldown** (`RATE_LIMIT_COOLDOWN_MS`) prevents rapid-fire discover requests after hitting HTTP 429. `RECS_POOL_MAX` is **120**; `RECS_VISIBLE_COUNT` is **10** (shuffled from the pool).
 
 ### Genre enrichment
 
@@ -229,8 +354,6 @@ Google Books categories are often sparse (e.g. just `"Fiction"`). The system enr
 2. **Description-based extraction:** Book descriptions are scanned for genre keywords (e.g. "dystopian", "romance", "thriller") to supplement sparse categories. Rules are defined in `googleBooks.ts` (`DESC_GENRE_RULES`).
 
 ### Recommendation system display names
-
-The two recommendation engines use **user-friendly names** in the UI to make them accessible to the average user:
 
 
 | Internal engine          | UI label          | Description                                                                                                                         |
@@ -249,7 +372,7 @@ The internal engine identifiers (`hybrid`, `tfidf`) and algorithm implementation
 
 ## 8. Ratings
 
-`/ratings` is the personal finished-book view (not a public leaderboard): ranked lists, derived scores, sentiment styling, text search, genre/author filters, URL query params `**genre**`, `**author**`, `**q**`, `**bucket**` (`RatingsPageClient`), editable detail flows where implemented.
+`/ratings` is the personal finished-book view (not a public leaderboard): ranked lists, derived scores, sentiment styling, text search, genre/author filters, URL query params `genre`, `author`, `q`, `bucket` (`RatingsPageClient`), editable detail flows via `BookDetailSheet`. Includes reorder mode for manually reranking books within sentiment buckets.
 
 **Legacy:** `/leaderboard` replaces to `/ratings`; avoid "Leaderboard" in primary nav copy.
 
@@ -261,11 +384,13 @@ The internal engine identifiers (`hybrid`, `tfidf`) and algorithm implementation
 
 - **Hero (`ProfileHeroCard`):** **Display name** in the **upper corner**; when signed in with a username set, the **main heading** shows the **username without a literal `@` prefix**; otherwise prompts to set username or falls back to display name. Tagline, avatar (when signed in), **Edit profile** and **Settings** links.  
 - **Body:** Stats, favorite book, genres, authors, sentiment insights, shelf snapshot links, etc. — **without** pushing account management and **library backup** into the main scroll (those live under **Settings**).  
-- **Theming:** Profile page uses `**PageShell`** plus inline `**ProfileDecorationBackdrop**` for the same decorative themes as other tabs (see §11 — implementation detail differs from `ThemedPageShell` import but visuals align).
+- **Social tallies:** Following and followers counts with clickable numbers that open `SocialConnectionsSheet` showing the full friend list. Counts are fetched via the friends API.  
+- **Favorite book click:** Clicking the favorite book on the profile opens the `BookDetailSheet`.  
+- **Theming:** Profile page uses `PageShell` plus inline `ProfileDecorationBackdrop` for the same decorative themes as other tabs (see §11 — implementation detail differs from `ThemedPageShell` import but visuals align).
 
 ### Settings (`/profile/settings`)
 
-Wrapped in `**ThemedPageShell**` with title **Settings**. Hosts **account** controls and **library backup** import/export (`LibraryBackupSection` and related), isolated from the main profile marketing/stats experience.
+Wrapped in `ThemedPageShell` with title **Settings**. Hosts **account** controls and **library backup** import/export (`LibraryBackupSection` and related), isolated from the main profile marketing/stats experience.
 
 ### Edit Profile sheet
 
@@ -277,28 +402,64 @@ Owns display name, tagline, theme picker (8 themes in a 4-column grid), cloud `@
 
 ### Data + access
 
-- Friend relationships are stored in `**friendships`** with RLS limited to participants.  
-- **Migration `004`:** Accepted friends may **always** read each other's `**libraries`** row (library JSON) — the earlier `share_shelves`-gated friend read on libraries was **dropped**; `share_shelves` default was set to **true** for backward compatibility but **friend library visibility is not product-gated on that flag anymore** for accepted pairs.
+- Friend relationships are stored in `friendships` with RLS limited to participants.  
+- **Migration `004`:** Accepted friends may **always** read each other's `libraries` row (library JSON) — the earlier `share_shelves`-gated friend read on libraries was **dropped**; `share_shelves` default was set to **true** for backward compatibility but **friend library visibility is not product-gated on that flag anymore** for accepted pairs.  
+- **Follower/following counts:** Use a **service-role Supabase client** (`app/src/lib/friendshipCounts.ts`) to bypass RLS and return accurate counts across all users. This fixes a bug where friend profiles showed incorrect 1/1 counts because the authenticated client could only see friendships involving the current user.
 
 ### UX
 
-- `**/friends`:** Pending/accepted lists, send requests, search users by username (`/api/users/search`, `/api/users/[username]`).  
-- `**/friends/[username]`:** **Full-page friend profile** via `FriendProfileView` — **not** a modal sheet.  
+- `/friends`: Pending/accepted lists, send requests, search users by username (`/api/users/search`, `/api/users/[username]`).  
+- `/friends/[username]`: **Full-page friend profile** via `FriendProfileView` — **not** a modal sheet. **Self-username redirect:** If a user navigates to `/friends/[their-own-username]` (via comment link click or manual URL), they are redirected to `/profile`.  
+- **Social connections:** Follower/following counts on friend profiles are clickable, opening `SocialConnectionsSheet` with the full friend list (fetched via `/api/users/[username]/friends` using service-role client).  
 - **Insights (`FriendProfileInsights`):** When the friend has **ratings rows**, the **Finished** shelf subsection is **omitted** from the library area to avoid duplicating finished content already shown in ratings; the library section hides entirely if it would be empty.
 
 ### APIs
 
-`GET`/`POST` `/api/friends`, friend-scoped `library`, `profile`, `taste` routes — all require Supabase + auth as implemented.
+`GET`/`POST` `/api/friends`, friend-scoped `library`, `profile`, `taste` routes, `/api/users/[username]/friends` (service-role friend list) — all require Supabase + auth as implemented.
 
 ---
 
-## 11. Theming
+## 11. Book Clubs
 
-- User-selectable `**AppTheme`:** `plant`, `coffee`, `matcha`, `cats`, `galaxy`, `raindrops`, `sakura`, `vinyl` (8 themes).  
+### Overview
+
+Book clubs are a social feature allowing users to create themed reading groups, share a "current book," and maintain a club-scoped feed separate from the home feed.
+
+### Data model
+
+- `**clubs` table:** `id`, `name`, `description`, `creator_id`, `is_public` (boolean), `invite_code` (auto-generated 8-char unique string), `current_book_id`/`current_book_title`/`current_book_cover_url`/`current_book_author` (nullable), `created_at`.  
+- `**club_members` table:** `club_id`, `user_id`, `role` (`member` | `admin` — creator is auto-added as admin), `joined_at`. Unique constraint on `(club_id, user_id)`.  
+- `**posts.club_id`:** Optional foreign key to `clubs(id)` with `ON DELETE SET NULL`, allowing posts to be cross-posted to a club feed.
+
+### RLS and security
+
+- RLS policies use a `SECURITY DEFINER` function `public.is_club_member(p_club_id, p_user_id)` to check membership without triggering infinite recursion in policy evaluation.  
+- Public clubs are visible to all authenticated users; private clubs are visible only to members and the creator.  
+- Members can view club details, other members, and the club feed. Only members can post to a club.  
+- Club creator can update club info (name, description, current book) and delete the club.
+
+### UX flow
+
+1. **Clubs page (`/clubs`):** Lists the user's clubs as `ClubCard` components (name, description preview, member count, current book thumbnail, public/private badge). Two action buttons: "Create Club" (links to `/clubs/create`) and "Join Club" (opens `JoinClubSheet`).
+2. **Create club (`/clubs/create`):** Form with club name, description, public/private toggle, and optional book picker for setting the initial current book.
+3. **Join club (`JoinClubSheet`):** Enter an invite code → lookup → preview (name + member count) → join. Works for both public and private clubs.
+4. **Club detail (`/clubs/[clubId]`):** Header (name, description, member count, privacy badge), current book section (with admin book-change controls via `BookPickerSheet`), members list (collapsible), invite code (copyable), leave/delete buttons, and club-scoped feed with `NewPostComposer` and `FeedCard`s (including clickable books).
+
+### Cross-posting
+
+When composing a post on the home feed, users can optionally **attach a club** via the `ClubPickerSheet` (similar to the "Attach a book" button). This sets `club_id` on the post, causing it to appear in both the home feed and the club's feed. Posts with a `club_id` display a pill badge ("in ClubName") linking to the club.
+
+When posting directly from within a club detail page, the `club_id` is automatically set to that club.
+
+---
+
+## 12. Theming
+
+- User-selectable `AppTheme`: `plant`, `coffee`, `matcha`, `cats`, `galaxy`, `raindrops`, `sakura`, `vinyl` (8 themes).  
 - **New accounts** are assigned a **random theme** on first load (client-side, after hydration) to encourage discovery of theme options when comparing with friends.  
 - Each theme defines a **nav color palette** (accent, accentSoft, border, barBg, activeShadow), a **background gradient**, **decoration image slots**, and a **preview image** for the picker.  
-- **Library, Ratings, Add, Friends list, Friend profile, and Settings** use `**ThemedPageShell`**, which applies `**ProfileDecorationBackdrop**` using `state.profile.theme`. `ThemedPageShell` defers rendering children until the `ready` flag is true to avoid SSR hydration mismatches.  
-- **Profile tab** applies the same `**ProfileDecorationBackdrop`** inside `**PageShell**` (no `ThemedPageShell` import on that page — intentional layout for hero + scroll).  
+- **Library, Ratings, Add, Friends list, Friend profile, Clubs, and Settings** use `ThemedPageShell`, which applies `ProfileDecorationBackdrop` using `state.profile.theme`. `ThemedPageShell` defers rendering children until the `ready` flag is true to avoid SSR hydration mismatches.  
+- **Profile tab** applies the same `ProfileDecorationBackdrop` inside `PageShell` (no `ThemedPageShell` import on that page — intentional layout for hero + scroll).  
 - **Bottom nav** accent tokens (`--nav-accent`, etc.) follow the active profile theme via CSS variables (`ProfileThemeApplier` / related).  
 - **Intent:** Decorative motifs are tied to the user's profile theme and appear across primary tabs for a cohesive "nook" — not arbitrary global app skins.
 
@@ -319,66 +480,78 @@ Key files: `ThemedPageShell.tsx`, `ProfileDecorationBackdrop.tsx`, `ProfileTheme
 
 ---
 
-## 12. Progress Tracking
+## 13. Progress Tracking
 
 Applies to **Currently Reading** (`shelf === "reading"`).
 
 ### Estimated
 
-User picks one of four canonical fraction bands (e.g. 0–25%, …). Stored as `estimatedRange: [lo, hi]`. **UI:** compact **2×2 grid of rectangular tiles** (percent label + short qualitative label) in `**ProgressUpdateSheet`**.
+User picks one of four canonical fraction bands (e.g. 0–25%, …). Stored as `estimatedRange: [lo, hi]`. **UI:** compact **2×2 grid of rectangular tiles** (percent label + short qualitative label) in `ProgressUpdateSheet`.
 
 ### Exact
 
-**Always available** in the sheet: user may enter **Current page** (left) and **Total pages** (right) even when catalog `totalPages === 0` (common for API-sourced books). Saving calls `**updateReadingExactProgress`**, which updates **both** the catalog copy's `totalPages` and the `UserBook` exact progress fields (`UPDATE_READING_EXACT_PROGRESS` in `app-reducer.ts`).
+**Always available** in the sheet: user may enter **Current page** (left) and **Total pages** (right) even when catalog `totalPages === 0` (common for API-sourced books). Saving calls `updateReadingExactProgress`, which updates **both** the catalog copy's `totalPages` and the `UserBook` exact progress fields (`UPDATE_READING_EXACT_PROGRESS` in `app-reducer.ts`).
 
 Progress bars elsewhere should remain readable on small screens (exact fill vs estimated band treatment in shelf cards — see components under `LibraryShelves` / book cards).
 
 ---
 
-## 13. Deployment / Env
+## 14. Deployment / Env
 
 - **Vercel (or similar):** Project **root directory = `app/`** (see `docs/DEPLOY.md`, `app/vercel.json`).  
 - **Build / verify (from `app/`):** `npm run dev`, `npm test`, `npm run lint`, `npm run build`.  
-- **Environment:** Copy `app/.env.example` → `app/.env.local` and set `**NEXT_PUBLIC_SUPABASE_URL`** and `**NEXT_PUBLIC_SUPABASE_ANON_KEY**` (**required** — app enforces login). Optional `**SUPABASE_SERVICE_ROLE_KEY**` server-only as documented. Set `**GOOGLE_BOOKS_API_KEY**` for book search and discover (free tier: 100 requests/minute, no daily cap).  
+- **Environment:** Copy `app/.env.example` → `app/.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (**required** — app enforces login). Optional `SUPABASE_SERVICE_ROLE_KEY` server-only (used for discover cache, friendship counts, friend list fetching, club operations). Set `GOOGLE_BOOKS_API_KEY` for book search and discover (free tier: 100 requests/minute, no daily cap).  
 - **Without Supabase env:** App will **not function** — middleware forces login, and login requires Supabase + Google OAuth configuration.  
 - **LAN testing:** `npm run dev -- --hostname 0.0.0.0 --port 3000` then open the host machine's IP on a phone.
 
 ---
 
-## 14. Legacy / Reference Systems
+## 15. Migration History
+
+All migrations live in `supabase/migrations/`. They must be run in order against the Supabase project.
+
+
+| Migration                              | Purpose                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_reading_nook.sql`                 | Core tables: `profiles`, `libraries`, `friendships` with RLS policies                                                                                         |
+| `002_profiles_username.sql`            | Add `username` column to `profiles` with unique constraint                                                                                                    |
+| `003_profiles_avatar.sql`              | Add `avatar_url` to `profiles`, create `avatars` storage bucket with policies                                                                                 |
+| `004_friends_always_share_library.sql` | Drop `share_shelves` gate on friend library reads — accepted friends always see each other's library                                                          |
+| `005_feed.sql`                         | Create `feed_events`, `posts`, `post_reactions` tables with RLS for the social feed                                                                           |
+| `006_posts_update.sql`                 | Add `updated_at`, `book_author` columns to `posts`, add `body` and `parent_id` to `post_reactions` for comments                                               |
+| `007_comment_replies.sql`              | Add `parent_id` column to `post_reactions` for one-level threaded replies (if not already added by 006)                                                       |
+| `008_event_reactions.sql`              | Create `event_reactions` table (mirrors `post_reactions` structure) for likes and comments on feed events                                                     |
+| `009_discover_cache.sql`               | Create `discover_cache` table for server-side caching of Google Books discover results                                                                        |
+| `010_comment_likes.sql`                | Create `comment_likes` table for liking individual comments/replies on both posts and events                                                                  |
+| `011_clubs.sql`                        | Create `clubs` and `club_members` tables, add `club_id` to `posts`, RLS policies, `is_club_member` function, indexes                                          |
+| `012_clubs_fix_recursion.sql`          | Hotfix: recreate `is_club_member` as `SECURITY DEFINER` function and drop/recreate RLS policies to fix infinite recursion in `club_members` policy evaluation |
+
+
+---
+
+## 16. Legacy / Reference Systems
 
 Treat as **non-product sources** for live behavior:
 
 
-| Asset                                      | Notes                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------ |
-| `git-forked-database/` (Goodbooks CSVs)    | Historical corpus — **not** the live recommendation pool in the Next app |
-| `recommender/` (Python)                    | Offline / experiments                                                    |
-| `notebook.ipynb`                           | STAT course artifact                                                     |
-| `app/src/lib/bookProviders/openLibrary.ts` | **Deleted** — replaced by `googleBooks.ts`                               |
-| `app/src/components/MagicLinkAuthForm.tsx`  | **Deleted** — email sign-in removed in favor of Google OAuth only        |
-| `app/src/components/SyncConflictSheet.tsx`  | **Deleted** — server-authoritative model has no conflict resolution      |
-| `/recs` route                              | Redirect stub only                                                       |
-| `/leaderboard`                             | Redirect-only legacy                                                     |
+| Asset                                         | Notes                                                                                                                             |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `git-forked-database/` (Goodbooks CSVs)       | Historical corpus — **not** the live recommendation pool in the Next app                                                          |
+| `recommender/` (Python)                       | Offline / experiments                                                                                                             |
+| `notebook.ipynb`                              | STAT course artifact                                                                                                              |
+| `app/src/lib/bookProviders/openLibrary.ts`    | **Deleted** — replaced by `googleBooks.ts`                                                                                        |
+| `app/src/components/MagicLinkAuthForm.tsx`    | **Deleted** — email sign-in removed in favor of Google OAuth only                                                                 |
+| `app/src/components/SyncConflictSheet.tsx`    | **Deleted** — server-authoritative model has no conflict resolution                                                               |
+| `app/src/components/RatedBookDetailSheet.tsx` | **Superseded** — replaced by unified `BookDetailSheet.tsx` for all shelves; file still exists but is not imported by active views |
+| `/recs` route                                 | Redirect stub only                                                                                                                |
+| `/leaderboard`                                | Redirect-only legacy                                                                                                              |
 
 
 Do not delete without explicit request; do not wire these back in as the primary user-facing recommendation source.
 
 ---
 
-## 15. Next Roadmap
-
-Suggested ordering (product, not commitments):
-
-1. **Hardening:** Broader device testing, empty/error states for friends without usernames, feed pagination for performance at scale.
-2. **Recommendations:** Tune discover thresholds and copy; optional future **recommendation "lenses"** (e.g. more discovery vs more comfort) **without** prescribing implementation algorithms in this PRD.
-3. **Deploy + onboarding docs:** Ensure shared deploy URL users understand Google sign-in + sync.
-4. **Feed enhancements:** Notifications for reactions/comments, feed filtering, mute controls — **only** if explicitly scoped.
-5. **Additional OAuth providers:** Apple, GitHub, etc. if demand exists.
-
----
-
-## 16. Cursor / Agent Rules
+## 17. Cursor / Agent Rules
 
 When editing Reading Nook:
 
@@ -391,10 +564,13 @@ When editing Reading Nook:
 7. **Profile themes** = user motifs via `ProfileDecorationBackdrop` / `ThemedPageShell` patterns — do not reintroduce unrelated global theme systems.
 8. **Canonical genres only** in chips; manual genres optional, capped (see `genreVocabulary.ts` and pickers).
 9. **Shelf labels** exactly: Currently Reading, Finished, Want to Read.
-10. Prefer **small, incremental** diffs; match existing code style.
-11. **Do not edit** `.cursor/plans/` unless the user explicitly asks.
-12. **Do not commit** unless the user explicitly asks.
-13. After **substantive code** changes: run `npm run lint`, `npm test`, and `npm run build` from `app/`. **Markdown-only doc edits** do not require those commands.
+10. **BookDetailSheet** is the unified book detail view for all shelves — do not create shelf-specific detail sheets.
+11. **Comments** use one-level threading (`parent_id`) — replies cannot have further replies.
+12. **Service-role client** pattern: use `getServiceClient()` or `createClient(url, serviceKey)` for operations that need to bypass RLS (counts, friend lists, cache, club feeds).
+13. Prefer **small, incremental** diffs; match existing code style.
+14. **Do not edit** `.cursor/plans/` unless the user explicitly asks.
+15. **Do not commit** unless the user explicitly asks.
+16. After **substantive code** changes: run `npm run lint`, `npm test`, and `npm run build` from `app/`. **Markdown-only doc edits** do not require those commands.
 
 ---
 
