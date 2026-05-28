@@ -9,6 +9,7 @@ import { mergeCatalogGenres } from "@/lib/mergeCatalogGenres";
 import type { Book, Shelf } from "@/lib/types";
 import type { SentimentBucket } from "@/lib/types";
 import { FinishBookSheet } from "./FinishBookSheet";
+import { OpenBookScoreBadge } from "./OpenBookScoreBadge";
 import { PairwiseComparisonSheet } from "./PairwiseComparisonSheet";
 import { ShelfPickerSheet, shelfDisplayName } from "./ShelfPickerSheet";
 
@@ -20,9 +21,12 @@ export const MIN_QUERY_LENGTH = 2;
 type BookRowProps = {
   book: Book;
   onPick: () => void;
+  inLibrary: boolean;
+  score: number | null;
+  scoreBucket: SentimentBucket | null;
 };
 
-function AddBookResultRow({ book, onPick }: BookRowProps) {
+function AddBookResultRow({ book, onPick, inLibrary, score, scoreBucket }: BookRowProps) {
   const [coverFailed, setCoverFailed] = useState(false);
   const showCover = Boolean(book.coverUrl) && !coverFailed;
 
@@ -49,8 +53,18 @@ function AddBookResultRow({ book, onPick }: BookRowProps) {
         )}
       </div>
       <div className="min-w-0 flex-1 py-0.5">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">{book.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">{book.title}</p>
+          {score != null && scoreBucket ? (
+            <OpenBookScoreBadge score={score} bucket={scoreBucket} width={46} height={34} />
+          ) : null}
+        </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-foreground-muted">{book.author}</p>
+        {inLibrary ? (
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-accent">
+            In your library
+          </p>
+        ) : null}
         {(book.genres ?? []).length > 0 ? (
           <ul className="mt-1.5 flex flex-wrap gap-1">
             {(book.genres ?? []).slice(0, 3).map((g) => (
@@ -173,9 +187,7 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
   const yearMax = maxYear ?? null;
   const allMatches = useMemo(() => {
     if (searchStatus !== "ready" || !queryReady) return [];
-    const inLibrary = new Set(Object.keys(state.userBooks));
     return searchResults
-      .filter((b) => !inLibrary.has(b.id))
       .filter((b) => passesYearFilter(b, yearMin, yearMax));
   }, [searchResults, searchStatus, queryReady, state.userBooks, yearMin, yearMax]);
   const results = useMemo(() => allMatches.slice(0, MAX_RESULTS), [allMatches]);
@@ -294,7 +306,13 @@ export function AddBookScreen({ query: queryProp, onQueryChange, afterSearch, mi
             <ul className="flex flex-col gap-2.5">
               {results.map((book) => (
                 <li key={book.id}>
-                  <AddBookResultRow book={book} onPick={() => setPickerBook(book)} />
+                  <AddBookResultRow
+                    book={book}
+                    onPick={() => setPickerBook(book)}
+                    inLibrary={Boolean(state.userBooks[book.id])}
+                    score={state.userBooks[book.id]?.derivedScore ?? null}
+                    scoreBucket={state.userBooks[book.id]?.sentimentBucket ?? null}
+                  />
                 </li>
               ))}
             </ul>
