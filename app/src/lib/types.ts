@@ -16,6 +16,10 @@ export type Book = {
   ratingsCount?: number;
   /** Open Library reading-log count when known. */
   readinglogCount?: number;
+  /** Normalized ISBN-10 when known (Goodreads import / enrichment). */
+  isbn10?: string;
+  /** Normalized ISBN-13 when known (Goodreads import / enrichment). */
+  isbn13?: string;
 };
 
 /** Which shelf a copy lives on in the user library. */

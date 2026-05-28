@@ -10,6 +10,17 @@ import type {
 import { SENTIMENT_BUCKETS } from "./types";
 import { computeDerivedScores } from "./ranking";
 import { normalizeGenreList } from "./genreNormalize";
+import {
+  isbnFieldsMatch,
+  isPlaceholderCover,
+  normalizeAuthor,
+  normalizeIsbn,
+  normalizeTitle,
+  PLACEHOLDER_COVER_PREFIX,
+  stripSeriesInfo,
+  titlesMatch,
+} from "./bookIdentity";
+import type { SearchBookResult } from "./bookProviders/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -111,16 +122,12 @@ function splitCsvRows(text: string): string[] {
   return rows;
 }
 
-/** Strip Goodreads `="0451526538"` wrapper from ISBN fields. */
+/** @deprecated Use `normalizeIsbn` from `bookIdentity`. */
 export function cleanIsbn(raw: string): string {
-  let v = raw.trim();
-  if (v.startsWith('="') && v.endsWith('"')) {
-    v = v.slice(2, -1);
-  }
-  v = v.replace(/[^0-9Xx]/g, "");
-  if (v.length !== 10 && v.length !== 13) return "";
-  return v;
+  return normalizeIsbn(raw);
 }
+
+export { stripSeriesInfo, isPlaceholderCover, PLACEHOLDER_COVER_PREFIX };
 
 const REQUIRED_HEADERS = ["Title", "Author", "Exclusive Shelf"];
 
@@ -229,8 +236,7 @@ export function mapRatingToSentiment(
 /*  Book ID & Catalog Entry                                            */
 /* ------------------------------------------------------------------ */
 
-const PLACEHOLDER_COVER =
-  "https://placehold.co/200x300/faf6ef/6b6560/png?text=Book";
+const PLACEHOLDER_COVER = `${PLACEHOLDER_COVER_PREFIX}200x300/faf6ef/6b6560/png?text=Book`;
 
 export function goodreadsImportId(goodreadsBookId: string): BookId {
   return `goodreads-import:${goodreadsBookId}`;
@@ -260,46 +266,41 @@ export function buildCatalogBook(row: GoodreadsRow): Book {
   };
   if (publishedYear != null) book.publishedYear = publishedYear;
   if (row.averageRating != null) book.averageRating = row.averageRating;
+  if (row.isbn13) book.isbn13 = row.isbn13;
+  if (row.isbn) book.isbn10 = row.isbn;
   return book;
+}
+
+/** Apply a Google Books search result onto a sparse Goodreads catalog row. */
+export function enrichCatalogBookFromGoogle(
+  existing: Book,
+  match: SearchBookResult,
+  row?: Pick<GoodreadsRow, "isbn" | "isbn13">,
+): Book {
+  const enriched: Book = {
+    ...existing,
+    id: match.id,
+    title: match.title || existing.title,
+    author: match.author !== "Unknown" ? match.author : existing.author,
+    coverUrl: match.coverUrl || existing.coverUrl,
+    totalPages: match.totalPages > 0 ? match.totalPages : existing.totalPages,
+    genres: match.genres.length > 0 ? match.genres : existing.genres,
+    description: match.description || existing.description,
+    publishedYear: match.publishedYear ?? existing.publishedYear,
+    averageRating: match.averageRating ?? existing.averageRating,
+    ratingsCount: match.ratingsCount ?? existing.ratingsCount,
+    readinglogCount: match.readinglogCount ?? existing.readinglogCount,
+  };
+  if (row?.isbn13) enriched.isbn13 = row.isbn13;
+  else if (existing.isbn13) enriched.isbn13 = existing.isbn13;
+  if (row?.isbn) enriched.isbn10 = row.isbn;
+  else if (existing.isbn10) enriched.isbn10 = existing.isbn10;
+  return enriched;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Duplicate Detection                                                */
 /* ------------------------------------------------------------------ */
-
-/**
- * Strip Goodreads series suffixes like "(Series Name, #1)" or trailing " #3".
- * Examples:
- *   "Dune (Dune, #1)"                          → "Dune"
- *   "The Hobbit (The Lord of the Rings, #0)"    → "The Hobbit"
- *   "Dune #1"                                   → "Dune"
- *   "A Game of Thrones (A Song of Ice and Fire)" → "A Game of Thrones"
- */
-export function stripSeriesInfo(title: string): string {
-  let t = title.trim();
-  // Remove trailing parenthetical that contains "#" or looks like a series name
-  t = t.replace(/\s*\([^)]*#\d+[^)]*\)\s*$/, "");
-  // Remove trailing parenthetical that looks like "(Series Name)"
-  t = t.replace(/\s*\([^)]*,\s*(?:book|vol\.?|volume|part)\s+\d+[^)]*\)\s*$/i, "");
-  // Remove trailing standalone series marker like " #1" or " Book 1"
-  t = t.replace(/\s+#\d+\s*$/, "");
-  t = t.replace(/,?\s+(?:book|vol\.?|volume|part)\s+\d+\s*$/i, "");
-  return t.trim();
-}
-
-function normalizeForMatch(s: string): string {
-  return stripSeriesInfo(s).toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function titlesMatch(a: string, b: string): boolean {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  // Substring match: "dune" matches "dunechronicles1"
-  const shorter = a.length <= b.length ? a : b;
-  const longer = a.length <= b.length ? b : a;
-  if (shorter.length >= 3 && longer.startsWith(shorter)) return true;
-  return false;
-}
 
 export function findDuplicateBookId(
   row: GoodreadsRow,
@@ -309,15 +310,17 @@ export function findDuplicateBookId(
   const importId = goodreadsImportId(row.bookId);
   if (userBooks[importId]) return importId;
 
-  const normTitle = normalizeForMatch(row.title);
-  const normAuthor = normalizeForMatch(row.author);
+  const rowIsbn = { isbn10: row.isbn || undefined, isbn13: row.isbn13 || undefined };
+  const normTitle = normalizeTitle(row.title);
+  const normAuthor = normalizeAuthor(row.author);
   if (!normTitle) return null;
 
   for (const book of Object.values(catalog)) {
     if (!book) continue;
     if (!userBooks[book.id]) continue;
-    const catTitle = normalizeForMatch(book.title);
-    const catAuthor = normalizeForMatch(book.author);
+    if (isbnFieldsMatch(rowIsbn, book)) return book.id;
+    const catTitle = normalizeTitle(book.title);
+    const catAuthor = normalizeAuthor(book.author);
     if (catAuthor !== normAuthor) continue;
     if (titlesMatch(catTitle, normTitle)) return book.id;
   }
@@ -554,4 +557,33 @@ export function backfillGenresFromDuplicates(
   }
 
   return { patchedCount, catalog };
+}
+
+/**
+ * For rows skipped as duplicates, enrich the existing shelved catalog entry
+ * (cover, description, genres) when Google Books match is available.
+ */
+export function enrichDuplicateCatalogFromGoogle(
+  duplicateRows: ImportRow[],
+  state: AppState,
+  googleByRowId: Map<string, SearchBookResult>,
+): AppState {
+  let catalog = { ...state.catalog };
+
+  for (const row of duplicateRows) {
+    const match = googleByRowId.get(row.bookId);
+    if (!match) continue;
+
+    const matchId = findDuplicateBookId(row, catalog, state.userBooks);
+    if (!matchId) continue;
+
+    const existing = catalog[matchId];
+    if (!existing) continue;
+
+    const enriched = enrichCatalogBookFromGoogle(existing, match, row);
+    enriched.id = matchId;
+    catalog = { ...catalog, [matchId]: enriched };
+  }
+
+  return { ...state, catalog };
 }

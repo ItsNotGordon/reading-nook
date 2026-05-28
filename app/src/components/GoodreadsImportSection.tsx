@@ -8,10 +8,13 @@ import {
   buildImportPlan,
   mergeImportIntoState,
   backfillGenresFromDuplicates,
+  enrichCatalogBookFromGoogle,
+  enrichDuplicateCatalogFromGoogle,
   stripSeriesInfo,
+  type ImportRow,
   type ImportSummary,
 } from "@/lib/goodreadsImport";
-import type { Book } from "@/lib/types";
+import { normalizeAuthor, normalizeTitle, titlesMatch } from "@/lib/bookIdentity";
 import type { SearchBookResult, BookSearchResponse } from "@/lib/bookProviders/types";
 
 type Stage = "idle" | "preview" | "enriching" | "done";
@@ -54,33 +57,39 @@ async function searchByTitle(
   if (!res.ok) return null;
   const data = (await res.json()) as BookSearchResponse;
   if (!data.books || data.books.length === 0) return null;
-  const norm = (s: string) =>
-    s.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const normTitle = norm(cleanTitle);
+  const normTitle = normalizeTitle(cleanTitle);
+  const normAuthor = normalizeAuthor(author);
+  if (normTitle.length < 2 || normAuthor.length < 2) return null;
+
   for (const book of data.books) {
-    const bookNorm = norm(book.title);
-    if (bookNorm === normTitle || bookNorm.startsWith(normTitle)) {
-      return book;
-    }
+    const bookTitle = normalizeTitle(book.title);
+    const bookAuthor = normalizeAuthor(book.author);
+    if (bookAuthor !== normAuthor) continue;
+    if (titlesMatch(bookTitle, normTitle)) return book;
   }
   return null;
 }
 
-function enrichCatalogBook(existing: Book, ol: SearchBookResult): Book {
-  return {
-    ...existing,
-    id: ol.id,
-    title: ol.title || existing.title,
-    author: ol.author !== "Unknown" ? ol.author : existing.author,
-    coverUrl: ol.coverUrl || existing.coverUrl,
-    totalPages: ol.totalPages > 0 ? ol.totalPages : existing.totalPages,
-    genres: ol.genres.length > 0 ? ol.genres : existing.genres,
-    description: ol.description || existing.description,
-    publishedYear: ol.publishedYear ?? existing.publishedYear,
-    averageRating: ol.averageRating ?? existing.averageRating,
-    ratingsCount: ol.ratingsCount ?? existing.ratingsCount,
-    readinglogCount: ol.readinglogCount ?? existing.readinglogCount,
-  };
+async function lookupRowIsbns(
+  row: Pick<ImportRow, "isbn" | "isbn13">,
+  cache: Map<string, SearchBookResult | null>,
+): Promise<SearchBookResult | null> {
+  const candidates = [row.isbn13, row.isbn].filter(Boolean);
+  for (const isbn of candidates) {
+    if (cache.has(isbn)) {
+      const cached = cache.get(isbn);
+      if (cached) return cached;
+      continue;
+    }
+    const book = await lookupIsbn(isbn);
+    cache.set(isbn, book);
+    if (book) return book;
+  }
+  return null;
+}
+
+function applyGoogleMatch(row: ImportRow, match: SearchBookResult): void {
+  row.catalogBook = enrichCatalogBookFromGoogle(row.catalogBook, match, row);
 }
 
 function sleep(ms: number) {
@@ -123,7 +132,10 @@ export function GoodreadsImportSection() {
     setStage("enriching");
 
     const rows = [...summary.importRows];
-    const withIsbn = rows.filter((r) => r.isbn || r.isbn13);
+    const allRows = [...rows, ...summary.duplicateRows];
+    const isbnCache = new Map<string, SearchBookResult | null>();
+    const googleByRowId = new Map<string, SearchBookResult>();
+    const withIsbn = allRows.filter((r) => r.isbn || r.isbn13);
     const total = withIsbn.length;
     let matched = 0;
     let done = 0;
@@ -134,22 +146,22 @@ export function GoodreadsImportSection() {
       if (cancelRef.current || olBlocked) break;
       const batch = withIsbn.slice(i, i + BATCH_SIZE);
 
-      const results: { row: (typeof withIsbn)[number]; ol: SearchBookResult | null }[] = [];
+      const results: { row: ImportRow; match: SearchBookResult | null }[] = [];
       for (const row of batch) {
         if (olBlocked) break;
         try {
-          const isbn = row.isbn13 || row.isbn;
-          const ol = await lookupIsbn(isbn);
-          results.push({ row, ol });
+          const match = await lookupRowIsbns(row, isbnCache);
+          results.push({ row, match });
         } catch (err) {
           if (err instanceof ApiBlockedError) { olBlocked = true; break; }
-          results.push({ row, ol: null });
+          results.push({ row, match: null });
         }
       }
 
-      for (const { row, ol } of results) {
-        if (ol && !state.userBooks[ol.id]) {
-          row.catalogBook = enrichCatalogBook(row.catalogBook, ol);
+      for (const { row, match } of results) {
+        if (match) {
+          applyGoogleMatch(row, match);
+          googleByRowId.set(row.bookId, match);
           matched++;
         }
         done++;
@@ -169,30 +181,30 @@ export function GoodreadsImportSection() {
     }
 
     if (!olBlocked) {
-      const PLACEHOLDER = "https://placehold.co/";
-      const unenriched = rows.filter(
-        (r) => !r.isbn && !r.isbn13 && r.catalogBook.coverUrl.startsWith(PLACEHOLDER),
+      const unenriched = allRows.filter(
+        (r) => !googleByRowId.has(r.bookId) && !r.isbn && !r.isbn13,
       );
       if (unenriched.length > 0) {
         const searchTotal = total + unenriched.length;
         for (let i = 0; i < unenriched.length; i += BATCH_SIZE) {
           if (cancelRef.current || olBlocked) break;
 
-          const results: { row: (typeof unenriched)[number]; ol: SearchBookResult | null }[] = [];
+          const results: { row: ImportRow; match: SearchBookResult | null }[] = [];
           for (const row of unenriched.slice(i, i + BATCH_SIZE)) {
             if (olBlocked) break;
             try {
-              const ol = await searchByTitle(row.title, row.author);
-              results.push({ row, ol });
+              const match = await searchByTitle(row.title, row.author);
+              results.push({ row, match });
             } catch (err) {
               if (err instanceof ApiBlockedError) { olBlocked = true; break; }
-              results.push({ row, ol: null });
+              results.push({ row, match: null });
             }
           }
 
-          for (const { row, ol } of results) {
-            if (ol && !state.userBooks[ol.id]) {
-              row.catalogBook = enrichCatalogBook(row.catalogBook, ol);
+          for (const { row, match } of results) {
+            if (match) {
+              applyGoogleMatch(row, match);
+              googleByRowId.set(row.bookId, match);
               matched++;
             }
             done++;
@@ -214,6 +226,11 @@ export function GoodreadsImportSection() {
     let merged = mergeImportIntoState(state, rows);
 
     if (summary.duplicateRows.length > 0) {
+      merged = enrichDuplicateCatalogFromGoogle(
+        summary.duplicateRows,
+        merged,
+        googleByRowId,
+      );
       const { patchedCount, catalog } = backfillGenresFromDuplicates(
         summary.duplicateRows,
         merged,

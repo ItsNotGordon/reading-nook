@@ -90,6 +90,8 @@ function parseBook(value: unknown): Book | null {
     averageRating,
     ratingsCount,
     readinglogCount,
+    isbn10,
+    isbn13,
   } = value;
   if (typeof id !== "string" || typeof title !== "string" || typeof author !== "string") {
     return null;
@@ -124,6 +126,12 @@ function parseBook(value: unknown): Book | null {
   }
   if (typeof readinglogCount === "number" && Number.isFinite(readinglogCount)) {
     book.readinglogCount = Math.floor(readinglogCount);
+  }
+  if (typeof isbn10 === "string" && isbn10.trim() !== "") {
+    book.isbn10 = isbn10.trim();
+  }
+  if (typeof isbn13 === "string" && isbn13.trim() !== "") {
+    book.isbn13 = isbn13.trim();
   }
   return book;
 }
