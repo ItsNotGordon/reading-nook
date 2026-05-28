@@ -108,7 +108,7 @@ export function AddToShelfSheet({
   if (!open || !book) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex flex-col justify-end bg-black/45 p-0 sm:p-4 sm:items-center sm:justify-center">
+    <div className="fixed inset-0 z-[260] flex flex-col justify-end bg-black/45 p-0 sm:p-4 sm:items-center sm:justify-center">
       <button
         type="button"
         className="absolute inset-0 cursor-default"
@@ -137,7 +137,7 @@ export function AddToShelfSheet({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain px-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2.5">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-3.5 pb-[max(6.5rem,env(safe-area-inset-bottom))] pt-2.5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))]">
           <div className="mt-2.5 flex items-start gap-2.5">
             <CoverThumb
               src={book.coverUrl}
