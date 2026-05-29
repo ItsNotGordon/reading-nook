@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { decideInitialSync, librariesDiffer, libraryFingerprint } from "./cloudSync";
+import {
+  decideInitialSync,
+  isStaleServerRevision,
+  librariesDiffer,
+  libraryFingerprint,
+} from "./cloudSync";
 import type { AppState, Book, UserBook } from "./types";
 
 function book(id: string): Book {
@@ -76,6 +81,19 @@ describe("cloudSync", () => {
       assert.equal(blocked.cloudCount, 0);
       assert.equal(blocked.localCount, 1);
     }
+  });
+
+  it("detects stale server revision", () => {
+    assert.equal(isStaleServerRevision(null, null, false), false);
+    assert.equal(isStaleServerRevision(null, "2024-01-02T00:00:00.000Z", true), true);
+    assert.equal(
+      isStaleServerRevision("2024-01-01T00:00:00.000Z", "2024-01-02T00:00:00.000Z", true),
+      true,
+    );
+    assert.equal(
+      isStaleServerRevision("2024-01-02T00:00:00.000Z", "2024-01-02T00:00:00.000Z", true),
+      false,
+    );
   });
 
   it("fingerprints differ when libraries differ", () => {

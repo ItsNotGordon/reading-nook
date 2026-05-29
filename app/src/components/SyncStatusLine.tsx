@@ -34,7 +34,11 @@ export function SyncStatusLine() {
           <span className="text-foreground-muted"> · Last synced {lastSyncedLabel}</span>
         ) : null}
         {statusMessage ? (
-          <span className="block mt-1 text-red-700">{statusMessage}</span>
+          <span
+            className={`block mt-1 ${status === "error" ? "text-red-700" : "text-foreground-muted"}`}
+          >
+            {statusMessage}
+          </span>
         ) : null}
       </p>
       {status === "error" ? (

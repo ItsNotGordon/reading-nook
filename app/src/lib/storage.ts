@@ -19,6 +19,39 @@ import { computeDerivedScores } from "./ranking";
 import { normalizeGenreList } from "./genreNormalize";
 export const STORAGE_KEY = "reading-nook-v1";
 export const LOCAL_REVISION_KEY = "reading-nook-v1-local-revision";
+export const LAST_SERVER_UPDATED_AT_PREFIX = "reading-nook-v1-server-updated-at:";
+
+export function lastServerUpdatedAtKey(userId: string): string {
+  return `${LAST_SERVER_UPDATED_AT_PREFIX}${userId}`;
+}
+
+export function loadLastServerUpdatedAt(userId: string | null | undefined): string | null {
+  if (!userId || typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(lastServerUpdatedAtKey(userId));
+    return raw && raw.trim() !== "" ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLastServerUpdatedAt(userId: string, updatedAt: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = lastServerUpdatedAtKey(userId);
+    if (!updatedAt) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    window.localStorage.setItem(key, updatedAt);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearLastServerUpdatedAt(userId: string): void {
+  saveLastServerUpdatedAt(userId, null);
+}
 
 export function loadLocalRevision(): string | null {
   if (typeof window === "undefined") return null;

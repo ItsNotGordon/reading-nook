@@ -15,8 +15,14 @@ import {
   fetchCloudLibrary,
   formatSyncTime,
   pushCloudLibrary,
+  STALE_REFRESH_MESSAGE,
 } from "@/lib/cloudSync";
-import { isRevisionNewer, loadLocalRevision } from "@/lib/storage";
+import {
+  isRevisionNewer,
+  loadLastServerUpdatedAt,
+  loadLocalRevision,
+  saveLastServerUpdatedAt,
+} from "@/lib/storage";
 import { countShelvedBooks } from "@/lib/tasteComparison";
 import { useSupabaseAuth } from "./SupabaseAuthProvider";
 
@@ -43,13 +49,49 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   const pulledForUser = useRef<string | null>(null);
   const readyToPush = useRef(false);
+  const lastServerUpdatedAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
+  const rememberServerUpdatedAt = useCallback((userId: string, updatedAt: string | null) => {
+    lastServerUpdatedAtRef.current = updatedAt;
+    saveLastServerUpdatedAt(userId, updatedAt);
+  }, []);
+
+  const applyStaleRefresh = useCallback(
+    (userId: string, serverState: Parameters<typeof actions.hydrateLibrary>[0], updatedAt: string) => {
+      rememberServerUpdatedAt(userId, updatedAt);
+      actions.hydrateLibrary(serverState);
+      setStatus("synced");
+      setLastSyncedAt(updatedAt);
+      setStatusMessage(STALE_REFRESH_MESSAGE);
+    },
+    [actions, rememberServerUpdatedAt],
+  );
+
+  const handlePushResult = useCallback(
+    (userId: string, result: Awaited<ReturnType<typeof pushCloudLibrary>>) => {
+      if (result.ok) {
+        rememberServerUpdatedAt(userId, result.updatedAt);
+        setStatus("synced");
+        setLastSyncedAt(result.updatedAt);
+        setStatusMessage(null);
+        return;
+      }
+      if (!result.ok && "stale" in result) {
+        applyStaleRefresh(userId, result.state, result.updatedAt);
+        return;
+      }
+      setStatus("error");
+      setStatusMessage(!result.ok ? result.error : "Sync failed.");
+    },
+    [applyStaleRefresh, rememberServerUpdatedAt],
+  );
+
   const runInitialPull = useCallback(
-    async () => {
+    async (userId: string) => {
       setStatus("syncing");
       setStatusMessage(null);
       const revisionAtPullStart = loadLocalRevision();
@@ -63,6 +105,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       }
 
       if (pull.kind === "cloud") {
+        rememberServerUpdatedAt(userId, pull.updatedAt);
         const localNow = stateRef.current;
         const localCount = countShelvedBooks(localNow);
         const localRevision = loadLocalRevision();
@@ -70,14 +113,8 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
         const localIsNewer = isRevisionNewer(localRevision, pull.updatedAt);
 
         if (localCount > 0 && (editedDuringPull || localIsNewer)) {
-          const result = await pushCloudLibrary(localNow);
-          if (result.ok) {
-            setStatus("synced");
-            setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-          } else {
-            setStatus("error");
-            setStatusMessage(result.error ?? "Upload failed.");
-          }
+          const result = await pushCloudLibrary(localNow, pull.updatedAt);
+          handlePushResult(userId, result);
           readyToPush.current = true;
           return;
         }
@@ -89,41 +126,39 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Cloud is empty -- push local data if any
+      // Cloud is empty — push local data if any (first-login migration).
       const localCount = countShelvedBooks(stateRef.current);
       if (localCount > 0) {
-        const result = await pushCloudLibrary(stateRef.current);
-        if (result.ok) {
-          setStatus("synced");
-          setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-        } else {
-          setStatus("error");
-          setStatusMessage(result.error ?? "Upload failed.");
-        }
+        const result = await pushCloudLibrary(stateRef.current, null);
+        handlePushResult(userId, result);
       } else {
+        rememberServerUpdatedAt(userId, null);
         setStatus("synced");
         setLastSyncedAt(new Date().toISOString());
       }
       readyToPush.current = true;
     },
-    [actions],
+    [actions, handlePushResult, rememberServerUpdatedAt],
   );
 
   useEffect(() => {
     if (!configured || !user) {
       pulledForUser.current = null;
       readyToPush.current = false;
+      lastServerUpdatedAtRef.current = null;
       const resetTimer = window.setTimeout(() => {
         setStatus("idle");
         setLastSyncedAt(null);
+        setStatusMessage(null);
       }, 0);
       return () => window.clearTimeout(resetTimer);
     }
     if (pulledForUser.current === user.id) return;
     pulledForUser.current = user.id;
     readyToPush.current = false;
+    lastServerUpdatedAtRef.current = loadLastServerUpdatedAt(user.id);
     const startTimer = window.setTimeout(() => {
-      void runInitialPull();
+      void runInitialPull(user.id);
     }, 0);
     return () => window.clearTimeout(startTimer);
   }, [configured, user, runInitialPull]);
@@ -132,33 +167,25 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     setStatus("syncing");
     setStatusMessage(null);
-    const result = await pushCloudLibrary(stateRef.current);
-    if (result.ok) {
-      setStatus("synced");
-      setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-    } else {
-      setStatus("error");
-      setStatusMessage(result.error ?? "Sync failed.");
-    }
-  }, [user]);
+    const result = await pushCloudLibrary(
+      stateRef.current,
+      lastServerUpdatedAtRef.current ?? loadLastServerUpdatedAt(user.id),
+    );
+    handlePushResult(user.id, result);
+  }, [user, handlePushResult]);
 
   useEffect(() => {
     if (!configured || !user || !readyToPush.current) return;
     setStatus("syncing");
     const timer = window.setTimeout(() => {
-      void pushCloudLibrary(stateRef.current).then((result) => {
-        if (result.ok) {
-          setStatus("synced");
-          setLastSyncedAt(result.updatedAt ?? new Date().toISOString());
-          setStatusMessage(null);
-        } else {
-          setStatus("error");
-          setStatusMessage(result.error ?? "Sync failed.");
-        }
+      const lastKnown =
+        lastServerUpdatedAtRef.current ?? loadLastServerUpdatedAt(user.id);
+      void pushCloudLibrary(stateRef.current, lastKnown).then((result) => {
+        handlePushResult(user.id, result);
       });
     }, PUSH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [configured, user, state]);
+  }, [configured, user, state, handlePushResult]);
 
   const value = useMemo(
     () => ({
