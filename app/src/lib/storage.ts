@@ -53,6 +53,18 @@ export function clearLastServerUpdatedAt(userId: string): void {
   saveLastServerUpdatedAt(userId, null);
 }
 
+/** Wipes local library cache (server remains source of truth after reload). */
+export function clearLocalLibraryCache(userId?: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(LOCAL_REVISION_KEY);
+    if (userId) clearLastServerUpdatedAt(userId);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function loadLocalRevision(): string | null {
   if (typeof window === "undefined") return null;
   try {

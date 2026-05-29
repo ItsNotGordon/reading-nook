@@ -5,6 +5,15 @@ import { applyProfileDbFields, getInitialState, parseStoredState } from "@/lib/s
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, max-age=0, must-revalidate",
+  Pragma: "no-cache",
+};
+
+function jsonNoStore(body: unknown, status = 200): NextResponse {
+  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+}
+
 type ProfileRow = { display_name: string | null; tagline: string | null };
 
 async function loadProfileRow(
@@ -59,66 +68,66 @@ async function loadLibraryState(
 
 export async function GET() {
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Cloud sync is not configured." }, { status: 503 });
+    return jsonNoStore({ error: "Cloud sync is not configured." }, 503);
   }
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Cloud sync is not configured." }, { status: 503 });
+    return jsonNoStore({ error: "Cloud sync is not configured." }, 503);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    return jsonNoStore({ error: "Sign in required." }, 401);
   }
 
   try {
     const profileRow = await loadProfileRow(supabase, user.id);
     const library = await loadLibraryState(supabase, user.id, profileRow);
-    return NextResponse.json({ state: library.state, updatedAt: library.updatedAt });
+    return jsonNoStore({ state: library.state, updatedAt: library.updatedAt });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to load library.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonNoStore({ error: message }, 500);
   }
 }
 
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: "Cloud sync is not configured." }, { status: 503 });
+    return jsonNoStore({ error: "Cloud sync is not configured." }, 503);
   }
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Cloud sync is not configured." }, { status: 503 });
+    return jsonNoStore({ error: "Cloud sync is not configured." }, 503);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    return jsonNoStore({ error: "Sign in required." }, 401);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    return jsonNoStore({ error: "Invalid JSON body." }, 400);
   }
 
   if (typeof body !== "object" || body === null) {
-    return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+    return jsonNoStore({ error: "Invalid body." }, 400);
   }
 
   const stateRaw =
     "state" in body ? JSON.stringify((body as { state: unknown }).state) : null;
   if (!stateRaw) {
-    return NextResponse.json({ error: "Missing state." }, { status: 400 });
+    return jsonNoStore({ error: "Missing state." }, 400);
   }
 
   const state: AppState | null = parseStoredState(stateRaw);
   if (!state) {
-    return NextResponse.json({ error: "Invalid library state." }, { status: 400 });
+    return jsonNoStore({ error: "Invalid library state." }, 400);
   }
 
   const lastKnownUpdatedAt =
@@ -136,26 +145,26 @@ export async function POST(request: Request) {
       lastKnownUpdatedAt !== null &&
       lastKnownUpdatedAt !== existing.updatedAt
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           stale: true,
           error: "Server library is newer than this device last synced.",
           state: existing.state,
           updatedAt: existing.updatedAt,
         },
-        { status: 409 },
+        409,
       );
     }
 
     if (existing.updatedAt && lastKnownUpdatedAt === null) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           stale: true,
           error: "Server library exists but device has no sync version.",
           state: existing.state,
           updatedAt: existing.updatedAt,
         },
-        { status: 409 },
+        409,
       );
     }
 
@@ -174,12 +183,12 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return jsonNoStore({ error: error.message }, 500);
     }
 
-    return NextResponse.json({ ok: true, updatedAt });
+    return jsonNoStore({ ok: true, updatedAt });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to save library.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonNoStore({ error: message }, 500);
   }
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   decideInitialSync,
+  isServerCloudNewer,
   isStaleServerRevision,
   librariesDiffer,
   libraryFingerprint,
@@ -81,6 +82,23 @@ describe("cloudSync", () => {
       assert.equal(blocked.cloudCount, 0);
       assert.equal(blocked.localCount, 1);
     }
+  });
+
+  it("detects newer server cloud timestamp", () => {
+    assert.equal(isServerCloudNewer(null, null), false);
+    assert.equal(isServerCloudNewer("2024-01-02T00:00:00.000Z", null), true);
+    assert.equal(
+      isServerCloudNewer("2024-01-02T00:00:00.000Z", "2024-01-01T00:00:00.000Z"),
+      true,
+    );
+    assert.equal(
+      isServerCloudNewer("2024-01-01T00:00:00.000Z", "2024-01-02T00:00:00.000Z"),
+      false,
+    );
+    assert.equal(
+      isServerCloudNewer("2024-01-02T00:00:00.000Z", "2024-01-02T00:00:00.000Z"),
+      false,
+    );
   });
 
   it("detects stale server revision", () => {

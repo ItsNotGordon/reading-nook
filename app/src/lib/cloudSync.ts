@@ -1,6 +1,13 @@
 import type { AppState } from "./types";
 import { SENTIMENT_BUCKETS } from "./types";
+import { isRevisionNewer } from "./storage";
 import { countShelvedBooks } from "./tasteComparison";
+
+export const RESUME_REFRESH_THROTTLE_MS = 20_000;
+
+export const REFRESH_CHECKING_MESSAGE = "Checking cloud...";
+export const REFRESH_HYDRATED_MESSAGE = "Library refreshed from cloud.";
+export const REFRESH_UP_TO_DATE_MESSAGE = "Already up to date.";
 
 export const STALE_REFRESH_MESSAGE =
   "Your library was updated on another device. Refreshed from cloud.";
@@ -20,6 +27,23 @@ export type InitialSyncDecision =
   | { action: "push" }
   | { action: "hydrate" }
   | { action: "conflict"; localCount: number; cloudCount: number };
+
+export type CloudRefreshOutcome =
+  | { outcome: "hydrated"; updatedAt: string }
+  | { outcome: "up_to_date"; updatedAt: string | null }
+  | { outcome: "pushed_migration"; updatedAt: string }
+  | { outcome: "error"; message: string }
+  | { outcome: "throttled" };
+
+/** True when server `updated_at` is strictly newer than the client's last-known value. */
+export function isServerCloudNewer(
+  serverUpdatedAt: string | null | undefined,
+  lastKnownUpdatedAt: string | null | undefined,
+): boolean {
+  if (!serverUpdatedAt) return false;
+  if (!lastKnownUpdatedAt) return true;
+  return isRevisionNewer(serverUpdatedAt, lastKnownUpdatedAt);
+}
 
 /** True when server has a library row the client has not caught up to. */
 export function isStaleServerRevision(
@@ -78,9 +102,14 @@ export function decideInitialSync(
   return { action: "hydrate" };
 }
 
+const SYNC_FETCH_INIT: RequestInit = {
+  cache: "no-store",
+  headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+};
+
 export async function fetchCloudLibrary(): Promise<SyncPullResult> {
   try {
-    const res = await fetch("/api/sync", { cache: "no-store" });
+    const res = await fetch("/api/sync", SYNC_FETCH_INIT);
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       return { kind: "error", message: data.error ?? `Sync failed (${res.status})` };
@@ -104,7 +133,11 @@ export async function pushCloudLibrary(
   try {
     const res = await fetch("/api/sync", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      ...SYNC_FETCH_INIT,
+      headers: {
+        ...SYNC_FETCH_INIT.headers,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ state, lastKnownUpdatedAt }),
     });
     const data = (await res.json().catch(() => ({}))) as {

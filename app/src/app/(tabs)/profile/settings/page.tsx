@@ -5,6 +5,7 @@ import { BlacklistSection } from "@/components/BlacklistSection";
 import { DismissedRecsSection } from "@/components/DismissedRecsSection";
 import { GoodreadsImportSection } from "@/components/GoodreadsImportSection";
 import { LibraryBackupSection } from "@/components/LibraryBackupSection";
+import { CloudLibrarySyncSection } from "@/components/CloudLibrarySyncSection";
 import { ProfileAccountSection } from "@/components/ProfileAccountSection";
 import { ThemedPageShell } from "@/components/ThemedPageShell";
 
@@ -19,6 +20,7 @@ export default function ProfileSettingsPage() {
       </Link>
       <div className="flex flex-col gap-4">
         <ProfileAccountSection />
+        <CloudLibrarySyncSection />
         <BlacklistSection />
         <DismissedRecsSection />
         <GoodreadsImportSection />
