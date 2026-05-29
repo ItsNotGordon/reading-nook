@@ -5,14 +5,20 @@ import { CoverThumb } from "@/components/CoverThumb";
 import { GenreChipPicker } from "@/components/GenreChipPicker";
 import { MoveShelfSheet } from "@/components/MoveShelfSheet";
 import { SentimentPicker } from "@/components/SentimentPicker";
-import { useReadingNook } from "@/lib/app-state";
+import { useReadingNook, type SentimentChangeOptions } from "@/lib/app-state";
+import { ShareSentimentToFeedToggle } from "@/components/ShareSentimentToFeedToggle";
+import { bookHasBucketRanking } from "@/lib/libraryRankings";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
 
 type RatedBookDetailSheetProps = {
   bookId: BookId;
   onClose: () => void;
-  onStartPairwise?: (bookId: BookId, bucket: SentimentBucket) => void;
+  onStartPairwise?: (
+    bookId: BookId,
+    bucket: SentimentBucket,
+    options?: SentimentChangeOptions,
+  ) => void;
 };
 
 function scoreColorClass(bucket: SentimentBucket): string {
@@ -59,6 +65,7 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
   const [editingGenres, setEditingGenres] = useState(false);
   const [draftGenres, setDraftGenres] = useState<string[]>([]);
   const [changingSentiment, setChangingSentiment] = useState(false);
+  const [shareToFeed, setShareToFeed] = useState(false);
   const [moveShelfOpen, setMoveShelfOpen] = useState(false);
   const [editingFinishedAt, setEditingFinishedAt] = useState(false);
 
@@ -76,6 +83,10 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
   const rowUb = ub;
 
   const score = rowUb.derivedScore;
+  const isPrivate = rowUb.visibility === "private";
+  const hadPriorRating = bookHasBucketRanking(state, bookId);
+  const shareOptions: SentimentChangeOptions | undefined =
+    !isPrivate && shareToFeed ? { shareToFeed: true } : undefined;
 
   const saveNotes = (): void => {
     actions.updateUserBookNotes(bookId, draftNotes);
@@ -105,16 +116,24 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
   const chooseSentiment = (bucket: SentimentBucket): void => {
     if (displayBucket === bucket) {
       setChangingSentiment(false);
+      setShareToFeed(false);
       return;
     }
     const existingIds = (state.bucketRankings[bucket] ?? []).filter((id) => id !== bookId);
     if (existingIds.length === 0) {
-      actions.insertBookIntoBucketAtIndex(bookId, bucket, 0);
+      actions.insertBookIntoBucketAtIndex(
+        bookId,
+        bucket,
+        0,
+        hadPriorRating ? shareOptions : undefined,
+      );
       setChangingSentiment(false);
+      setShareToFeed(false);
       return;
     }
-    onStartPairwise?.(bookId, bucket);
+    onStartPairwise?.(bookId, bucket, hadPriorRating ? shareOptions : undefined);
     setChangingSentiment(false);
+    setShareToFeed(false);
   };
 
   const moveToShelf = (shelf: Shelf): void => {
@@ -223,7 +242,13 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => setChangingSentiment((v) => !v)}
+                    onClick={() => {
+                      setChangingSentiment((v) => {
+                        const next = !v;
+                        if (next) setShareToFeed(false);
+                        return next;
+                      });
+                    }}
                     className="min-h-10 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground active:bg-accent-soft/35"
                   >
                     Change how I felt
@@ -237,11 +262,18 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
                   </button>
                 </div>
                 {changingSentiment ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <p className="text-xs text-foreground-muted">
                       Pick a new feeling — you may rank it in your list.
                     </p>
                     <SentimentPicker value={displayBucket} onChoose={chooseSentiment} />
+                    {hadPriorRating ? (
+                      <ShareSentimentToFeedToggle
+                        checked={shareToFeed}
+                        onChange={setShareToFeed}
+                        disabled={isPrivate}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </div>

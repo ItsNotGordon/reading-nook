@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { findFriendshipBetween, relationshipWithViewer } from "@/lib/friendshipStatus";
+import {
+  findFriendshipBetween,
+  friendshipRequestWithViewer,
+} from "@/lib/friendshipStatus";
+import {
+  areMutualFollows,
+  countFollowDirections,
+  ensureMutualFollows,
+  listMutualFollowsForUser,
+} from "@/lib/socialGraph";
 import { normalizeUsername } from "@/lib/username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -11,8 +20,8 @@ type FriendRow = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
-  status: "pending" | "accepted";
-  direction: "incoming" | "outgoing";
+  status: "friend" | "pending";
+  direction?: "incoming" | "outgoing";
 };
 
 export async function GET() {
@@ -41,8 +50,18 @@ export async function GET() {
   }
 
   const friends: FriendRow[] = [];
+  type FriendshipLinkRow = {
+    id: string;
+    requester_id: string;
+    addressee_id: string;
+    status: string;
+  };
+  const linkByOther = new Map<string, FriendshipLinkRow>();
   for (const link of links ?? []) {
     const otherId = link.requester_id === user.id ? link.addressee_id : link.requester_id;
+    linkByOther.set(otherId, link);
+    if (link.status !== "pending") continue;
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("username, display_name, tagline, avatar_url")
@@ -56,12 +75,33 @@ export async function GET() {
       displayName: profile?.display_name ?? "Reader",
       avatarUrl: profile?.avatar_url ?? null,
       tagline: profile?.tagline ?? "",
-      status: link.status,
+      status: "pending",
       direction: link.requester_id === user.id ? "outgoing" : "incoming",
     });
   }
 
-  return NextResponse.json({ friends, configured: true });
+  const mutual = await listMutualFollowsForUser(user.id);
+  for (const person of mutual) {
+    const link = linkByOther.get(person.userId);
+    friends.push({
+      friendshipId: link?.id ?? "",
+      userId: person.userId,
+      username: person.username,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+      tagline: person.tagline,
+      status: "friend",
+    });
+  }
+
+  const counts = await countFollowDirections(user.id);
+
+  return NextResponse.json({
+    friends,
+    configured: true,
+    followingCount: counts.following,
+    followersCount: counts.followers,
+  });
 }
 
 export async function POST(request: Request) {
@@ -121,10 +161,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: linkError }, { status: 500 });
   }
 
-  const { relationship, friendshipId } = relationshipWithViewer(user.id, targetId, links);
-  if (relationship === "accepted") {
+  if (await areMutualFollows(user.id, targetId)) {
     return NextResponse.json({ error: "You are already friends." }, { status: 409 });
   }
+
+  const { relationship, friendshipId } = friendshipRequestWithViewer(user.id, targetId, links);
   if (relationship === "pending_outgoing") {
     return NextResponse.json({ error: "Friend request already sent." }, { status: 409 });
   }
@@ -214,6 +255,7 @@ export async function PATCH(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    await ensureMutualFollows(row.requester_id, row.addressee_id);
     return NextResponse.json({ ok: true });
   }
 

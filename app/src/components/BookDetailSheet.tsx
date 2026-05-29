@@ -8,7 +8,9 @@ import { SentimentPicker } from "@/components/SentimentPicker";
 import { ProgressUpdateSheet } from "@/components/ProgressUpdateSheet";
 import { FinishBookSheet } from "@/components/FinishBookSheet";
 import { ProgressBar } from "@/components/ProgressBar";
-import { useReadingNook } from "@/lib/app-state";
+import { useReadingNook, type SentimentChangeOptions } from "@/lib/app-state";
+import { ShareSentimentToFeedToggle } from "@/components/ShareSentimentToFeedToggle";
+import { bookHasBucketRanking } from "@/lib/libraryRankings";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
 import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
@@ -16,7 +18,11 @@ import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
 type BookDetailSheetProps = {
   bookId: BookId;
   onClose: () => void;
-  onStartPairwise?: (bookId: BookId, bucket: SentimentBucket) => void;
+  onStartPairwise?: (
+    bookId: BookId,
+    bucket: SentimentBucket,
+    options?: SentimentChangeOptions,
+  ) => void;
 };
 
 function scoreColorClass(bucket: SentimentBucket): string {
@@ -154,6 +160,7 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
   const [editingGenres, setEditingGenres] = useState(false);
   const [draftGenres, setDraftGenres] = useState<string[]>([]);
   const [changingSentiment, setChangingSentiment] = useState(false);
+  const [shareToFeed, setShareToFeed] = useState(false);
   const [moveShelfOpen, setMoveShelfOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
@@ -194,19 +201,32 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
     setEditingGenres(true);
   };
 
+  const hadPriorRating =
+    displayBucket != null || bookHasBucketRanking(state, bookId);
+  const shareOptions: SentimentChangeOptions | undefined =
+    !isPrivate && shareToFeed ? { shareToFeed: true } : undefined;
+
   const chooseSentiment = (bucket: SentimentBucket): void => {
     if (displayBucket === bucket) {
       setChangingSentiment(false);
+      setShareToFeed(false);
       return;
     }
     const existingIds = (state.bucketRankings[bucket] ?? []).filter((id) => id !== bookId);
     if (existingIds.length === 0) {
-      actions.insertBookIntoBucketAtIndex(bookId, bucket, 0);
+      actions.insertBookIntoBucketAtIndex(
+        bookId,
+        bucket,
+        0,
+        hadPriorRating ? shareOptions : undefined,
+      );
       setChangingSentiment(false);
+      setShareToFeed(false);
       return;
     }
-    onStartPairwise?.(bookId, bucket);
+    onStartPairwise?.(bookId, bucket, hadPriorRating ? shareOptions : undefined);
     setChangingSentiment(false);
+    setShareToFeed(false);
   };
 
   const moveToShelf = (s: Shelf): void => {
@@ -321,11 +341,18 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
 
             {/* Sentiment picker (when changing feeling) */}
             {changingSentiment ? (
-              <div className="space-y-2 px-6 pb-3">
+              <div className="space-y-3 px-6 pb-3">
                 <p className="text-xs text-foreground-muted">
                   Pick a new feeling — you may rank it in your list.
                 </p>
                 <SentimentPicker value={displayBucket} onChoose={chooseSentiment} />
+                {hadPriorRating ? (
+                  <ShareSentimentToFeedToggle
+                    checked={shareToFeed}
+                    onChange={setShareToFeed}
+                    disabled={isPrivate}
+                  />
+                ) : null}
               </div>
             ) : null}
 
@@ -468,7 +495,13 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
                 <ActionButton
                   icon={<SmileyIcon />}
                   label="Change feeling"
-                  onClick={() => setChangingSentiment((v) => !v)}
+                  onClick={() => {
+                    setChangingSentiment((v) => {
+                      const next = !v;
+                      if (next) setShareToFeed(false);
+                      return next;
+                    });
+                  }}
                 />
               ) : shelf === "reading" ? (
                 <ActionButton

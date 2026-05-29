@@ -25,6 +25,7 @@ export function HomeFeed() {
     open: boolean;
     bookId: BookId | null;
     bucket: SentimentBucket | null;
+    shareToFeed?: boolean;
   }>({ open: false, bookId: null, bucket: null });
 
   useEffect(() => {
@@ -97,9 +98,14 @@ export function HomeFeed() {
         <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
-          onStartPairwise={(bookId, bucket) => {
+          onStartPairwise={(bookId, bucket, options) => {
             setDetailBookId(null);
-            setPairwise({ open: true, bookId, bucket });
+            setPairwise({
+              open: true,
+              bookId,
+              bucket,
+              shareToFeed: options?.shareToFeed,
+            });
           }}
         />
       ) : null}
@@ -115,6 +121,7 @@ export function HomeFeed() {
         <PairwiseComparisonSheet
           newBookId={pairwise.bookId}
           bucket={pairwise.bucket}
+          shareToFeed={pairwise.shareToFeed}
           onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
         />
       ) : null}

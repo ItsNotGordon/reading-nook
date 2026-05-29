@@ -15,8 +15,8 @@ type FriendRow = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
-  status: "pending" | "accepted";
-  direction: "incoming" | "outgoing";
+  status: "pending" | "friend";
+  direction?: "incoming" | "outgoing";
 };
 
 type SearchUser = {
@@ -98,7 +98,7 @@ export function FriendsPanel() {
 
   const pendingIncoming = friends.filter((f) => f.status === "pending" && f.direction === "incoming");
   const pendingOutgoing = friends.filter((f) => f.status === "pending" && f.direction === "outgoing");
-  const accepted = friends.filter((f) => f.status === "accepted");
+  const mutualFriends = friends.filter((f) => f.status === "friend");
 
   if (!configured) {
     return (
@@ -310,11 +310,11 @@ export function FriendsPanel() {
         </section>
       ) : null}
 
-      {accepted.length > 0 ? (
+      {mutualFriends.length > 0 ? (
         <section>
           <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">Friends</p>
           <ul className="mt-2 space-y-3">
-            {accepted.map((f) => (
+            {mutualFriends.map((f) => (
                 <li
                   key={f.friendshipId}
                   className="rounded-2xl border border-border/80 bg-background px-4 py-3 shadow-sm"
@@ -341,7 +341,7 @@ export function FriendsPanel() {
             ))}
           </ul>
         </section>
-      ) : accepted.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
+      ) : mutualFriends.length === 0 && pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
         <p className="text-sm text-foreground-muted">No friends yet — search for someone above.</p>
       ) : null}
 

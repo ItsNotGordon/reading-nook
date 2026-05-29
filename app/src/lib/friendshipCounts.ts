@@ -4,6 +4,7 @@ import {
   getSupabaseServiceRoleKey,
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
+import { countFollowDirections } from "@/lib/socialGraph";
 
 export type AcceptedFriendLink = {
   friendId: string;
@@ -80,14 +81,14 @@ export async function getAcceptedFriendIdsForUser(userId: string): Promise<strin
 }
 
 /**
- * Symmetric tallies: accepted friends count for both followers and following.
+ * Follower/following tallies from the one-way `follows` graph (can differ).
+ * Mutual accepted friends are backfilled as mutual follows on accept / migration.
  */
 export async function countAcceptedFriendships(
   _supabase: SupabaseClient,
   userId: string,
 ): Promise<{ following: number; followers: number }> {
-  const n = (await getAcceptedFriendshipsForUser(userId)).length;
-  return { following: n, followers: n };
+  return countFollowDirections(userId);
 }
 
 /** Full accepted friend list with profile fields (service role). */

@@ -11,10 +11,19 @@ import {
   type ReactNode,
 } from "react";
 import { appReducer } from "./app-reducer";
-import { bookHasBucketRanking } from "./libraryRankings";
 import { APP_THEMES, type AppState, type Book, type BookId, type BookVisibility, type SentimentBucket, type Shelf, type UserProfile } from "./types";
 import { getInitialState, loadState, saveState } from "./storage";
 import { postFeedEvent, debouncedPostFeedEvent } from "./feedClient";
+import {
+  buildSentimentUpdateFeedEvent,
+  sentimentRatingChanged,
+  shouldPostInitialFinishedFeed,
+} from "./sentimentFeed";
+
+export type SentimentChangeOptions = {
+  /** When true, post a `sentiment_update` feed event after a successful change. Default off. */
+  shareToFeed?: boolean;
+};
 
 export type ReadingNookActions = {
   addBookToShelf: (bookId: BookId, shelf: Shelf, catalogBook?: Book) => void;
@@ -31,8 +40,17 @@ export type ReadingNookActions = {
   removeUserBook: (bookId: BookId) => void;
   updateFinishedAt: (bookId: BookId, finishedAt: string) => void;
   updateAddedAt: (bookId: BookId, addedAt: string) => void;
-  setSentimentBucket: (bookId: BookId, sentimentBucket: SentimentBucket | null) => void;
-  insertBookIntoBucketAtIndex: (bookId: BookId, bucket: SentimentBucket, index: number) => void;
+  setSentimentBucket: (
+    bookId: BookId,
+    sentimentBucket: SentimentBucket | null,
+    options?: SentimentChangeOptions,
+  ) => void;
+  insertBookIntoBucketAtIndex: (
+    bookId: BookId,
+    bucket: SentimentBucket,
+    index: number,
+    options?: SentimentChangeOptions,
+  ) => void;
   updateBucketRankings: (bucket: SentimentBucket, orderedBookIds: BookId[]) => void;
   /** Wipe shelves, rankings, and cached catalog copies (localStorage only). */
   resetLibrary: () => void;
@@ -173,31 +191,18 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "UPDATE_FINISHED_AT", bookId, finishedAt }),
       updateAddedAt: (bookId, addedAt) =>
         dispatch({ type: "UPDATE_ADDED_AT", bookId, addedAt }),
-      setSentimentBucket: (bookId, sentimentBucket) => {
+      setSentimentBucket: (bookId, sentimentBucket, options) => {
         const before = stateRef.current;
         const action = { type: "SET_SENTIMENT_BUCKET" as const, bookId, sentimentBucket };
         const next = appReducer(before, action);
         if (next === before) return;
-        const hadRanking = bookHasBucketRanking(before, bookId);
         dispatch(action);
-        if (!hadRanking && sentimentBucket) {
-          const cat = next.catalog[bookId];
-          const ub = next.userBooks[bookId];
-          if (cat) {
-            postFeedEvent({
-              eventType: "finished",
-              bookId,
-              bookTitle: cat.title,
-              bookAuthor: cat.author,
-              bookCoverUrl: cat.coverUrl,
-              shelf: "finished",
-              sentiment: sentimentBucket,
-              derivedScore: ub?.derivedScore ?? undefined,
-            });
-          }
+        if (options?.shareToFeed && sentimentRatingChanged(before, next, bookId)) {
+          const payload = buildSentimentUpdateFeedEvent(next, bookId);
+          if (payload) postFeedEvent(payload);
         }
       },
-      insertBookIntoBucketAtIndex: (bookId, bucket, index) => {
+      insertBookIntoBucketAtIndex: (bookId, bucket, index, options) => {
         const before = stateRef.current;
         if (!before.userBooks[bookId]) return;
         const action = {
@@ -208,23 +213,18 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         };
         const next = appReducer(before, action);
         if (next === before) return;
-        const hadRanking = bookHasBucketRanking(before, bookId);
         dispatch(action);
-        if (!hadRanking) {
-          const cat = next.catalog[bookId];
-          const ub = next.userBooks[bookId];
-          if (cat && ub?.sentimentBucket) {
-            postFeedEvent({
-              eventType: "finished",
-              bookId,
-              bookTitle: cat.title,
-              bookAuthor: cat.author,
-              bookCoverUrl: cat.coverUrl,
-              shelf: "finished",
-              sentiment: ub.sentimentBucket,
-              derivedScore: ub.derivedScore ?? undefined,
-            });
+        if (shouldPostInitialFinishedFeed(before, bookId)) {
+          const payload = buildSentimentUpdateFeedEvent(next, bookId);
+          if (payload) {
+            postFeedEvent({ ...payload, eventType: "finished" });
           }
+        } else if (
+          options?.shareToFeed &&
+          sentimentRatingChanged(before, next, bookId)
+        ) {
+          const payload = buildSentimentUpdateFeedEvent(next, bookId);
+          if (payload) postFeedEvent(payload);
         }
       },
       updateBucketRankings: (bucket, orderedBookIds) =>

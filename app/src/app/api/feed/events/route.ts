@@ -54,6 +54,13 @@ export async function POST(request: Request) {
       .in("event_type", ["finished", "shelved"]);
   }
 
+  if (eventType === "sentiment_update") {
+    const allowed = ["liked", "okay", "disliked"];
+    if (!sentiment || !allowed.includes(sentiment)) {
+      return NextResponse.json({ error: "Invalid sentiment for update." }, { status: 400 });
+    }
+  }
+
   const { error } = await supabase.from("feed_events").insert({
     user_id: user.id,
     event_type: eventType,

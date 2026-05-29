@@ -39,10 +39,15 @@ export default function ProfilePage() {
     open: boolean;
     bookId: BookId | null;
     bucket: SentimentBucket | null;
+    shareToFeed?: boolean;
   }>({ open: false, bookId: null, bucket: null });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [usernameRefreshKey, setUsernameRefreshKey] = useState(0);
   const [friends, setFriends] = useState<AcceptedFriend[] | null>(null);
+  const [followingCount, setFollowingCount] = useState<number | null>(null);
+  const [followersCount, setFollowersCount] = useState<number | null>(null);
+  const [followingList, setFollowingList] = useState<SocialConnectionUser[] | null>(null);
+  const [followersList, setFollowersList] = useState<SocialConnectionUser[] | null>(null);
   const [socialSheet, setSocialSheet] = useState<"following" | "followers" | null>(null);
 
   useEffect(() => {
@@ -70,10 +75,14 @@ export default function ProfilePage() {
             avatarUrl: string | null;
             tagline: string;
           }>;
+          followingCount?: number;
+          followersCount?: number;
         }) => {
-          const accepted = (data.friends ?? []).filter((f) => f.status === "accepted");
+          const mutual = (data.friends ?? []).filter(
+            (f) => f.status === "friend" || f.status === "accepted",
+          );
           setFriends(
-            accepted.map((f) => ({
+            mutual.map((f) => ({
               userId: f.userId,
               username: f.username,
               displayName: f.displayName,
@@ -82,15 +91,40 @@ export default function ProfilePage() {
               direction: f.direction,
             })),
           );
+          setFollowingCount(
+            typeof data.followingCount === "number" ? data.followingCount : null,
+          );
+          setFollowersCount(
+            typeof data.followersCount === "number" ? data.followersCount : null,
+          );
         },
       )
-      .catch(() => setFriends(null));
+      .catch(() => {
+        setFriends(null);
+        setFollowingCount(null);
+        setFollowersCount(null);
+      });
   }, [canLoadSocial]);
 
-  const acceptedFriends = useMemo(() => friends ?? [], [friends]);
-  const friendCount = canLoadSocial ? (friends == null ? null : acceptedFriends.length) : null;
-  const followingCount = friendCount;
-  const followersCount = friendCount;
+  const openSocialSheet = (which: "following" | "followers") => {
+    setSocialSheet(which);
+    if (which === "following" && followingList === null) {
+      void fetch("/api/friends/following")
+        .then((res) => res.json())
+        .then((data: { users?: SocialConnectionUser[] }) => {
+          setFollowingList(data.users ?? []);
+        })
+        .catch(() => setFollowingList([]));
+    }
+    if (which === "followers" && followersList === null) {
+      void fetch("/api/friends/followers")
+        .then((res) => res.json())
+        .then((data: { users?: SocialConnectionUser[] }) => {
+          setFollowersList(data.users ?? []);
+        })
+        .catch(() => setFollowersList([]));
+    }
+  };
 
   const shelfCounts = useMemo(() => getShelfCounts(state), [state]);
   const shelfRows = useMemo(() => profileShelfBarRows(shelfCounts), [shelfCounts]);
@@ -149,12 +183,12 @@ export default function ProfilePage() {
                 followingCount={followingCount}
                 followersCount={followersCount}
                 gated={socialGated}
-                onFollowingPress={canLoadSocial ? () => setSocialSheet("following") : undefined}
-                onFollowersPress={canLoadSocial ? () => setSocialSheet("followers") : undefined}
+                onFollowingPress={canLoadSocial ? () => openSocialSheet("following") : undefined}
+                onFollowersPress={canLoadSocial ? () => openSocialSheet("followers") : undefined}
               />
               {!socialGated ? (
                 <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
-                  Following lists your friends. One-way follows for public accounts are coming later.
+                  Friends follow each other back. Following and follower counts can differ.
                 </p>
               ) : null}
               <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
@@ -186,12 +220,12 @@ export default function ProfilePage() {
                 followingCount={followingCount}
                 followersCount={followersCount}
                 gated={socialGated}
-                onFollowingPress={canLoadSocial ? () => setSocialSheet("following") : undefined}
-                onFollowersPress={canLoadSocial ? () => setSocialSheet("followers") : undefined}
+                onFollowingPress={canLoadSocial ? () => openSocialSheet("following") : undefined}
+                onFollowersPress={canLoadSocial ? () => openSocialSheet("followers") : undefined}
               />
               {!socialGated ? (
                 <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
-                  Following lists your friends. One-way follows for public accounts are coming later.
+                  Friends follow each other back. Following and follower counts can differ.
                 </p>
               ) : null}
               <ProfileShelfBars rows={shelfRows} />
@@ -218,9 +252,14 @@ export default function ProfilePage() {
         <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
-          onStartPairwise={(bookId, bucket) => {
+          onStartPairwise={(bookId, bucket, options) => {
             setDetailBookId(null);
-            setPairwise({ open: true, bookId, bucket });
+            setPairwise({
+              open: true,
+              bookId,
+              bucket,
+              shareToFeed: options?.shareToFeed,
+            });
           }}
         />
       ) : null}
@@ -229,6 +268,7 @@ export default function ProfilePage() {
         <PairwiseComparisonSheet
           newBookId={pairwise.bookId}
           bucket={pairwise.bucket}
+          shareToFeed={pairwise.shareToFeed}
           onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
         />
       ) : null}
@@ -236,14 +276,14 @@ export default function ProfilePage() {
       {socialSheet === "following" ? (
         <SocialConnectionsSheet
           title="Following"
-          users={acceptedFriends}
+          users={followingList ?? []}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}
       {socialSheet === "followers" ? (
         <SocialConnectionsSheet
           title="Followers"
-          users={acceptedFriends}
+          users={followersList ?? []}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}

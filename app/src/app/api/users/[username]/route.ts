@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { countAcceptedFriendships } from "@/lib/friendshipCounts";
-import { findFriendshipBetween, relationshipWithViewer } from "@/lib/friendshipStatus";
+import { findFriendshipBetween, resolveSocialRelationship } from "@/lib/friendshipStatus";
+import { areMutualFollows, viewerFollowsTarget } from "@/lib/socialGraph";
 import { normalizeUsername } from "@/lib/username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -32,7 +33,7 @@ export async function GET(
 
   const { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, username, display_name, tagline, avatar_url")
+    .select("id, username, display_name, tagline, avatar_url, is_public")
     .eq("username", username)
     .maybeSingle();
 
@@ -48,9 +49,24 @@ export async function GET(
     return NextResponse.json({ error: linkError }, { status: 500 });
   }
 
-  const { relationship, friendshipId } = relationshipWithViewer(user.id, profile.id, links);
+  const viewerFollows = await viewerFollowsTarget(user.id, profile.id);
+  const targetFollowsViewer = await viewerFollowsTarget(profile.id, user.id);
+  const mutualFollow = await areMutualFollows(user.id, profile.id);
+
+  const { relationship, friendshipId } = resolveSocialRelationship(
+    user.id,
+    profile.id,
+    links,
+    mutualFollow,
+    viewerFollows,
+    targetFollowsViewer,
+  );
 
   const counts = await countAcceptedFriendships(supabase, profile.id);
+
+  const isPublic = Boolean(profile.is_public);
+  const canViewCounts =
+    relationship === "friends" || isPublic || viewerFollows || targetFollowsViewer;
 
   return NextResponse.json({
     id: profile.id,
@@ -58,9 +74,12 @@ export async function GET(
     displayName: profile.display_name ?? "Reader",
     avatarUrl: profile.avatar_url ?? null,
     tagline: profile.tagline ?? "",
+    isPublic,
     relationship,
     friendshipId,
-    followingCount: counts.following,
-    followersCount: counts.followers,
+    viewerFollows,
+    targetFollowsViewer,
+    followingCount: canViewCounts ? counts.following : null,
+    followersCount: canViewCounts ? counts.followers : null,
   });
 }

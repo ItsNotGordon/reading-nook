@@ -29,10 +29,16 @@ function MiniBook({ bookId }: { bookId: BookId }) {
 type PairwiseComparisonSheetProps = {
   newBookId: BookId;
   bucket: SentimentBucket;
+  shareToFeed?: boolean;
   onDone: () => void;
 };
 
-export function PairwiseComparisonSheet({ newBookId, bucket, onDone }: PairwiseComparisonSheetProps) {
+export function PairwiseComparisonSheet({
+  newBookId,
+  bucket,
+  shareToFeed = false,
+  onDone,
+}: PairwiseComparisonSheetProps) {
   const { state, actions } = useReadingNook();
 
   const bucketIds = useMemo(() => {
@@ -63,7 +69,12 @@ export function PairwiseComparisonSheet({ newBookId, bucket, onDone }: PairwiseC
     setHigh(newHigh);
 
     if (newLow >= newHigh) {
-      actions.insertBookIntoBucketAtIndex(newBookId, bucket, newLow);
+      actions.insertBookIntoBucketAtIndex(
+        newBookId,
+        bucket,
+        newLow,
+        shareToFeed ? { shareToFeed: true } : undefined,
+      );
       onDone();
     }
   }
@@ -71,10 +82,15 @@ export function PairwiseComparisonSheet({ newBookId, bucket, onDone }: PairwiseC
   // If opened incorrectly for an empty bucket, insert immediately.
   useEffect(() => {
     if (n === 0) {
-      actions.insertBookIntoBucketAtIndex(newBookId, bucket, 0);
+      actions.insertBookIntoBucketAtIndex(
+        newBookId,
+        bucket,
+        0,
+        shareToFeed ? { shareToFeed: true } : undefined,
+      );
       onDone();
     }
-  }, [n, newBookId, bucket, actions, onDone]);
+  }, [n, newBookId, bucket, shareToFeed, actions, onDone]);
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/35 p-4">

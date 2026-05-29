@@ -427,13 +427,15 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
     const verb =
       item.eventType === "progress"
         ? "is reading"
-        : item.eventType === "finished"
-          ? "finished"
-          : item.shelf === "reading"
-            ? "started reading"
-            : item.shelf === "want_to_read"
-              ? "wants to read"
-              : `added to ${shelfLabel(item.shelf)}`;
+        : item.eventType === "sentiment_update"
+          ? "changed how they felt about"
+          : item.eventType === "finished"
+            ? "finished"
+            : item.shelf === "reading"
+              ? "started reading"
+              : item.shelf === "want_to_read"
+                ? "wants to read"
+                : `added to ${shelfLabel(item.shelf)}`;
 
     let progressFraction =
       item.eventType === "progress" && typeof item.derivedScore === "number"
@@ -457,7 +459,9 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
                   <span className="font-semibold">{authorLabel(item.author)}</span>
                 </AuthorLink>{" "}
                 {verb}{" "}
-                <span className="font-semibold">&ldquo;{item.bookTitle}&rdquo;</span>
+                <span className="font-semibold">
+                  {item.eventType === "sentiment_update" ? item.bookTitle : `“${item.bookTitle}”`}
+                </span>
               </p>
             </div>
             <p className="mt-0.5 text-[10px] text-foreground-muted">

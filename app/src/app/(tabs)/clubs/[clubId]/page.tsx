@@ -58,7 +58,12 @@ export default function ClubDetailPage() {
   const [showMembers, setShowMembers] = useState(false);
   const [detailBookId, setDetailBookId] = useState<BookId | null>(null);
   const [previewBook, setPreviewBook] = useState<FeedBookInfo | null>(null);
-  const [pairwise, setPairwise] = useState<{ open: boolean; bookId: BookId | null; bucket: SentimentBucket | null }>({ open: false, bookId: null, bucket: null });
+  const [pairwise, setPairwise] = useState<{
+    open: boolean;
+    bookId: BookId | null;
+    bucket: SentimentBucket | null;
+    shareToFeed?: boolean;
+  }>({ open: false, bookId: null, bucket: null });
   const mountedRef = useRef(true);
 
   const handleBookClick = useCallback(
@@ -410,9 +415,14 @@ export default function ClubDetailPage() {
         <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
-          onStartPairwise={(bookId, bucket) => {
+          onStartPairwise={(bookId, bucket, options) => {
             setDetailBookId(null);
-            setPairwise({ open: true, bookId, bucket });
+            setPairwise({
+              open: true,
+              bookId,
+              bucket,
+              shareToFeed: options?.shareToFeed,
+            });
           }}
         />
       ) : null}
@@ -428,6 +438,7 @@ export default function ClubDetailPage() {
         <PairwiseComparisonSheet
           newBookId={pairwise.bookId}
           bucket={pairwise.bucket}
+          shareToFeed={pairwise.shareToFeed}
           onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
         />
       ) : null}

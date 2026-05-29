@@ -35,6 +35,7 @@ export function LibraryShelves() {
     open: boolean;
     bookId: string | null;
     bucket: SentimentBucket | null;
+    shareToFeed?: boolean;
   }>({ open: false, bookId: null, bucket: null });
 
   const reading = useMemo(
@@ -149,9 +150,14 @@ export function LibraryShelves() {
         <BookDetailSheet
           bookId={detailBookId}
           onClose={() => setDetailBookId(null)}
-          onStartPairwise={(bookId, bucket) => {
+          onStartPairwise={(bookId, bucket, options) => {
             setDetailBookId(null);
-            setPairwise({ open: true, bookId, bucket });
+            setPairwise({
+              open: true,
+              bookId,
+              bucket,
+              shareToFeed: options?.shareToFeed,
+            });
           }}
         />
       ) : null}
@@ -174,6 +180,7 @@ export function LibraryShelves() {
         <PairwiseComparisonSheet
           newBookId={pairwise.bookId}
           bucket={pairwise.bucket}
+          shareToFeed={pairwise.shareToFeed}
           onDone={() => setPairwise({ open: false, bookId: null, bucket: null })}
         />
       ) : null}

@@ -38,6 +38,7 @@ export function EditProfileSheet({
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [usernameBusy, setUsernameBusy] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false);
   const profileTheme = state.profile.theme ?? "plant";
 
   useEffect(() => {
@@ -58,6 +59,12 @@ export function EditProfileSheet({
       .then((res) => res.json())
       .then((data: { avatarUrl?: string | null }) => {
         setAvatarUrl(data.avatarUrl ?? null);
+      })
+      .catch(() => undefined);
+    void fetch("/api/profile/visibility")
+      .then((res) => res.json())
+      .then((data: { isPublic?: boolean }) => {
+        setIsPublic(Boolean(data.isPublic));
       })
       .catch(() => undefined);
   }, [cloudConfigured, cloudUser]);
@@ -101,6 +108,16 @@ export function EditProfileSheet({
           return;
         }
         onUsernameSaved?.();
+      }
+      const visRes = await fetch("/api/profile/visibility", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic }),
+      });
+      if (!visRes.ok) {
+        const visData = (await visRes.json().catch(() => ({}))) as { error?: string };
+        setUsernameHint(visData.error ?? "Could not save account visibility.");
+        return;
       }
     }
     actions.updateProfile({ displayName, tagline });
@@ -217,6 +234,30 @@ export function EditProfileSheet({
                           : usernameHint}
                     </p>
                   ) : null}
+                </div>
+              ) : null}
+
+              {cloudConfigured && cloudUser ? (
+                <div className="rounded-xl border border-border bg-card-surface/80 px-3 py-2.5">
+                  <label className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-foreground">
+                        Public account
+                      </span>
+                      <span className="mt-0.5 block text-xs text-foreground-muted">
+                        Public accounts can be followed without a friend request. Private
+                        accounts require approval (friend request) before someone can follow
+                        you. Off by default.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-border text-accent focus:ring-accent/35"
+                      aria-label="Public account"
+                    />
+                  </label>
                 </div>
               ) : null}
 

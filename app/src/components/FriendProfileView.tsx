@@ -27,10 +27,13 @@ type PublicProfile = {
   displayName: string;
   avatarUrl: string | null;
   tagline: string;
+  isPublic?: boolean;
   relationship: FriendRelationship;
   friendshipId: string | null;
-  followingCount?: number;
-  followersCount?: number;
+  viewerFollows?: boolean;
+  targetFollowsViewer?: boolean;
+  followingCount?: number | null;
+  followersCount?: number | null;
 };
 
 type TasteResponse = {
@@ -68,9 +71,8 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
   const [insights, setInsights] = useState<FriendProfileSummaryResponse | "loading" | null>(null);
   const [compareBookId, setCompareBookId] = useState<BookId | null>(null);
   const [socialSheet, setSocialSheet] = useState<"following" | "followers" | null>(null);
-  const [friendsList, setFriendsList] = useState<
-    (SocialConnectionUser & { direction: "incoming" | "outgoing" })[] | null
-  >(null);
+  const [followingList, setFollowingList] = useState<SocialConnectionUser[] | null>(null);
+  const [followersList, setFollowersList] = useState<SocialConnectionUser[] | null>(null);
 
   const loadProfile = useCallback(async () => {
     setError(null);
@@ -87,7 +89,7 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     setTaste(null);
     setProfile(data);
     document.title = `${data.displayName} · Reading Nook`;
-    if (data.relationship === "accepted") {
+    if (data.relationship === "friends") {
       setTaste("loading");
       setInsights("loading");
       const [insightsRes, tasteRes] = await Promise.all([
@@ -113,6 +115,25 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     });
     return () => cancelAnimationFrame(frame);
   }, [loadProfile]);
+
+  async function followAction(method: "POST" | "DELETE") {
+    if (!profile) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/users/${encodeURIComponent(profile.username)}/follow`,
+        { method },
+      );
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not update follow.");
+      await loadProfile();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function sendFriendRequest() {
     if (!profile) return;
@@ -150,26 +171,36 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     }
   }
 
-  const isAccepted = profile?.relationship === "accepted";
+  const isFriend = profile?.relationship === "friends";
+  const showSocialTallies =
+    profile?.followingCount != null && profile?.followersCount != null;
+  const canFollowPublic =
+    profile?.isPublic &&
+    !isFriend &&
+    profile.relationship !== "pending_incoming";
 
   const openSocialSheet = useCallback(
     async (which: "following" | "followers") => {
       setSocialSheet(which);
-      if (friendsList) return;
+      if (which === "following" && followingList !== null) return;
+      if (which === "followers" && followersList !== null) return;
       try {
         const res = await fetch(
-          `/api/users/${encodeURIComponent(username)}/friends`,
+          `/api/users/${encodeURIComponent(username)}/friends?list=${which}`,
         );
         if (!res.ok) return;
-        const data = (await res.json()) as {
-          friends: (SocialConnectionUser & { direction: "incoming" | "outgoing" })[];
-        };
-        setFriendsList(data.friends ?? []);
+        const data = (await res.json()) as { users?: SocialConnectionUser[] };
+        if (which === "following") {
+          setFollowingList(data.users ?? []);
+        } else {
+          setFollowersList(data.users ?? []);
+        }
       } catch {
-        /* leave null — sheet shows empty */
+        if (which === "following") setFollowingList([]);
+        else setFollowersList([]);
       }
     },
-    [username, friendsList],
+    [username, followingList, followersList],
   );
 
   const openBookCompare = (bookId: BookId) => {
@@ -231,18 +262,40 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
         ) : null}
 
         {profile.relationship === "none" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void sendFriendRequest()}
-            className="mt-4 min-h-11 w-full rounded-xl border border-accent bg-accent px-4 text-sm font-semibold text-white disabled:opacity-60"
-          >
-            Add friend
-          </button>
+          <div className="mt-4 space-y-2">
+            {profile.isPublic ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void followAction(profile.viewerFollows ? "DELETE" : "POST")}
+                className="min-h-11 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:opacity-60"
+              >
+                {profile.viewerFollows ? "Unfollow" : "Follow"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void sendFriendRequest()}
+              className="min-h-11 w-full rounded-xl border border-accent bg-accent px-4 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {profile.isPublic ? "Add friend" : "Request friend"}
+            </button>
+          </div>
         ) : null}
         {profile.relationship === "pending_outgoing" ? (
           <div className="mt-4 space-y-2">
             <p className="text-xs text-foreground-muted">Friend request sent</p>
+            {canFollowPublic ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void followAction(profile.viewerFollows ? "DELETE" : "POST")}
+                className="min-h-10 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold"
+              >
+                {profile.viewerFollows ? "Unfollow" : "Follow"}
+              </button>
+            ) : null}
             <button
               type="button"
               disabled={busy}
@@ -275,15 +328,17 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
         ) : null}
       </section>
 
-      {isAccepted ? (
-        <>
-          <ProfileSocialTallies
-            followingCount={profile.followingCount ?? null}
-            followersCount={profile.followersCount ?? null}
-            onFollowingPress={() => void openSocialSheet("following")}
-            onFollowersPress={() => void openSocialSheet("followers")}
-          />
+      {showSocialTallies ? (
+        <ProfileSocialTallies
+          followingCount={profile.followingCount ?? null}
+          followersCount={profile.followersCount ?? null}
+          onFollowingPress={() => void openSocialSheet("following")}
+          onFollowersPress={() => void openSocialSheet("followers")}
+        />
+      ) : null}
 
+      {isFriend ? (
+        <>
           <section className="rounded-xl border border-border/60 bg-card-surface/50 p-3">
             <button
               type="button"
@@ -335,14 +390,14 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
       {socialSheet === "following" ? (
         <SocialConnectionsSheet
           title="Following"
-          users={friendsList ?? []}
+          users={followingList ?? []}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}
       {socialSheet === "followers" ? (
         <SocialConnectionsSheet
           title="Followers"
-          users={friendsList ?? []}
+          users={followersList ?? []}
           onClose={() => setSocialSheet(null)}
         />
       ) : null}
