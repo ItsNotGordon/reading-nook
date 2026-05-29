@@ -7,7 +7,7 @@ The Next.js app lives in [`app/`](../app/). Deploy that directory as the project
 1. Import the Git repo in [Vercel](https://vercel.com/new).
 2. Set **Root Directory** to `app`.
 3. Framework preset: **Next.js** (uses [`app/vercel.json`](../app/vercel.json)).
-4. Add environment variables from [`app/.env.example`](../app/.env.example) only if you enable Supabase (optional).
+4. Add environment variables from [`app/.env.example`](../app/.env.example) (Supabase required for login). Set `NEXT_PUBLIC_SITE_URL` to your production URL (same as Supabase Auth Site URL). See [`GOOGLE_OAUTH_BRANDING.md`](GOOGLE_OAUTH_BRANDING.md) for Google sign-in branding.
 5. Deploy.
 
 Build command (default): `npm run build`  

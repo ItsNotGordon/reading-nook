@@ -13,6 +13,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { buildAuthCallbackUrl } from "@/lib/siteUrl";
 
 type SignOutSideEffect = () => void | Promise<void>;
 
@@ -70,14 +71,14 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       if (!configured) {
         return { ok: false, message: "Cloud sign-in is not configured on this deployment." };
       }
-      const safePath = redirectPath.startsWith("/") && !redirectPath.startsWith("//")
-        ? redirectPath
-        : "/profile";
       const client = createSupabaseBrowserClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safePath)}`;
+      const redirectTo = buildAuthCallbackUrl(window.location.origin, redirectPath);
       const { error } = await client.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          queryParams: { prompt: "select_account" },
+        },
       });
       if (error) return { ok: false, message: error.message };
       return { ok: true, message: "" };
