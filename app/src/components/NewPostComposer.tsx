@@ -10,6 +10,11 @@ import type { Book } from "@/lib/types";
 type NewPostComposerProps = {
   onPosted: () => void;
   clubId?: string;
+  /** Cozy club discussion styling when posting inside a club. */
+  variant?: "default" | "club";
+  placeholder?: string;
+  /** Pre-attach a book (e.g. current club read). */
+  initialBook?: Book | null;
 };
 
 function ClubPickerSheet({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (club: Club) => void }) {
@@ -81,9 +86,15 @@ function ClubPickerSheet({ open, onClose, onPick }: { open: boolean; onClose: ()
   );
 }
 
-export function NewPostComposer({ onPosted, clubId }: NewPostComposerProps) {
+export function NewPostComposer({
+  onPosted,
+  clubId,
+  variant = "default",
+  placeholder,
+  initialBook = null,
+}: NewPostComposerProps) {
   const [body, setBody] = useState("");
-  const [attachedBook, setAttachedBook] = useState<Book | null>(null);
+  const [attachedBook, setAttachedBook] = useState<Book | null>(initialBook);
   const [attachedClub, setAttachedClub] = useState<Club | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [clubPickerOpen, setClubPickerOpen] = useState(false);
@@ -110,14 +121,25 @@ export function NewPostComposer({ onPosted, clubId }: NewPostComposerProps) {
     }
   }
 
+  const resolvedPlaceholder =
+    placeholder ??
+    (variant === "club" || clubId
+      ? "Share a thought with the club..."
+      : "Share a thought about what you're reading...");
+
+  const shellClass =
+    variant === "club"
+      ? "rounded-2xl border border-border/80 bg-card-surface/90 p-4 shadow-sm ring-1 ring-black/[0.04]"
+      : "rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]";
+
   return (
-    <div className="rounded-2xl border border-border bg-card-surface/95 p-3 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[1px]">
+    <div className={shellClass}>
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder={clubId ? "Share something with the club..." : "Share a thought about what you're reading..."}
-        rows={2}
-        className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:ring-1 focus:ring-accent"
+        placeholder={resolvedPlaceholder}
+        rows={variant === "club" ? 3 : 2}
+        className="w-full resize-none rounded-xl border border-border/80 bg-background/80 px-3 py-2.5 text-sm text-foreground placeholder:text-foreground-muted/70 focus:outline-none focus:ring-1 focus:ring-accent/40"
       />
 
       {attachedBook ? (
@@ -163,19 +185,25 @@ export function NewPostComposer({ onPosted, clubId }: NewPostComposerProps) {
         </div>
       ) : null}
 
-      <div className="mt-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <button
+            type="button"
             onClick={() => setPickerOpen(true)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card-surface text-accent hover:bg-accent-soft/20"
+            className={
+              variant === "club"
+                ? "inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-soft/15"
+                : "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card-surface text-accent hover:bg-accent-soft/20"
+            }
             aria-label="Attach a book"
             title="Attach a book"
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+            <svg className="h-4 w-4 shrink-0 text-accent" viewBox="0 0 24 24" fill="none">
               <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z" stroke="currentColor" strokeWidth="1.75" />
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" strokeWidth="1.75" />
               <path d="M9 7h6" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
             </svg>
+            {variant === "club" ? <span>Attach book</span> : null}
           </button>
           {!clubId ? (
             <button
@@ -193,9 +221,10 @@ export function NewPostComposer({ onPosted, clubId }: NewPostComposerProps) {
           ) : null}
         </div>
         <button
+          type="button"
           onClick={handlePost}
           disabled={!body.trim() || posting}
-          className="inline-flex h-8 items-center justify-center rounded-xl border border-accent bg-accent px-4 text-xs font-semibold text-white shadow-sm disabled:opacity-50 active:bg-accent/80"
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-accent bg-accent px-5 text-xs font-semibold text-white shadow-sm disabled:opacity-50 active:bg-accent/80"
         >
           {posting ? "Posting..." : "Post"}
         </button>

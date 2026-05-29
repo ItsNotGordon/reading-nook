@@ -17,6 +17,8 @@ type ClubIconPickerProps = {
   iconUrl: string | null;
   size?: "md" | "lg";
   onIconChange: (url: string | null) => void;
+  /** When false, hides "Tap icon to change" under the icon. */
+  showHint?: boolean;
 };
 
 export function ClubIconPicker({
@@ -25,6 +27,7 @@ export function ClubIconPicker({
   iconUrl,
   size = "lg",
   onIconChange,
+  showHint = true,
 }: ClubIconPickerProps) {
   const galleryInputId = useId();
   const cameraInputId = useId();
@@ -107,7 +110,9 @@ export function ClubIconPicker({
         size={size}
         onClick={() => setMenuOpen(true)}
       />
-      <p className="text-xs text-foreground-muted">Tap icon to change</p>
+      {showHint ? (
+        <p className="text-xs text-foreground-muted">Tap icon to change</p>
+      ) : null}
       {error ? <p className="text-xs text-red-700">{error}</p> : null}
       {busy ? <p className="text-xs text-foreground-muted">Updating icon…</p> : null}
 

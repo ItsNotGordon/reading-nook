@@ -13,6 +13,7 @@ import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment
 import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
+import { OverflowMenu } from "./OverflowMenu";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -567,23 +568,26 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
               </span>
             </div>
             {isOwn ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setEditing(true);
-                    setEditText(item.body);
-                  }}
-                  className="text-[10px] font-medium text-foreground-muted"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="text-[10px] font-medium text-red-400"
-                >
-                  Delete
-                </button>
-              </div>
+              <OverflowMenu
+                align="right"
+                ariaLabel="Post options"
+                items={[
+                  {
+                    id: "edit",
+                    label: "Edit",
+                    onClick: () => {
+                      setEditing(true);
+                      setEditText(item.body);
+                    },
+                  },
+                  {
+                    id: "delete",
+                    label: "Delete",
+                    destructive: true,
+                    onClick: () => void handleDelete(),
+                  },
+                ]}
+              />
             ) : null}
           </div>
 
