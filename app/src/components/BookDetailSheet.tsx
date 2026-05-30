@@ -239,7 +239,9 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
     ? `Finished ${formatDate(ub.finishedAt)}`
     : shelf === "reading"
       ? `Started ${formatDate(ub.addedAt)}`
-      : `Added ${formatDate(ub.addedAt)}`;
+      : shelf === "did_not_finish"
+        ? `Did not finish · added ${formatDate(ub.addedAt)}`
+        : `Added ${formatDate(ub.addedAt)}`;
 
   return (
     <dialog
@@ -509,6 +511,15 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
                   label="Update progress"
                   onClick={() => setProgressOpen(true)}
                 />
+              ) : shelf === "did_not_finish" ? (
+                <ActionButton
+                  icon={<PlayIcon />}
+                  label="Start reading"
+                  onClick={() => {
+                    actions.moveBookToShelf(bookId, "reading");
+                    onClose();
+                  }}
+                />
               ) : (
                 <ActionButton
                   icon={<PlayIcon />}
@@ -575,6 +586,7 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
       {moveShelfOpen ? (
         <MoveShelfSheet
           book={book}
+          currentShelf={ub.shelf}
           onChoose={moveToShelf}
           onClose={() => setMoveShelfOpen(false)}
         />

@@ -275,8 +275,20 @@ function normalizeHydratedUserBook(ub: UserBook, catalogEntry: Book | undefined)
   let next: UserBook = { ...ub };
 
   // Non-finished shelves should not carry post-read metadata.
-  if (next.shelf !== "finished" && (next.sentimentBucket !== null || next.derivedScore !== null)) {
-    next = { ...next, sentimentBucket: null, derivedScore: null, finishedSortAt: null };
+  if (
+    next.shelf !== "finished" &&
+    (next.sentimentBucket !== null ||
+      next.derivedScore !== null ||
+      next.finishedAt !== null ||
+      next.finishedSortAt !== null)
+  ) {
+    next = {
+      ...next,
+      sentimentBucket: null,
+      derivedScore: null,
+      finishedAt: null,
+      finishedSortAt: null,
+    };
   }
 
   if (next.shelf === "finished") {
@@ -339,12 +351,18 @@ export function defaultUserProfile(): UserProfile {
   return {
     displayName: DEFAULT_DISPLAY_NAME,
     tagline: DEFAULT_TAGLINE,
-    theme: "plant",
+    theme: "matcha",
   };
 }
 
 function isAppTheme(value: unknown): value is AppTheme {
   return typeof value === "string" && (APP_THEMES as string[]).includes(value);
+}
+
+function normalizeStoredTheme(value: unknown): AppTheme {
+  if (value === "plant") return "garden";
+  if (isAppTheme(value)) return value;
+  return defaultUserProfile().theme;
 }
 
 const PROFILE_DISPLAY_MAX = 80;
@@ -359,7 +377,7 @@ function parseProfile(value: unknown): UserProfile {
     ? nameRaw.slice(0, PROFILE_DISPLAY_MAX)
     : d.displayName;
   const tagline = tagRaw ? tagRaw.slice(0, PROFILE_TAGLINE_MAX) : d.tagline;
-  const theme = isAppTheme(value.theme) ? value.theme : d.theme;
+  const theme = normalizeStoredTheme(value.theme);
   return { displayName, tagline, theme };
 }
 

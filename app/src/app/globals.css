@@ -23,6 +23,7 @@
   /* Unread tail of the bar (inside the gray outline) */
   --progress-unread: #ffffff;
   --card-surface: #ffffff;
+  --nav-muted: var(--foreground-muted);
   --nav-accent: var(--accent);
   --nav-accent-soft: var(--accent-soft);
   --nav-border: var(--border);

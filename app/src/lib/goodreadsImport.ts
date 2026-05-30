@@ -348,6 +348,7 @@ export function buildImportPlan(
     want_to_read: 0,
     reading: 0,
     finished: 0,
+    did_not_finish: 0,
   };
   const bySentiment: Record<SentimentBucket | "unrated", number> = {
     liked: 0,

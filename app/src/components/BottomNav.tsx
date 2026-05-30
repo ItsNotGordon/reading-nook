@@ -122,7 +122,7 @@ export function BottomNav() {
               className={`flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1 text-[10px] font-medium transition-colors ${
                 active
                   ? "text-[var(--nav-accent)]"
-                  : "text-foreground-muted hover:text-foreground"
+                  : "text-[var(--nav-muted)] hover:text-[var(--foreground)]"
               }`}
             >
               <span

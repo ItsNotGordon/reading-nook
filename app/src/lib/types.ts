@@ -23,7 +23,7 @@ export type Book = {
 };
 
 /** Which shelf a copy lives on in the user library. */
-export type Shelf = "want_to_read" | "reading" | "finished";
+export type Shelf = "want_to_read" | "reading" | "finished" | "did_not_finish";
 
 /** Post-read sentiment used for bucket rankings (not recommendations). */
 export type SentimentBucket = "liked" | "okay" | "disliked";
@@ -64,11 +64,30 @@ export const SENTIMENT_BUCKETS: SentimentBucket[] = [
   "disliked",
 ];
 
-export const SHELVES: Shelf[] = ["want_to_read", "reading", "finished"];
+export const SHELVES: Shelf[] = ["want_to_read", "reading", "finished", "did_not_finish"];
 
-export type AppTheme = "plant" | "coffee" | "matcha" | "cats" | "galaxy" | "raindrops" | "sakura" | "vinyl";
+export type AppTheme =
+  | "matcha"
+  | "coffee"
+  | "sunroom"
+  | "citrus"
+  | "galaxy"
+  | "raindrops"
+  | "sakura"
+  | "vinyl"
+  | "kintsugi"
+  | "garden"
+  | "observatory"
+  | "cats";
 
-export const APP_THEMES: AppTheme[] = ["plant", "coffee", "matcha", "cats", "galaxy", "raindrops", "sakura", "vinyl"];
+/** Profile background picker: three rows of four. */
+export const PROFILE_THEME_ROWS: AppTheme[][] = [
+  ["matcha", "coffee", "sunroom", "citrus"],
+  ["galaxy", "raindrops", "sakura", "vinyl"],
+  ["kintsugi", "garden", "observatory", "cats"],
+];
+
+export const APP_THEMES: AppTheme[] = PROFILE_THEME_ROWS.flat();
 
 /** Local name + tagline; `displayName` maps to `display_name` in cloud profiles. */
 export type UserProfile = {

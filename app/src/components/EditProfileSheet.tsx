@@ -3,13 +3,17 @@
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
-import { themePreviewSrc } from "@/components/ProfileDecorationBackdrop";
-import { themePickerSelectedStyle } from "@/lib/profileTheme";
-import { useReadingNook } from "@/lib/app-state";
 import { ProfilePhotoPicker } from "@/components/ProfilePhotoPicker";
+import { useReadingNook } from "@/lib/app-state";
 import { normalizeUsername } from "@/lib/username";
 import type { UserProfile } from "@/lib/types";
-import { APP_THEMES } from "@/lib/types";
+import { PROFILE_THEME_ROWS } from "@/lib/types";
+import {
+  normalizeProfileTheme,
+  themeDisplayName,
+  themePickerSelectedStyle,
+  themePreviewSrc,
+} from "@/lib/profileTheme";
 
 type EditProfileSheetProps = {
   profile: UserProfile;
@@ -39,7 +43,7 @@ export function EditProfileSheet({
   const [usernameBusy, setUsernameBusy] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState(false);
-  const profileTheme = state.profile.theme ?? "plant";
+  const profileTheme = normalizeProfileTheme(state.profile.theme);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -286,42 +290,42 @@ export function EditProfileSheet({
                 <p className="mt-1 text-xs text-foreground-muted">
                   Decorations and backdrop tint on Profile only. Updates immediately.
                 </p>
-                <div
-                  className="mt-3 grid grid-cols-4 gap-2"
-                  role="radiogroup"
-                  aria-label="Profile background style"
-                >
-                  {APP_THEMES.map((theme) => {
-                    const selected = profileTheme === theme;
-                    const label = theme.charAt(0).toUpperCase() + theme.slice(1);
-                    return (
-                      <button
-                        key={theme}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => actions.updateProfile({ theme })}
-                        className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-colors ${
-                          selected
-                            ? "ring-1"
-                            : "border-border/80 bg-background hover:bg-foreground/[0.04]"
-                        }`}
-                        style={selected ? themePickerSelectedStyle(theme) : undefined}
-                      >
-                        <span className="relative h-12 w-12">
-                          <Image
-                            src={themePreviewSrc(theme)}
-                            alt=""
-                            width={48}
-                            height={48}
-                            className="h-full w-full object-contain"
-                            sizes="48px"
-                          />
-                        </span>
-                        <span className="text-[10px] font-semibold text-foreground">{label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mt-3 space-y-2" role="radiogroup" aria-label="Profile background style">
+                  {PROFILE_THEME_ROWS.map((row) => (
+                    <div key={row.join("-")} className="grid grid-cols-4 gap-2">
+                      {row.map((theme) => {
+                        const selected = profileTheme === theme;
+                        const label = themeDisplayName(theme);
+                        return (
+                          <button
+                            key={theme}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            onClick={() => actions.updateProfile({ theme })}
+                            className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-colors ${
+                              selected
+                                ? "ring-1"
+                                : "border-border/80 bg-background hover:bg-foreground/[0.04]"
+                            }`}
+                            style={selected ? themePickerSelectedStyle(theme) : undefined}
+                          >
+                            <span className="relative h-12 w-12">
+                              <Image
+                                src={themePreviewSrc(theme)}
+                                alt=""
+                                width={48}
+                                height={48}
+                                className="h-full w-full object-contain"
+                                sizes="48px"
+                              />
+                            </span>
+                            <span className="text-[10px] font-semibold text-foreground">{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

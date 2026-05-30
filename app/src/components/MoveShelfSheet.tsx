@@ -1,17 +1,19 @@
 "use client";
 
 import type { Book, Shelf } from "@/lib/types";
-import { shelfDisplayName } from "@/components/ShelfPickerSheet";
+import { moveShelfTargets, shelfDisplayName } from "@/lib/shelves";
 
 type MoveShelfSheetProps = {
   book: Book;
+  currentShelf: Shelf;
   onChoose: (shelf: Shelf) => void;
   onClose: () => void;
 };
 
-const MOVE_TARGETS: Shelf[] = ["reading", "want_to_read"];
+export function MoveShelfSheet({ book, currentShelf, onChoose, onClose }: MoveShelfSheetProps) {
+  const targets = moveShelfTargets(currentShelf);
+  const clearsRating = currentShelf === "finished";
 
-export function MoveShelfSheet({ book, onChoose, onClose }: MoveShelfSheetProps) {
   return (
     <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
       <button
@@ -27,11 +29,13 @@ export function MoveShelfSheet({ book, onChoose, onClose }: MoveShelfSheetProps)
       >
         <p className="font-serif text-lg font-semibold text-foreground">Move to shelf</p>
         <p className="mt-1 line-clamp-2 text-sm text-foreground-muted">{book.title}</p>
-        <p className="mt-2 text-xs leading-relaxed text-foreground-muted">
-          Moving off Finished clears your rating and ranking for this book.
-        </p>
+        {clearsRating ? (
+          <p className="mt-2 text-xs leading-relaxed text-foreground-muted">
+            Moving off Finished clears your rating and ranking for this book.
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-col gap-2">
-          {MOVE_TARGETS.map((shelf) => (
+          {targets.map((shelf) => (
             <button
               key={shelf}
               type="button"

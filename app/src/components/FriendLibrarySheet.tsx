@@ -14,6 +14,7 @@ const SHELF_LABELS: Record<string, string> = {
   reading: "Currently reading",
   finished: "Finished",
   want_to_read: "Want to read",
+  did_not_finish: "Did not finish",
 };
 
 export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibrarySheetProps) {
@@ -90,7 +91,7 @@ export function FriendLibrarySheet({ friendId, friendName, onClose }: FriendLibr
               <p className="text-sm text-foreground-muted">No shelved books yet.</p>
             ) : (
               <div className="space-y-4">
-                {(["reading", "finished", "want_to_read"] as const).map((shelf) => {
+                {(["reading", "finished", "want_to_read", "did_not_finish"] as const).map((shelf) => {
                   const items = grouped[shelf];
                   if (items.length === 0) return null;
                   return (

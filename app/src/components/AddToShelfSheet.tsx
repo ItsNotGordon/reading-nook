@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { CoverThumb } from "@/components/CoverThumb";
 import { GenreChipPicker } from "@/components/GenreChipPicker";
 import type { Book, Shelf } from "@/lib/types";
+import { PRIMARY_ADD_SHELVES, shelfDisplayName } from "@/lib/shelves";
 
-const SHELF_OPTIONS: Array<{ shelf: Shelf; label: string }> = [
-  { shelf: "want_to_read", label: "Want to Read" },
-  { shelf: "reading", label: "Currently Reading" },
-  { shelf: "finished", label: "Finished" },
-];
+const SHELF_OPTIONS: Array<{ shelf: Shelf; label: string }> = PRIMARY_ADD_SHELVES.map((shelf) => ({
+  shelf,
+  label: shelfDisplayName(shelf),
+}));
 
 function shelfIcon(shelf: Shelf) {
   if (shelf === "want_to_read") {
@@ -197,6 +197,24 @@ export function AddToShelfSheet({
               );
             })}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveShelf("did_not_finish");
+              onChooseShelf("did_not_finish", selectedGenres, makePrivate ? "private" : "public");
+            }}
+            className={`mt-2 w-full rounded-xl border px-3 py-2.5 text-left text-sm ${
+              activeShelf === "did_not_finish"
+                ? "border-accent/70 bg-accent-soft/30 font-medium text-accent"
+                : "border-border/80 bg-card-surface/60 font-medium text-foreground-muted hover:border-border hover:text-foreground"
+            }`}
+          >
+            Did Not Finish
+            <span className="mt-0.5 block text-[11px] font-normal text-foreground-muted">
+              Stopped partway — no rating needed
+            </span>
+          </button>
 
           <div className="mt-3 rounded-xl border border-border bg-card-surface px-2.5 py-2">
             <div className="flex items-center justify-between gap-3">

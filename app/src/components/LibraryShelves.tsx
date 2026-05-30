@@ -18,10 +18,18 @@ const SHELF_SECTION_ID: Record<Shelf, string> = {
   reading: "shelf-reading",
   finished: "shelf-finished",
   want_to_read: "shelf-want",
+  did_not_finish: "shelf-dnf",
 };
 
 function parseShelfParam(value: string | null): Shelf | null {
-  if (value === "reading" || value === "finished" || value === "want_to_read") return value;
+  if (
+    value === "reading" ||
+    value === "finished" ||
+    value === "want_to_read" ||
+    value === "did_not_finish"
+  ) {
+    return value;
+  }
   return null;
 }
 
@@ -54,8 +62,16 @@ export function LibraryShelves() {
     () => itemsForShelf(state.userBooks, state.catalog, "want_to_read"),
     [state.userBooks, state.catalog],
   );
+  const didNotFinish = useMemo(
+    () => itemsForShelf(state.userBooks, state.catalog, "did_not_finish"),
+    [state.userBooks, state.catalog],
+  );
 
-  const libraryEmpty = reading.length === 0 && finished.length === 0 && want.length === 0;
+  const libraryEmpty =
+    reading.length === 0 &&
+    finished.length === 0 &&
+    want.length === 0 &&
+    didNotFinish.length === 0;
 
   useEffect(() => {
     if (!shelfParam || libraryEmpty) return;
@@ -66,7 +82,7 @@ export function LibraryShelves() {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     return () => cancelAnimationFrame(frame);
-  }, [shelfParam, libraryEmpty, reading.length, finished.length, want.length]);
+  }, [shelfParam, libraryEmpty, reading.length, finished.length, want.length, didNotFinish.length]);
 
   const openDetail = (bookId: BookId) => {
     const ub = state.userBooks[bookId];
@@ -142,6 +158,16 @@ export function LibraryShelves() {
         items={want}
         emptyTitle="Your wishlist is empty"
         emptyBody="Books you want to read will stack here—unhurried, one scroll at a time."
+        onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
+        onOpenDetail={openDetail}
+      />
+      <ShelfSection
+        sectionId={SHELF_SECTION_ID.did_not_finish}
+        title="Did Not Finish"
+        variant="dnf"
+        items={didNotFinish}
+        emptyTitle="No unfinished reads here"
+        emptyBody="Books you set aside partway will appear here—no rating required, just a quiet shelf."
         onStartPairwise={(bookId, bucket) => setPairwise({ open: true, bookId, bucket })}
         onOpenDetail={openDetail}
       />

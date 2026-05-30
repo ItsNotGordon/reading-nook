@@ -15,8 +15,16 @@ export type FeedComment = {
   replies: FeedComment[];
 };
 
+export type LikedByUser = {
+  userId: string;
+  displayName: string;
+  username: string | null;
+  avatarUrl: string | null;
+};
+
 export type LikedByPreview = {
-  names: string[];
+  /** Up to two likers for inline “Liked by …” copy. */
+  users: LikedByUser[];
   totalLikes: number;
 };
 

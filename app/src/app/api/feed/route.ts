@@ -193,6 +193,22 @@ export async function GET() {
     }
   }
 
+  const likerIds = new Set<string>();
+  for (const entry of reactionMap.values()) {
+    for (const id of entry.likeUserIds) likerIds.add(id);
+  }
+  for (const entry of eventReactionMap.values()) {
+    for (const id of entry.likeUserIds) likerIds.add(id);
+  }
+  const missingLikers = Array.from(likerIds).filter((id) => !profileMap.has(id));
+  if (missingLikers.length > 0) {
+    const { data: likerProfiles } = await supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_url")
+      .in("id", missingLikers);
+    for (const p of likerProfiles ?? []) profileMap.set(p.id, p);
+  }
+
   // Collect all comment reaction IDs to fetch their likes
   const allCommentIds: { id: string; source: "post" | "event" }[] = [];
   for (const entry of reactionMap.values()) {
@@ -254,10 +270,16 @@ export async function GET() {
 
   function likedByPreviewFor(likeUserIds: string[], totalLikes: number) {
     const unique = Array.from(new Set(likeUserIds));
-    const names = unique
-      .slice(0, 2)
-      .map((id) => profileMap.get(id)?.display_name?.trim() || "Reader");
-    return { names, totalLikes };
+    const users = unique.slice(0, 2).map((id) => {
+      const p = profileMap.get(id);
+      return {
+        userId: id,
+        displayName: p?.display_name?.trim() || "Reader",
+        username: p?.username ?? null,
+        avatarUrl: p?.avatar_url ?? null,
+      };
+    });
+    return { users, totalLikes };
   }
 
   const clubIds = new Set<string>();

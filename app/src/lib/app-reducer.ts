@@ -14,6 +14,7 @@ import { matchesCanonicalRange } from "./progress";
 import { computeDerivedScores } from "./ranking";
 import { sanitizeCatalogGenres } from "./mergeCatalogGenres";
 import { reconcileRankingsState } from "./libraryRankings";
+import { normalizeProfileTheme } from "./profileTheme";
 import { getInitialState, defaultUserProfile } from "./storage";
 
 export type AppAction =
@@ -209,7 +210,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         tagline = t || d.tagline;
       }
       if (action.theme !== undefined) {
-        theme = action.theme;
+        theme = normalizeProfileTheme(action.theme);
       }
       return {
         ...state,
@@ -300,6 +301,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       } else {
         nextUb = {
           ...nextUb,
+          shelf,
           finishedAt: null,
           finishedSortAt: null,
           sentimentBucket: null,

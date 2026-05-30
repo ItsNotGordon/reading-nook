@@ -17,7 +17,7 @@ export type FriendShelfBook = {
   totalPages?: number;
 };
 
-const SHELF_ORDER: Shelf[] = ["reading", "finished", "want_to_read"];
+const SHELF_ORDER: Shelf[] = ["reading", "finished", "want_to_read", "did_not_finish"];
 
 export function listFriendShelfBooks(state: AppState): FriendShelfBook[] {
   const out: FriendShelfBook[] = [];
@@ -57,5 +57,6 @@ export function groupFriendShelfBooks(books: FriendShelfBook[]): Record<Shelf, F
     reading: books.filter((b) => b.shelf === "reading"),
     finished: books.filter((b) => b.shelf === "finished"),
     want_to_read: books.filter((b) => b.shelf === "want_to_read"),
+    did_not_finish: books.filter((b) => b.shelf === "did_not_finish"),
   };
 }

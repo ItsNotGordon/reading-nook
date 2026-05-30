@@ -37,6 +37,7 @@ function formatFinishedAt(iso: string | null): string {
 function shelfLabel(shelf: FriendBookSnapshot["shelf"]): string {
   if (shelf === "reading") return "Currently reading";
   if (shelf === "finished") return "Finished";
+  if (shelf === "did_not_finish") return "Did not finish";
   return "Want to read";
 }
 

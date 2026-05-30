@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type {
@@ -10,6 +10,12 @@ import type {
   LikedByPreview,
 } from "@/lib/feedClient";
 import { toggleLike, addComment, deleteComment, toggleEventLike, addEventComment, deleteEventComment, deletePost, editPost, toggleCommentLike } from "@/lib/feedClient";
+import {
+  authorDisplayLabel,
+  getProfileHref,
+  profileLinkAriaLabel,
+} from "@/lib/profileLinks";
+import { LikedByPreviewLine } from "@/components/LikedByPreviewLine";
 import { OpenBookScoreBadge } from "@/components/OpenBookScoreBadge";
 import type { SentimentBucket } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
@@ -32,26 +38,40 @@ function shelfLabel(shelf: string): string {
     case "want_to_read": return "Want to Read";
     case "reading": return "Currently Reading";
     case "finished": return "Finished";
+    case "did_not_finish": return "Did Not Finish";
     default: return shelf;
   }
 }
 
 
 function authorLabel(author: FeedAuthor): string {
-  return author.username ? `@${author.username}` : author.displayName;
+  return authorDisplayLabel({
+    userId: author.userId,
+    displayName: author.displayName,
+    username: author.username,
+  });
 }
 
 function AuthorLink({ author, currentUserId, children }: { author: FeedAuthor; currentUserId?: string | null; children: React.ReactNode }) {
-  if (author.username) {
-    const isSelf = currentUserId && author.userId === currentUserId;
-    const href = isSelf ? "/profile" : `/friends/${encodeURIComponent(author.username)}`;
-    return (
-      <Link href={href} className="inline-flex items-center gap-1.5">
-        {children}
-      </Link>
-    );
+  const profileUser = {
+    userId: author.userId,
+    displayName: author.displayName,
+    username: author.username,
+  };
+  const href = getProfileHref(profileUser, currentUserId);
+  if (!href) {
+    return <span className="inline-flex items-center gap-1.5">{children}</span>;
   }
-  return <span className="inline-flex items-center gap-1.5">{children}</span>;
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1.5"
+      aria-label={profileLinkAriaLabel(profileUser)}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </Link>
+  );
 }
 
 function Avatar({ name, url }: { name: string; url: string | null }) {
@@ -88,21 +108,6 @@ function BookThumbnail({ coverUrl, title, onClick }: { coverUrl: string; title: 
       onClick={onClick}
     />
   );
-}
-
-function formatLikedByText(preview?: LikedByPreview | null): string | null {
-  if (!preview) return null;
-  const total = preview.totalLikes;
-  if (total <= 0 || preview.names.length === 0) return null;
-
-  const [first, second] = preview.names;
-  if (total === 1) return `Liked by ${first}`;
-  if (total === 2) {
-    if (second) return `Liked by ${first} and ${second}`;
-    return `Liked by ${first} and 1 other`;
-  }
-  if (total === 3 && second) return `Liked by ${first}, ${second} and 1 other`;
-  return `Liked by ${first}${second ? `, ${second}` : ""} and ${total - 2} others`;
 }
 
 function CommentLikeButton({ reactionId, source, initialCount, initialLiked }: {
@@ -146,7 +151,7 @@ function CommentSection({
   currentUserId,
   onCommentAdded,
   likeButton,
-  likedByText,
+  likedByPreview,
 }: {
   targetId: string;
   targetType?: "post" | "event";
@@ -154,13 +159,13 @@ function CommentSection({
   currentUserId: string | null;
   onCommentAdded: () => void;
   likeButton?: React.ReactNode;
-  likedByText?: string | null;
+  likedByPreview?: LikedByPreview | null;
 }) {
   const [showAllComments, setShowAllComments] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
-  const inputRef = useState<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const totalCount = comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0);
   const visibleTopLevel = showAllComments ? comments : comments.slice(0, 3);
@@ -173,7 +178,7 @@ function CommentSection({
     const label = authorLabel(comment.author);
     setReplyingTo({ id: comment.id, username: label });
     setText(`${label} `);
-    setTimeout(() => inputRef[0]?.focus(), 0);
+    setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   function cancelReply() {
@@ -204,11 +209,7 @@ function CommentSection({
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           {likeButton}
-          {likedByText ? (
-            <p className="mt-1 truncate text-xs font-medium text-foreground-muted">
-              {likedByText}
-            </p>
-          ) : null}
+          <LikedByPreviewLine preview={likedByPreview} currentUserId={currentUserId} />
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-foreground-muted">
           <svg
@@ -347,7 +348,7 @@ function CommentSection({
 
       <div className="flex items-center gap-2">
         <input
-          ref={(el) => { inputRef[0] = el; }}
+          ref={inputRef}
           type="text"
           placeholder={replyingTo ? `Reply to ${replyingTo.username}...` : "Write a comment..."}
           value={text}
@@ -422,8 +423,6 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
     }
   }
 
-  const likedByText = formatLikedByText(item.likedByPreview ?? null);
-
   if (item.kind === "event") {
     const verb =
       item.eventType === "progress"
@@ -432,11 +431,15 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
           ? "changed how they felt about"
           : item.eventType === "finished"
             ? "finished"
-            : item.shelf === "reading"
-              ? "started reading"
-              : item.shelf === "want_to_read"
-                ? "wants to read"
-                : `added to ${shelfLabel(item.shelf)}`;
+            : item.eventType === "did_not_finish"
+              ? "did not finish"
+              : item.shelf === "reading"
+                ? "started reading"
+                : item.shelf === "want_to_read"
+                  ? "wants to read"
+                  : item.shelf === "did_not_finish"
+                    ? "did not finish"
+                    : `added to ${shelfLabel(item.shelf)}`;
 
     let progressFraction =
       item.eventType === "progress" && typeof item.derivedScore === "number"
@@ -520,7 +523,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
         comments={item.comments}
         currentUserId={currentUserId}
         onCommentAdded={onRefresh}
-        likedByText={likedByText}
+        likedByPreview={item.likedByPreview}
         likeButton={
           <button
             onClick={handleToggleLike}
@@ -574,7 +577,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
                 items={[
                   {
                     id: "edit",
-                    label: "Edit",
+                    label: "Edit post",
                     onClick: () => {
                       setEditing(true);
                       setEditText(item.body);
@@ -582,7 +585,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
                   },
                   {
                     id: "delete",
-                    label: "Delete",
+                    label: "Delete post",
                     destructive: true,
                     onClick: () => void handleDelete(),
                   },
@@ -650,7 +653,7 @@ export function FeedCard({ item, currentUserId, onRefresh, onBookClick }: FeedCa
         comments={item.comments}
         currentUserId={currentUserId}
         onCommentAdded={onRefresh}
-        likedByText={likedByText}
+        likedByPreview={item.likedByPreview}
         likeButton={
           <button
             onClick={handleToggleLike}

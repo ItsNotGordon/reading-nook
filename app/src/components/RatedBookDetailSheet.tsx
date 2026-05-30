@@ -416,6 +416,7 @@ export function RatedBookDetailSheet({ bookId, onClose, onStartPairwise }: Rated
       {moveShelfOpen ? (
         <MoveShelfSheet
           book={rowBook}
+          currentShelf={ub.shelf}
           onChoose={moveToShelf}
           onClose={() => setMoveShelfOpen(false)}
         />

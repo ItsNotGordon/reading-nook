@@ -12,7 +12,9 @@ type BookPickerSheetProps = {
   onPick: (book: Book) => void;
 };
 
-const SHELF_LABELS: Record<Shelf, string> = {
+const PICKER_SHELVES = ["reading", "finished", "want_to_read"] as const satisfies readonly Shelf[];
+
+const SHELF_LABELS: Record<(typeof PICKER_SHELVES)[number], string> = {
   want_to_read: "Want to Read",
   reading: "Currently Reading",
   finished: "Finished",
@@ -21,10 +23,10 @@ const SHELF_LABELS: Record<Shelf, string> = {
 export function BookPickerSheet({ open, onClose, onPick }: BookPickerSheetProps) {
   const { state } = useReadingNook();
   const [query, setQuery] = useState("");
-  const [expandedShelf, setExpandedShelf] = useState<Shelf | null>(null);
+  const [expandedShelf, setExpandedShelf] = useState<(typeof PICKER_SHELVES)[number] | null>(null);
 
   const groups = useMemo(() => {
-    const shelves: Shelf[] = ["reading", "finished", "want_to_read"];
+    const shelves = PICKER_SHELVES;
     return shelves.map((shelf) => ({
       shelf,
       label: SHELF_LABELS[shelf],

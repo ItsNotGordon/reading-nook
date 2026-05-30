@@ -2,6 +2,9 @@
 
 import { AddToShelfSheet } from "@/components/AddToShelfSheet";
 import type { Book, Shelf } from "@/lib/types";
+import { shelfDisplayName } from "@/lib/shelves";
+
+export { shelfDisplayName };
 
 export const SHELF_CHOICES: { shelf: Shelf; title: string; subtitle: string }[] = [
   {
@@ -19,12 +22,12 @@ export const SHELF_CHOICES: { shelf: Shelf; title: string; subtitle: string }[] 
     title: "Want to Read",
     subtitle: "Save for later",
   },
+  {
+    shelf: "did_not_finish",
+    title: "Did Not Finish",
+    subtitle: "Stopped partway",
+  },
 ];
-
-export function shelfDisplayName(shelf: Shelf): string {
-  const row = SHELF_CHOICES.find((s) => s.shelf === shelf);
-  return row?.title ?? shelf;
-}
 
 type ShelfPickerSheetProps = {
   book: Book | null;

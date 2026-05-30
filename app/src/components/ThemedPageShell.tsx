@@ -2,6 +2,7 @@
 
 import { ProfileDecorationBackdrop } from "@/components/ProfileDecorationBackdrop";
 import { useReadingNook } from "@/lib/app-state";
+import { normalizeProfileTheme } from "@/lib/profileTheme";
 
 type ThemedPageShellProps = {
   children: React.ReactNode;
@@ -11,7 +12,7 @@ type ThemedPageShellProps = {
 /** Main column with profile theme gradient + decorations behind content. */
 export function ThemedPageShell({ children, title }: ThemedPageShellProps) {
   const { state, ready } = useReadingNook();
-  const theme = state.profile.theme ?? "plant";
+  const theme = normalizeProfileTheme(state.profile.theme);
 
   return (
     <div className="flex min-h-dvh flex-col">

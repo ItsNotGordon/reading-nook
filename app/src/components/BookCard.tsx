@@ -4,11 +4,12 @@ import Image from "next/image";
 import { useState } from "react";
 import type { Book, UserBook, SentimentBucket } from "@/lib/types";
 import { sentimentLabel } from "@/lib/sentiment-display";
+import { shelfDisplayName } from "@/lib/shelves";
 import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
 import { ProgressBar } from "./ProgressBar";
 import { ScoreBadge } from "./ScoreBadge";
 
-export type BookCardVariant = "reading" | "finished" | "want";
+export type BookCardVariant = "reading" | "finished" | "want" | "dnf";
 
 type BookCardProps = {
   book: Book;
@@ -107,6 +108,12 @@ export function BookCard({ book, userBook, variant, onOpenRatedDetail, onOpenDet
               <p className="text-[10px] text-foreground-muted">Tap to rate</p>
             )}
           </div>
+        ) : null}
+
+        {variant === "dnf" ? (
+          <p className="mt-auto text-[10px] font-medium text-foreground-muted">
+            {shelfDisplayName("did_not_finish")}
+          </p>
         ) : null}
       </div>
     </article>

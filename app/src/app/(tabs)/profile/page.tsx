@@ -18,6 +18,7 @@ import { BookDetailSheet } from "@/components/BookDetailSheet";
 import { ProfileDecorationBackdrop } from "@/components/ProfileDecorationBackdrop";
 import { useSupabaseAuth } from "@/components/SupabaseAuthProvider";
 import { useReadingNook } from "@/lib/app-state";
+import { normalizeProfileTheme } from "@/lib/profileTheme";
 import {
   buildSentimentInsights,
   getFavoriteAuthors,
@@ -134,7 +135,7 @@ export default function ProfilePage() {
   const sentimentInsights = useMemo(() => buildSentimentInsights(state), [state]);
   const ratedCount = useMemo(() => ratedFinishedCount(state), [state]);
 
-  const profileTheme = state.profile.theme ?? "plant";
+  const profileTheme = normalizeProfileTheme(state.profile.theme);
   const profileEditGated = cloudConfigured && !cloudUser;
   const socialGated = cloudConfigured && !cloudUser;
 

@@ -2,23 +2,51 @@
 
 import { useEffect } from "react";
 import { useReadingNook } from "@/lib/app-state";
-import { PROFILE_THEMES } from "@/lib/profileTheme";
+import {
+  LIGHT_UI_TOKENS,
+  PROFILE_THEMES,
+  applyUiTokensToElement,
+  isDarkProfileTheme,
+  normalizeProfileTheme,
+} from "@/lib/profileTheme";
 
-/** Syncs profile background theme to document for bottom nav styling. */
+const THEME_COLOR_META = 'meta[name="theme-color"]';
+
+/** Syncs profile theme to document CSS tokens (whole-app palette + bottom nav). */
 export function ProfileThemeApplier() {
   const { state } = useReadingNook();
-  const theme = state.profile.theme ?? "plant";
-  const nav = PROFILE_THEMES[theme]?.nav ?? PROFILE_THEMES.plant.nav;
+  const theme = normalizeProfileTheme(state.profile.theme);
+  const config = PROFILE_THEMES[theme] ?? PROFILE_THEMES.matcha;
+  const nav = config.nav;
+  const dark = isDarkProfileTheme(theme);
+  const uiTokens = config.uiTokens ?? LIGHT_UI_TOKENS;
 
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.profileTheme = theme;
+    root.dataset.profileMode = dark ? "dark" : "light";
+
+    applyUiTokensToElement(root, uiTokens);
+
     root.style.setProperty("--nav-accent", nav.accent);
     root.style.setProperty("--nav-accent-soft", nav.accentSoft);
     root.style.setProperty("--nav-border", nav.border);
     root.style.setProperty("--nav-bar-bg", nav.barBg);
     root.style.setProperty("--nav-active-shadow", nav.activeShadow);
-  }, [theme, nav.accent, nav.accentSoft, nav.border, nav.barBg, nav.activeShadow]);
+
+    const themeColor = dark ? nav.barBg : uiTokens.background;
+    const meta = document.querySelector(THEME_COLOR_META);
+    if (meta) meta.setAttribute("content", themeColor);
+  }, [
+    theme,
+    dark,
+    uiTokens,
+    nav.accent,
+    nav.accentSoft,
+    nav.border,
+    nav.barBg,
+    nav.activeShadow,
+  ]);
 
   return null;
 }

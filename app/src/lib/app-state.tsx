@@ -117,7 +117,29 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         }
       },
       moveBookToShelf: (bookId, shelf) => {
+        const prev = stateRef.current.userBooks[bookId];
+        const cat = stateRef.current.catalog[bookId];
         dispatch({ type: "MOVE_BOOK_TO_SHELF", bookId, shelf });
+        if (!cat || !prev || prev.shelf === shelf) return;
+        if (shelf === "did_not_finish") {
+          postFeedEvent({
+            eventType: "did_not_finish",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "did_not_finish",
+          });
+        } else if (shelf === "finished") {
+          postFeedEvent({
+            eventType: "finished",
+            bookId,
+            bookTitle: cat.title,
+            bookAuthor: cat.author,
+            bookCoverUrl: cat.coverUrl,
+            shelf: "finished",
+          });
+        }
       },
       setUserBookVisibility: (bookId, visibility) => {
         dispatch({ type: "SET_USER_BOOK_VISIBILITY", bookId, visibility });
