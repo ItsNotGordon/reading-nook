@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { appReducer } from "./app-reducer";
 import { getInitialState } from "./storage";
-import { moveShelfTargets, shelfDisplayName } from "./shelves";
+import { moveShelfTargets, parseRatingsShelfParam, shelfDisplayName } from "./shelves";
 import type { Book, UserBook } from "./types";
 
 describe("shelves", () => {
@@ -14,6 +14,13 @@ describe("shelves", () => {
     const targets = moveShelfTargets("reading");
     assert.ok(targets.includes("did_not_finish"));
     assert.ok(!targets.includes("reading"));
+  });
+
+  it("parseRatingsShelfParam defaults to finished", () => {
+    assert.equal(parseRatingsShelfParam(null), "finished");
+    assert.equal(parseRatingsShelfParam("finished"), "finished");
+    assert.equal(parseRatingsShelfParam("want_to_read"), "want_to_read");
+    assert.equal(parseRatingsShelfParam("invalid"), "finished");
   });
 });
 

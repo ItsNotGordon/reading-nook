@@ -13,7 +13,7 @@ type RatingsSentimentFiltersProps = {
 };
 
 const PILL_BASE =
-  "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition-colors";
+  "inline-flex min-h-7 shrink-0 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold transition-colors";
 
 function LikedIcon({ className = "" }: { className?: string }) {
   return (

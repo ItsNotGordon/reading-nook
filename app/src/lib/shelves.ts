@@ -8,6 +8,21 @@ export const LIBRARY_SHELF_ORDER: Shelf[] = [
   "did_not_finish",
 ];
 
+/** Ratings page shelf toggle order (Finished is default). */
+export const RATINGS_SHELF_ORDER: Shelf[] = [
+  "finished",
+  "reading",
+  "want_to_read",
+  "did_not_finish",
+];
+
+export function parseRatingsShelfParam(value: string | null): Shelf {
+  if (value && (RATINGS_SHELF_ORDER as string[]).includes(value)) {
+    return value as Shelf;
+  }
+  return "finished";
+}
+
 const DISPLAY_NAMES: Record<Shelf, string> = {
   reading: "Currently Reading",
   finished: "Finished",
@@ -22,6 +37,17 @@ export function shelfDisplayName(shelf: Shelf): string {
 /** Tight UI label (e.g. book cards). */
 export function shelfShortLabel(shelf: Shelf): string {
   return shelf === "did_not_finish" ? "DNF" : shelfDisplayName(shelf);
+}
+
+/** Compact shelf pills on the Ratings toolbar. */
+export function shelfToggleShortLabel(shelf: Shelf): string {
+  const SHORT: Record<Shelf, string> = {
+    finished: "Finished",
+    reading: "Reading",
+    want_to_read: "Want",
+    did_not_finish: "DNF",
+  };
+  return SHORT[shelf];
 }
 
 export function isFinishedShelf(shelf: Shelf): boolean {
