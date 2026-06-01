@@ -45,6 +45,7 @@ export type AppAction =
     }
   | { type: "UPDATE_USER_BOOK_NOTES"; bookId: BookId; notes: string }
   | { type: "UPDATE_CATALOG_GENRES"; bookId: BookId; genres: string[] }
+  | { type: "UPDATE_CATALOG_DESCRIPTION"; bookId: BookId; description: string }
   | { type: "UPDATE_PROFILE"; displayName?: string; tagline?: string; theme?: AppTheme }
   | { type: "DISMISS_REC"; bookId: BookId; catalogBook?: Book }
   | { type: "ADD_BLACKLIST_WORD"; word: string }
@@ -588,6 +589,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           [action.bookId]: {
             ...book,
             genres: sanitizeCatalogGenres(action.genres),
+          },
+        },
+      };
+    }
+
+    case "UPDATE_CATALOG_DESCRIPTION": {
+      const book = state.catalog[action.bookId];
+      if (!book) return state;
+      return {
+        ...state,
+        catalog: {
+          ...state.catalog,
+          [action.bookId]: {
+            ...book,
+            description: action.description,
           },
         },
       };

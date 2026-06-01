@@ -13,6 +13,7 @@ import { ShareSentimentToFeedToggle } from "@/components/ShareSentimentToFeedTog
 import { bookHasBucketRanking } from "@/lib/libraryRankings";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
+import { enrichBook } from "@/lib/enrichOpenLibraryBook";
 import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
 
 type BookDetailSheetProps = {
@@ -164,6 +165,7 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
   const [moveShelfOpen, setMoveShelfOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -171,7 +173,33 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
     if (!d.open) d.showModal();
   }, []);
 
+  useEffect(() => {
+    setShowFullDescription(false);
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!book || book.description?.trim()) return;
+    let active = true;
+    void enrichBook(book).then((enriched) => {
+        if (!active) return;
+        const nextDesc = enriched.description?.trim() ?? "";
+        if (nextDesc) {
+          actions.updateCatalogDescription(bookId, nextDesc);
+        }
+        const nextGenres = enriched.genres ?? [];
+        if (nextGenres.length > 0 && (book.genres?.length ?? 0) === 0) {
+          actions.updateCatalogGenres(bookId, nextGenres);
+        }
+    });
+    return () => {
+      active = false;
+    };
+  }, [bookId, book, actions]);
+
   if (!book || !ub) return null;
+
+  const descriptionText = book.description?.trim() || "No description available.";
+  const hasLongDescription = (book.description?.trim().length ?? 0) > 180;
 
   const score = ub.derivedScore;
   const isPrivate = ub.visibility === "private";
@@ -276,25 +304,49 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
               </button>
             </div>
 
-            {/* Large centered cover */}
-            <div className="flex flex-col items-center px-6 pt-6 pb-4">
-              <CoverThumb
-                src={book.coverUrl}
-                alt={`Cover: ${book.title}`}
-                sizes="160px"
-                fallbackLetter={book.title}
-                className="relative h-[220px] w-[148px] shrink-0 overflow-hidden rounded-xl bg-border shadow-lg"
-              />
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-start gap-2.5">
+                <CoverThumb
+                  src={book.coverUrl}
+                  alt={`Cover: ${book.title}`}
+                  sizes="76px"
+                  fallbackLetter={book.title}
+                  className="relative h-[114px] w-[76px] shrink-0 overflow-hidden rounded-lg bg-border shadow-sm"
+                />
+                <div className="min-w-0 flex-1 pr-6">
+                  <h2
+                    id={headingId}
+                    className="line-clamp-2 font-serif text-lg font-semibold leading-tight text-foreground"
+                  >
+                    {book.title}
+                  </h2>
+                  <p className="mt-0.5 text-xs font-medium text-accent">{book.author}</p>
+                  <p
+                    className={`mt-1.5 text-xs leading-relaxed text-foreground-muted ${
+                      showFullDescription ? "" : "line-clamp-4"
+                    }`}
+                  >
+                    {descriptionText}
+                  </p>
+                  {hasLongDescription ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowFullDescription((v) => !v)}
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-accent"
+                    >
+                      {showFullDescription ? "Less" : "More"}
+                      <span
+                        aria-hidden
+                        className={`transition-transform ${showFullDescription ? "rotate-180" : ""}`}
+                      >
+                        ⌄
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
+              </div>
 
-              {/* Title + Author */}
-              <h2
-                id={headingId}
-                className="mt-4 text-center font-serif text-xl font-semibold leading-snug text-foreground"
-              >
-                {book.title}
-              </h2>
-              <p className="mt-1 text-center text-sm text-foreground-muted">{book.author}</p>
-
+              <div className="mt-4 flex flex-col items-center">
               {/* Sentiment pill (finished only) */}
               {shelf === "finished" && displayBucket != null ? (
                 <div className={`mt-3 inline-flex items-center gap-0 rounded-full border ${sentimentPillBg(displayBucket)} overflow-hidden`}>
@@ -339,6 +391,7 @@ export function BookDetailSheet({ bookId, onClose, onStartPairwise }: BookDetail
                   Only visible to you
                 </span>
               ) : null}
+              </div>
             </div>
 
             {/* Sentiment picker (when changing feeling) */}

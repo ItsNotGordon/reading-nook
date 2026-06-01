@@ -60,6 +60,7 @@ export type ReadingNookActions = {
   hydrateLibrary: (next: AppState) => void;
   updateUserBookNotes: (bookId: BookId, notes: string) => void;
   updateCatalogGenres: (bookId: BookId, genres: string[]) => void;
+  updateCatalogDescription: (bookId: BookId, description: string) => void;
   updateProfile: (patch: Partial<Pick<UserProfile, "displayName" | "tagline" | "theme">>) => void;
   dismissRec: (bookId: BookId, catalogBook?: Book) => void;
   addBlacklistWord: (word: string) => void;
@@ -258,6 +259,8 @@ export function ReadingNookProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "UPDATE_USER_BOOK_NOTES", bookId, notes }),
       updateCatalogGenres: (bookId, genres) =>
         dispatch({ type: "UPDATE_CATALOG_GENRES", bookId, genres }),
+      updateCatalogDescription: (bookId, description) =>
+        dispatch({ type: "UPDATE_CATALOG_DESCRIPTION", bookId, description }),
       updateProfile: (patch) => dispatch({ type: "UPDATE_PROFILE", ...patch }),
       dismissRec: (bookId, catalogBook) => dispatch({ type: "DISMISS_REC", bookId, catalogBook }),
       addBlacklistWord: (word) => dispatch({ type: "ADD_BLACKLIST_WORD", word }),
