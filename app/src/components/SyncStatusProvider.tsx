@@ -84,6 +84,7 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
   const lastResumeRefreshAtRef = useRef(0);
   const refreshInFlightRef = useRef<Promise<CloudRefreshOutcome> | null>(null);
   const skipNextDebouncedPushRef = useRef(false);
+  const pendingDebouncedPushRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -131,6 +132,17 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     },
     [applyServerHydrate, rememberServerUpdatedAt],
   );
+
+  const pushNow = useCallback(async () => {
+    if (!user) return;
+    setStatus("syncing");
+    setStatusMessage(null);
+    const result = await pushCloudLibrary(
+      stateRef.current,
+      lastServerUpdatedAtRef.current ?? loadLastServerUpdatedAt(user.id),
+    );
+    handlePushResult(user.id, result);
+  }, [user, handlePushResult]);
 
   const refreshFromCloud = useCallback(
     async (options: RefreshFromCloudOptions = {}): Promise<CloudRefreshOutcome> => {
@@ -199,6 +211,15 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // If local has edits newer than the server revision we just pulled,
+        // do not overwrite local state with a hydrate—push local instead.
+        const localCount = countShelvedBooks(localNow);
+        const localIsNewerThanPulled = isRevisionNewer(localRevision, pull.updatedAt);
+        if (localCount > 0 && localIsNewerThanPulled && librariesDiffer(localNow, pull.state)) {
+          const result = await pushCloudLibrary(localNow, pull.updatedAt);
+          return handlePushResult(userId, result);
+        }
+
         const serverNewer = isServerCloudNewer(pull.updatedAt, lastKnown);
         const staleLocalCache = shouldRehydrateStaleLocalCache(
           lastKnown,
@@ -231,11 +252,15 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
       const promise = run().finally(() => {
         refreshInFlightRef.current = null;
         if (!force) lastResumeRefreshAtRef.current = Date.now();
+        if (pendingDebouncedPushRef.current && readyToPush.current) {
+          pendingDebouncedPushRef.current = false;
+          void pushNow();
+        }
       });
       refreshInFlightRef.current = promise;
       return promise;
     },
-    [user, applyServerHydrate, handlePushResult, rememberServerUpdatedAt],
+    [user, applyServerHydrate, handlePushResult, rememberServerUpdatedAt, pushNow],
   );
 
   const runInitialPull = useCallback(
@@ -297,28 +322,23 @@ export function SyncStatusProvider({ children }: { children: ReactNode }) {
     };
   }, [configured, user, refreshFromCloud]);
 
-  const pushNow = useCallback(async () => {
-    if (!user) return;
-    setStatus("syncing");
-    setStatusMessage(null);
-    const result = await pushCloudLibrary(
-      stateRef.current,
-      lastServerUpdatedAtRef.current ?? loadLastServerUpdatedAt(user.id),
-    );
-    handlePushResult(user.id, result);
-  }, [user, handlePushResult]);
-
   useEffect(() => {
     if (!configured || !user || !readyToPush.current) return;
     if (skipNextDebouncedPushRef.current) {
       skipNextDebouncedPushRef.current = false;
       return;
     }
-    if (refreshInFlightRef.current) return;
+    if (refreshInFlightRef.current) {
+      pendingDebouncedPushRef.current = true;
+      return;
+    }
 
     setStatus("syncing");
     const timer = window.setTimeout(() => {
-      if (refreshInFlightRef.current) return;
+      if (refreshInFlightRef.current) {
+        pendingDebouncedPushRef.current = true;
+        return;
+      }
       const lastKnown =
         lastServerUpdatedAtRef.current ?? loadLastServerUpdatedAt(user.id);
       void pushCloudLibrary(stateRef.current, lastKnown).then((result) => {
