@@ -4,7 +4,6 @@ import {
   defaultSortForShelf,
   parseRatingsSortParam,
   readingProgressFraction,
-  resolveSortWhenShelfChanges,
   sortFinishedRatingRows,
   sortShelfItems,
 } from "./ratingsShelfSort";
@@ -50,9 +49,9 @@ describe("ratingsShelfSort", () => {
     assert.equal(defaultSortForShelf("want_to_read"), "added_desc");
   });
 
-  it("resolveSortWhenShelfChanges keeps shared sorts", () => {
-    assert.equal(resolveSortWhenShelfChanges("want_to_read", "title_asc"), "title_asc");
-    assert.equal(resolveSortWhenShelfChanges("want_to_read", "score_desc"), "added_desc");
+  it("default sort differs by shelf", () => {
+    assert.equal(defaultSortForShelf("finished"), "score_desc");
+    assert.equal(defaultSortForShelf("reading"), "added_desc");
   });
 
   it("parseRatingsSortParam rejects invalid sort for shelf", () => {

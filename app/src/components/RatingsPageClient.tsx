@@ -18,7 +18,6 @@ import { useReadingNook } from "@/lib/app-state";
 import {
   defaultSortForShelf,
   parseRatingsSortParam,
-  resolveSortWhenShelfChanges,
   sortFinishedRatingRows,
   sortShelfItems,
   type RatingsSortKey,
@@ -247,12 +246,11 @@ export function RatingsPageClient() {
       if (shelf === "finished") params.delete("shelf");
       else params.set("shelf", shelf);
       if (shelf !== "finished") params.delete("bucket");
-      const nextSort = resolveSortWhenShelfChanges(shelf, selectedSort);
-      applySortToParams(params, shelf, nextSort);
+      applySortToParams(params, shelf, defaultSortForShelf(shelf));
       replaceRatingsUrl(params);
       setEditOrder(false);
     },
-    [searchParams, replaceRatingsUrl, selectedSort, applySortToParams],
+    [searchParams, replaceRatingsUrl, applySortToParams],
   );
 
   const setSortParam = useCallback(

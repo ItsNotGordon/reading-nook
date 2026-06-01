@@ -100,15 +100,6 @@ export function parseRatingsSortParam(shelf: Shelf, value: string | null): Ratin
   return defaultSortForShelf(shelf);
 }
 
-/** When switching shelves, keep sort if valid on the new shelf; otherwise use default. */
-export function resolveSortWhenShelfChanges(
-  newShelf: Shelf,
-  currentSort: RatingsSortKey,
-): RatingsSortKey {
-  if (isValidSortForShelf(newShelf, currentSort)) return currentSort;
-  return defaultSortForShelf(newShelf);
-}
-
 function timestampMs(iso: string | null | undefined): number {
   if (!iso) return -Infinity;
   const t = Date.parse(iso);
