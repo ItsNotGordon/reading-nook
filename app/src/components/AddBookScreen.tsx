@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useReadingNook } from "@/lib/app-state";
 import { toAppBook } from "@/lib/bookProviders/types";
-import { enrichBook } from "@/lib/enrichOpenLibraryBook";
+import { enrichBook } from "@/lib/enrichBook";
 import { mergeCatalogGenres } from "@/lib/mergeCatalogGenres";
 import type { Book, Shelf } from "@/lib/types";
 import type { SentimentBucket } from "@/lib/types";

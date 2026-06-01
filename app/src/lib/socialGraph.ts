@@ -9,13 +9,12 @@ import {
  * Reading Nook social graph:
  *
  * **`follows`** — one-way edges (`follower_id` → `following_id`).
- *   - Following count = outgoing edges from you.
- *   - Followers count = incoming edges to you.
- *   - **Friends** = mutual follows (you follow them AND they follow you).
+ *   - Following / followers counts come from these edges.
+ *   - **Friends** (colloquial) = mutual follows — a label only, not a library gate.
  *
- * **`friendships`** — approval workflow for private accounts only (`pending` | `accepted`).
- *   `requester_id` / `addressee_id` = who sent the friend request, NOT follow direction.
- *   Accepting a request should create mutual follows; library/taste access requires mutual follow.
+ * **`friendships`** — approval workflow for **private** accounts (`pending` | `accepted`).
+ *   Accepting a request inserts a one-way follow (requester → owner) so the requester
+ *   can view the private library. Public libraries are visible to any signed-in user.
  */
 
 export type SocialProfileRow = {

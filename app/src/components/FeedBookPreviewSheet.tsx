@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AddToShelfSheet } from "@/components/AddToShelfSheet";
 import { useReadingNook } from "@/lib/app-state";
-import { enrichBook } from "@/lib/enrichOpenLibraryBook";
+import { enrichBook } from "@/lib/enrichBook";
 import type { Book } from "@/lib/types";
 import type { FeedBookInfo } from "./FeedCard";
 import type { Shelf } from "@/lib/types";

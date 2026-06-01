@@ -28,6 +28,7 @@ type PublicProfile = {
   avatarUrl: string | null;
   tagline: string;
   isPublic?: boolean;
+  canViewLibrary?: boolean;
   relationship: FriendRelationship;
   friendshipId: string | null;
   viewerFollows?: boolean;
@@ -89,7 +90,7 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     setTaste(null);
     setProfile(data);
     document.title = `${data.displayName} · Reading Nook`;
-    if (data.relationship === "friends") {
+    if (data.canViewLibrary) {
       setTaste("loading");
       setInsights("loading");
       const [insightsRes, tasteRes] = await Promise.all([
@@ -171,13 +172,14 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
     }
   }
 
-  const isFriend = profile?.relationship === "friends";
+  const canViewLibrary = profile?.canViewLibrary ?? false;
   const showSocialTallies =
     profile?.followingCount != null && profile?.followersCount != null;
-  const canFollowPublic =
-    profile?.isPublic &&
-    !isFriend &&
-    profile.relationship !== "pending_incoming";
+  const showPublicFollow =
+    Boolean(profile?.isPublic) && profile?.relationship !== "pending_incoming";
+  const showPrivateUnfollow =
+    Boolean(profile && !profile.isPublic && profile.viewerFollows) &&
+    profile?.relationship !== "pending_outgoing";
 
   const openSocialSheet = useCallback(
     async (which: "following" | "followers") => {
@@ -261,41 +263,35 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
           <p className="mt-2 text-sm italic text-foreground-muted">{profile.tagline}</p>
         ) : null}
 
-        {profile.relationship === "none" ? (
-          <div className="mt-4 space-y-2">
-            {profile.isPublic ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void followAction(profile.viewerFollows ? "DELETE" : "POST")}
-                className="min-h-11 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:opacity-60"
-              >
-                {profile.viewerFollows ? "Unfollow" : "Follow"}
-              </button>
-            ) : null}
+        {showPublicFollow ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void followAction(profile.viewerFollows ? "DELETE" : "POST")}
+              className="min-h-11 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:opacity-60"
+            >
+              {profile.viewerFollows ? "Unfollow" : "Follow"}
+            </button>
+          </div>
+        ) : null}
+
+        {!profile.isPublic && profile.relationship === "none" ? (
+          <div className="mt-4">
             <button
               type="button"
               disabled={busy}
               onClick={() => void sendFriendRequest()}
               className="min-h-11 w-full rounded-xl border border-accent bg-accent px-4 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {profile.isPublic ? "Add friend" : "Request friend"}
+              Request to follow
             </button>
           </div>
         ) : null}
-        {profile.relationship === "pending_outgoing" ? (
+
+        {!profile.isPublic && profile.relationship === "pending_outgoing" ? (
           <div className="mt-4 space-y-2">
-            <p className="text-xs text-foreground-muted">Friend request sent</p>
-            {canFollowPublic ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void followAction(profile.viewerFollows ? "DELETE" : "POST")}
-                className="min-h-10 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold"
-              >
-                {profile.viewerFollows ? "Unfollow" : "Follow"}
-              </button>
-            ) : null}
+            <p className="text-xs text-foreground-muted">Follow request sent</p>
             <button
               type="button"
               disabled={busy}
@@ -306,6 +302,20 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
             </button>
           </div>
         ) : null}
+
+        {showPrivateUnfollow ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void followAction("DELETE")}
+              className="min-h-11 w-full rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground disabled:opacity-60"
+            >
+              Unfollow
+            </button>
+          </div>
+        ) : null}
+
         {profile.relationship === "pending_incoming" ? (
           <div className="mt-4 flex gap-2">
             <button
@@ -337,7 +347,13 @@ export function FriendProfileView({ username, onFriendsChange }: FriendProfileVi
         />
       ) : null}
 
-      {isFriend ? (
+      {!canViewLibrary && !profile.isPublic ? (
+        <p className="rounded-xl border border-border/60 bg-card-surface/50 px-4 py-3 text-center text-sm text-foreground-muted">
+          This account is private.
+        </p>
+      ) : null}
+
+      {canViewLibrary ? (
         <>
           <section className="rounded-xl border border-border/60 bg-card-surface/50 p-3">
             <button

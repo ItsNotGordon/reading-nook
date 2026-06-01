@@ -1,20 +1,58 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { areMutualFollows } from "@/lib/socialGraph";
+import { viewerFollowsTarget } from "@/lib/socialGraph";
+
+export type LibraryAccessInput = {
+  viewerId: string;
+  targetId: string;
+  targetIsPublic: boolean;
+  viewerFollowsTarget: boolean;
+};
 
 /**
- * Library, taste, and profile summaries require **friends** = mutual follows.
+ * Instagram-style library visibility:
+ * - Self always allowed
+ * - Public accounts: any signed-in viewer
+ * - Private accounts: viewer must follow target (approved one-way follow)
  */
-export async function assertMutualFollow(
-  _supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
-  userId: string,
-  friendId: string,
+export function canViewLibrary(input: LibraryAccessInput): boolean {
+  if (input.viewerId === input.targetId) return true;
+  if (input.targetIsPublic) return true;
+  return input.viewerFollowsTarget;
+}
+
+export async function resolveCanViewLibrary(
+  viewerId: string,
+  targetId: string,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+): Promise<boolean> {
+  if (viewerId === targetId) return true;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_public")
+    .eq("id", targetId)
+    .maybeSingle();
+
+  if (!profile) return false;
+
+  const targetIsPublic = Boolean(profile.is_public);
+  if (targetIsPublic) return true;
+
+  return viewerFollowsTarget(viewerId, targetId);
+}
+
+export async function assertCanViewLibrary(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  viewerId: string,
+  targetId: string,
 ) {
-  const mutual = await areMutualFollows(userId, friendId);
-  if (!mutual) {
-    return { ok: false as const, status: 403, error: "Not friends with this user." };
+  const allowed = await resolveCanViewLibrary(viewerId, targetId, supabase);
+  if (!allowed) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "This library is private.",
+    };
   }
   return { ok: true as const };
 }
-
-/** @deprecated Name kept for call sites — checks mutual follow, not friendship rows. */
-export const assertAcceptedFriend = assertMutualFollow;

@@ -41,7 +41,7 @@ It combines:
 | Area | Role |
 | --- | --- |
 | `app/` | Next.js product app — shipped UI, API routes, client state, and providers |
-| `supabase/migrations/` | SQL migrations applied to Supabase, currently `001`–`017` |
+| `supabase/migrations/` | SQL migrations applied to Supabase, currently `001`–`018` |
 | `docs/` | Product and setup documentation |
 | `notebook.ipynb`, `recommender/`, `git-forked-database/` | Legacy/reference artifacts only |
 
@@ -54,7 +54,7 @@ It combines:
 - **Hydration safety:** `ReadingNookProvider.ready` and `ThemedPageShell` protect against SSR/client localStorage mismatch.
 - **Resume refresh:** sync refreshes on focus/visibility with throttling to reduce PWA stale-cache issues.
 - **Auth:** Google OAuth only. Login is mandatory.
-- **Friends/social graph:** legacy `friendships` still exists, but shipped access now includes `follows`, public/private profiles, and mutual-follow library/taste access.
+- **Friends/social graph:** `follows` for one-way following; `friendships` for private-account approval requests; `profiles.is_public` for Instagram-style library visibility (public = open library; private = approved followers only). **Friends** (mutual follow) is colloquial labeling only—not a library gate.
 - **Feed:** `feed_events`, `posts`, `post_reactions`, `event_reactions`, `comment_likes`; one-level threaded comments.
 - **Privacy:** `UserBook.visibility` is per-user and must be enforced server-side for friend/feed/club/profile responses.
 - **Clubs:** `clubs`, `club_members`, `club_invites`, `notifications`, `club-icons` storage, club feeds, and unread tracking.
@@ -173,7 +173,7 @@ Home | Library | Add | Ratings | Profile
 
 ### Supabase status
 
-Supabase is required for the shipped app. Core migrations currently run from `001_reading_nook.sql` through `017_follows_and_profile_visibility.sql`.
+Supabase is required for the shipped app. Core migrations currently run from `001_reading_nook.sql` through `018_library_visibility_public_and_followers.sql`.
 
 ### Sign-in
 
@@ -489,7 +489,7 @@ Rules:
 - Do not use legacy Goodbooks JSON as the live UI source.
 - Hide shelved and dismissed candidates.
 - DNF books are already in the user's library and should not appear as candidates.
-- Open Library is not a live provider; `enrichOpenLibraryBook.ts` is a misleading legacy filename that currently calls the Google Books-backed work route.
+- Open Library is not a live provider; use `app/src/lib/enrichBook.ts` (Google Books `/api/books/work`).
 
 ### Discover pool
 
@@ -609,33 +609,38 @@ Note: shipped copy may still say decorations are “Profile only,” but themes 
 
 ### Model
 
-Reading Nook currently uses both legacy friendship rows and newer follow-based social graph behavior.
+Reading Nook uses Instagram-style account visibility plus a follow graph:
 
-- `friendships` supports pending/accepted request flows.
-- `follows` supports asymmetric following.
-- `profiles.is_public` controls whether others can follow/view public profile surfaces.
-- Mutual follows function as the stricter “friend” relationship for library/taste access.
-- Migration `017_follows_and_profile_visibility.sql` adds follows and profile visibility and backfills mutual follows from accepted friendships.
+- **`follows`** — one-way edges (`follower_id` → `following_id`). Powers follower/following counts.
+- **`friendships`** — approval workflow for **private** accounts only (`pending` → accept/decline). Not used for public accounts.
+- **`profiles.is_public`** — account visibility. New users default to **private** (`false`).
+- **Friends (colloquial)** — mutual follows (you follow each other). A social label only; **not** a permission gate for library access.
+
+Migration `017_follows_and_profile_visibility.sql` adds follows and profile visibility. Migration `018_library_visibility_public_and_followers.sql` updates library RLS to match.
 
 ### Access rules
 
-- Public profiles can be discovered/followed.
-- Library and taste access are gated by mutual follow access in shipped code, not friendship rows alone.
-- Private books are sanitized even when the viewer has access.
+| Account type | Who can view library + ratings |
+| --- | --- |
+| **Public** (`is_public = true`) | Any signed-in user — no follow required (like public Instagram posts) |
+| **Private** (`is_public = false`) | Only users the owner **approved** via follow request (one-way follow: requester → owner after accept) |
+| **Self** | Always full access |
+
+- Per-book `UserBook.visibility = private` still sanitizes individual titles for non-owners on all surfaces.
+- Enforcement lives in `assertCanViewLibrary` / `canViewLibrary` ([`friendAccess.ts`](app/src/lib/friendAccess.ts)) and matching Supabase RLS on `libraries`.
 - Service-role helpers may be used server-side for accurate counts/lists.
 
 ### UX
 
-- Users can follow/unfollow public accounts.
-- Friend/profile pages can show Follow, Unfollow, Add Friend, or mutual friend-style states depending on user relationship.
-- `/friends/[username]` is a full page, not a modal.
-- Self username routes redirect to `/profile`.
-- Followers/following counts can differ; profile copy explains this.
-- `FriendBookCompareSheet` and taste comparison compare shared rated books, including cross-provider matching where available.
+- **Public profiles:** Follow / Unfollow only (no “Add friend”). Library visible even without following.
+- **Private profiles:** “Request to follow” → pending → accept creates one-way follow (requester can view library; owner does not auto-follow back).
+- `/friends/[username]` is a full page; self username redirects to `/profile`.
+- `GET /api/users/[username]` returns `canViewLibrary` for client gating.
+- `FriendBookCompareSheet` and taste comparison load for any viewer with library access.
 
 ### APIs
 
-Relevant APIs include `/api/friends`, `/api/friends/followers`, `/api/friends/following`, `/api/users/[username]/follow`, `/api/profile/visibility`, and friend-scoped library/profile/taste endpoints.
+Relevant APIs: `/api/friends` (private follow requests + accept/decline), `/api/friends/followers`, `/api/friends/following`, `/api/users/[username]/follow` (public accounts only), `/api/profile/visibility`, and friend-scoped `/api/friends/[friendId]/library|profile|taste`.
 
 ---
 
@@ -771,6 +776,7 @@ All migrations live in `supabase/migrations/` and must be run in order.
 | `015_club_invites.sql` | Pending club invites |
 | `016_club_icon.sql` | Club icon storage and icon URL |
 | `017_follows_and_profile_visibility.sql` | `profiles.is_public`, `follows` table, RLS, friendship-to-follow backfill |
+| `018_library_visibility_public_and_followers.sql` | Library RLS: public profiles open to all authenticated users; private profiles open to approved one-way followers |
 
 ---
 
@@ -783,7 +789,7 @@ All migrations live in `supabase/migrations/` and must be run in order.
 | `notebook.ipynb` | STAT course artifact/reference |
 | Goodbooks static JSON | Not live UI source |
 | `app/src/lib/bookProviders/openLibrary.ts` | Deleted |
-| `app/src/lib/enrichOpenLibraryBook.ts` | Legacy/misleading filename; still imported and calls Google Books-backed `/api/books/work` |
+| `app/src/lib/enrichBook.ts` | Google Books work enrichment via `/api/books/work` |
 | `MagicLinkAuthForm.tsx` | Deleted |
 | `SyncConflictSheet.tsx` | Deleted |
 | `RatedBookDetailSheet.tsx` | Exists but unused/superseded |
@@ -824,16 +830,19 @@ When editing Reading Nook:
 
 ---
 
-## 20. Open Questions / Follow-up Decisions
+## 20. Resolved product decisions
 
-These are the remaining product/code alignment questions I could not fully resolve from the uploaded PRD and handoff alone:
-
-1. **BookDetailSheet design direction:** Code currently uses the compact horizontal header. Should the product direction remain this way, or do you still want to move toward the larger centered-cover Option E-style sheet later?
-2. **Theme names:** Code uses `garden`; your recent product language has used Moonlit/Midnight Garden. Should the display name be “Moonlit Garden” while the internal key remains `garden`?
-3. **Legacy filename:** Should `enrichOpenLibraryBook.ts` be renamed to something like `enrichBook.ts` or `googleBooksEnrichment.ts`, or left alone to avoid churn?
-4. **Friendship vs follow copy:** Should UI copy call mutual follows “friends,” or should it explicitly distinguish followers/following from friends?
-5. **Custom shelves/collections:** This PRD documents shipped shelves only. If custom user shelves are planned, should they be called Collections/Lists instead of primary shelves?
+| Topic | Decision |
+| --- | --- |
+| BookDetailSheet layout | Keep compact horizontal header (matches AddToShelf); description with More/Less |
+| Theme display name | **Garden** (`garden` key; legacy `plant` normalizes to `garden`) |
+| Book enrichment module | `app/src/lib/enrichBook.ts` |
+| Ratings genre/author filters | URL/deep-link only from Profile; no in-page pickers on `/ratings` |
+| Library visibility | Instagram-style: public = open library; private = approved one-way follower; friends = mutual follow label only |
+| Private request accept | One-way follow (requester → owner), not mutual |
+| New account default | Private profile (`is_public = false`) |
+| Custom shelves/collections | Possible future roadmap; not shipped |
 
 ---
 
-**Document maintenance:** This file is the canonical current PRD draft for the shipped app. `Reading_Nook_Product_PRD.md` should point to the current version if file names change.
+**Document maintenance:** This file is the canonical current PRD. [`Reading_Nook_Product_PRD.md`](Reading_Nook_Product_PRD.md) points here.

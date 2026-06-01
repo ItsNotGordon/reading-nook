@@ -2,14 +2,16 @@
 
 ## Canonical (use for all current product work)
 
-**[Reading_Nook_Product_PRD_Current.md](./Reading_Nook_Product_PRD_Current.md)**
+**[Reading_Nook_Product_PRD_Current_Updated_v3.md](./Reading_Nook_Product_PRD_Current_Updated_v3.md)**
 
-This file is the **source of truth** for:
+Shortcut pointer: **[Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md)**
+
+This is the **source of truth** for:
 
 - current UI and navigation  
 - routes and redirects  
 - data model and persistence  
-- shipped behavior and friends-scale roadmap  
+- shipped behavior (including social visibility, clubs, sync)  
 
 It **supersedes** older PRDs when they conflict.
 
@@ -21,8 +23,8 @@ Do not use these for current product decisions (navigation, types, routes, or ro
 
 | Document | Notes |
 | -------- | ----- |
-| [Reading_Nook_PRD.md](./Reading_Nook_PRD.md) | Original MVP spec; outdated tab names (`Leaderboard`, standalone `Recs`) and types (`currentlyReading`, `books` vs `catalog`) |
-| [Reading_Nook_Updated_PRD.md](./Reading_Nook_Updated_PRD.md) | Transition doc; e.g. Search \| Recs segment does not match the app |
-| [Reading_Nook_Product_PRD.md](./Reading_Nook_Product_PRD.md) | **Pointer** to the canonical [Reading_Nook_Product_PRD_Current.md](./Reading_Nook_Product_PRD_Current.md) (same spec; use `_Current` for the full document) |
+| [Reading_Nook_PRD.md](./Reading_Nook_PRD.md) | Original MVP spec; outdated tab names and types |
+| [Reading_Nook_Updated_PRD.md](./Reading_Nook_Updated_PRD.md) | Transition doc |
+| [Reading_Nook_Product_PRD_Current_Updated_v2.md](./Reading_Nook_Product_PRD_Current_Updated_v2.md) | Prior canonical snapshot; superseded by v3 |
 
 **Preserved assets (not deleted):** `notebook.ipynb`, `recommender/`, `git-forked-database/`.

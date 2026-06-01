@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canViewLibrary } from "@/lib/friendAccess";
 import { countAcceptedFriendships } from "@/lib/friendshipCounts";
 import { findFriendshipBetween, resolveSocialRelationship } from "@/lib/friendshipStatus";
 import { areMutualFollows, viewerFollowsTarget } from "@/lib/socialGraph";
@@ -67,6 +68,12 @@ export async function GET(
   const isPublic = Boolean(profile.is_public);
   const canViewCounts =
     relationship === "friends" || isPublic || viewerFollows || targetFollowsViewer;
+  const canViewLibraryFlag = canViewLibrary({
+    viewerId: user.id,
+    targetId: profile.id,
+    targetIsPublic: isPublic,
+    viewerFollowsTarget: viewerFollows,
+  });
 
   return NextResponse.json({
     id: profile.id,
@@ -75,6 +82,7 @@ export async function GET(
     avatarUrl: profile.avatar_url ?? null,
     tagline: profile.tagline ?? "",
     isPublic,
+    canViewLibrary: canViewLibraryFlag,
     relationship,
     friendshipId,
     viewerFollows,

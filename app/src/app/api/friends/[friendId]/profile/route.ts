@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAcceptedFriend } from "@/lib/friendAccess";
+import { assertCanViewLibrary } from "@/lib/friendAccess";
 import { redactStateForFriendView } from "@/lib/bookPrivacy";
 import { buildFriendProfileSummary } from "@/lib/friendProfileSummary";
 import { getInitialState, parseStoredState } from "@/lib/storage";
@@ -26,9 +26,9 @@ export async function GET(
   }
 
   const { friendId } = await context.params;
-  const friendship = await assertAcceptedFriend(supabase, user.id, friendId);
-  if (!friendship.ok) {
-    return NextResponse.json({ error: friendship.error }, { status: friendship.status });
+  const access = await assertCanViewLibrary(supabase, user.id, friendId);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const { data: profile, error: profileError } = await supabase

@@ -189,7 +189,7 @@ export default function ProfilePage() {
               />
               {!socialGated ? (
                 <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
-                  Friends follow each other back. Following and follower counts can differ.
+                  Public accounts share their library with everyone. Private accounts require approval.
                 </p>
               ) : null}
               <div className="rounded-2xl border border-dashed border-border/80 bg-card-surface/75 px-4 py-8 text-center shadow-inner backdrop-blur-[1px]">
@@ -226,7 +226,7 @@ export default function ProfilePage() {
               />
               {!socialGated ? (
                 <p className="-mt-1 text-center text-[11px] leading-snug text-foreground-muted">
-                  Friends follow each other back. Following and follower counts can differ.
+                  Public accounts share their library with everyone. Private accounts require approval.
                 </p>
               ) : null}
               <ProfileShelfBars rows={shelfRows} />

@@ -6,8 +6,9 @@ import {
 import {
   areMutualFollows,
   countFollowDirections,
-  ensureMutualFollows,
+  insertFollow,
   listMutualFollowsForUser,
+  viewerFollowsTarget,
 } from "@/lib/socialGraph";
 import { normalizeUsername } from "@/lib/username";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -137,16 +138,28 @@ export async function POST(request: Request) {
       : "";
 
   let targetId = userId;
+  let targetIsPublic = false;
   if (!targetId && username) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, is_public")
       .eq("username", username)
       .maybeSingle();
     if (!profile) {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
     }
     targetId = profile.id;
+    targetIsPublic = Boolean(profile.is_public);
+  } else if (targetId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_public")
+      .eq("id", targetId)
+      .maybeSingle();
+    if (!profile) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    targetIsPublic = Boolean(profile.is_public);
   }
 
   if (!targetId) {
@@ -154,6 +167,17 @@ export async function POST(request: Request) {
   }
   if (targetId === user.id) {
     return NextResponse.json({ error: "You cannot add yourself." }, { status: 400 });
+  }
+
+  if (targetIsPublic) {
+    return NextResponse.json(
+      { error: "This account is public. Use Follow on their profile instead." },
+      { status: 400 },
+    );
+  }
+
+  if (await viewerFollowsTarget(user.id, targetId)) {
+    return NextResponse.json({ error: "You already follow this account." }, { status: 409 });
   }
 
   const { links, error: linkError } = await findFriendshipBetween(supabase, user.id, targetId);
@@ -255,7 +279,7 @@ export async function PATCH(request: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    await ensureMutualFollows(row.requester_id, row.addressee_id);
+    await insertFollow(row.requester_id, row.addressee_id);
     return NextResponse.json({ ok: true });
   }
 

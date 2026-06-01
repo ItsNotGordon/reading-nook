@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * `friendships` = private-account approval requests (pending | accepted row).
- * **Friends** in product terms = mutual follows — see `resolveSocialRelationship`.
+ * **Friends** in product terms = mutual follows — colloquial label only; library access
+ * uses public/private profile rules in `friendAccess.ts`.
  */
 
 export type FriendRelationship =

@@ -44,6 +44,3 @@ export async function enrichBook(book: Book): Promise<Book> {
     return book;
   }
 }
-
-/** @deprecated Use `enrichBook` instead. Kept for backward compatibility. */
-export const enrichOpenLibraryBook = enrichBook;

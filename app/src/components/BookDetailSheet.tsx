@@ -13,7 +13,7 @@ import { ShareSentimentToFeedToggle } from "@/components/ShareSentimentToFeedTog
 import { bookHasBucketRanking } from "@/lib/libraryRankings";
 import { sentimentLabel } from "@/lib/sentiment-display";
 import { readingProgressDisplayFromBook } from "@/lib/readingProgressDisplay";
-import { enrichBook } from "@/lib/enrichOpenLibraryBook";
+import { enrichBook } from "@/lib/enrichBook";
 import type { BookId, SentimentBucket, Shelf } from "@/lib/types";
 
 type BookDetailSheetProps = {

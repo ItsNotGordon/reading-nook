@@ -10,34 +10,44 @@ When editing files under `app/` for **The Reading Nook**:
 
 ## Canonical spec (read first)
 
-**[`docs/Reading_Nook_Product_PRD.md`](docs/Reading_Nook_Product_PRD.md)** supersedes all older PRDs for **current product decisions**. Use it as the sole source of truth for:
+**[`docs/Reading_Nook_Product_PRD.md`](docs/Reading_Nook_Product_PRD.md)** → **[`docs/Reading_Nook_Product_PRD_Current_Updated_v3.md`](docs/Reading_Nook_Product_PRD_Current_Updated_v3.md)**
+
+Use as the sole source of truth for:
 
 - tab names, routes, shell layout, and redirects  
-- shelves, library, add flow (search + recs), ratings, profile, friends placeholder  
+- shelves, library, add flow (search + recs), ratings, profile, friends/follows  
 - `AppState` / types / persistence / `reading-nook-v1` storage  
 - sentiment buckets, progress modes, derived scoring, recommendation scope  
-- friends-scale **roadmap** (deploy, auth, Supabase/Postgres, sync, friend features)
+- Supabase sync, Instagram-style public/private library visibility, clubs, feed  
 
-Shortcut: [`docs/PRD.md`](docs/PRD.md) points to the Product PRD.
+Shortcut: [`docs/PRD.md`](docs/PRD.md) points to v3.
+
+## Social visibility (shipped)
+
+- **Public account** (`profiles.is_public`): any signed-in user can view library/ratings (per-book private toggles still sanitized).
+- **Private account**: library only for **approved** one-way followers (requester → owner after accept).
+- **Friends** = mutual follow = colloquial label only; not a library permission gate.
+- Access helper: `app/src/lib/friendAccess.ts` (`canViewLibrary`, `assertCanViewLibrary`).
 
 ## Historical / reference only
 
-Do **not** use these for current UI, routes, data model, or roadmap—they may be outdated:
+Do **not** use these for current UI, routes, data model, or roadmap:
 
 - [`docs/Reading_Nook_PRD.md`](docs/Reading_Nook_PRD.md) — original MVP  
 - [`docs/Reading_Nook_Updated_PRD.md`](docs/Reading_Nook_Updated_PRD.md) — transition snapshot  
+- [`docs/Reading_Nook_Product_PRD_Current_Updated_v2.md`](docs/Reading_Nook_Product_PRD_Current_Updated_v2.md) — prior snapshot  
 
-Consult them only for **supplementary** algorithm or requirement detail (e.g. pairwise insertion math) when the Product PRD does not cover it.
+Consult them only for **supplementary** algorithm detail when v3 is silent.
 
 ## Conflicts
 
-- **Product PRD vs older PRD:** follow **Reading_Nook_Product_PRD.md**.  
+- **Product PRD vs older PRD:** follow **v3**.  
 - **Product PRD vs code:** call out the conflict; prefer Product PRD unless the user says to diverge.  
 - **Product PRD silent:** say what is missing; do not invent tabs, fields, or MVP scope.
 
 ## Product direction
 
-Friends-scale deployable app—not mass-market social, not class ML integration. Prioritize **tracking, pairwise ranking, deployability**, then **auth + Postgres/Supabase + sync + small-group friend features**. Do **not** treat Apriori + KNN notebook extraction as the default next task.
+Friends-scale deployable app—not mass-market social, not class ML integration. Core loop: tracking, pairwise ranking, cozy UI, small-group social (feed, clubs, follows). Do **not** treat Apriori + KNN notebook extraction as the default next task.
 
 ## Preserved reference (do not delete; do not drive roadmap)
 
@@ -45,10 +55,6 @@ Friends-scale deployable app—not mass-market social, not class ML integration.
 - `recommender/` — offline JSON builds; keep unless user asks otherwise  
 - `git-forked-database/` — dataset for `build:books` / legacy rec scripts  
 
-## MVP vs future
-
-`localStorage` and `public/data/*.json` are valid for the current app. Roadmap items (auth, cloud DB, social) are in scope **only when the user asks**—but new code should not block that path.
-
 ## Repo layout
 
-The Next.js app lives in `app/`. Do not change `notebook.ipynb` or remove `recommender/` unless the user explicitly requests it.
+The Next.js app lives in `app/`. Migrations through `018` in `supabase/migrations/`. Do not change `notebook.ipynb` or remove `recommender/` unless the user explicitly requests it.
