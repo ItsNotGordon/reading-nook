@@ -1,6 +1,12 @@
 import { buildTasteSignals, type RecPersonalRow } from "@/lib/recPersonalization";
 import { RECOMMENDATION_SCORE_FLOOR } from "@/lib/ranking";
-import { HYBRID_SOURCE, hybridAprioriKnnRecommend, tfidfRecommend } from "@/lib/recommender";
+import {
+  clusterRecommend,
+  HYBRID_SOURCE,
+  hybridAprioriKnnRecommend,
+  tfidfRecommend,
+} from "@/lib/recommender";
+import { buildLibraryClusters } from "@/lib/recommender/libraryClusters";
 import type { AppState, Book } from "@/lib/types";
 import type { SearchBookResult } from "@/lib/bookProviders/types";
 
@@ -8,7 +14,7 @@ export { HYBRID_SOURCE };
 
 export const APP_NATIVE_SOURCE_CATALOG = "app-native-catalog";
 export const APP_NATIVE_SOURCE_DISCOVER = "googlebooks-discover";
-export const RECOMMENDATION_ENGINES = ["hybrid", "tfidf"] as const;
+export const RECOMMENDATION_ENGINES = ["hybrid", "tfidf", "clusters"] as const;
 export type RecommendationEngine = (typeof RECOMMENDATION_ENGINES)[number];
 
 /** Fetch discover candidates when unshelved catalog count is below this. */
@@ -41,6 +47,9 @@ function buildRecommendationsByEngine(
 ): RecPersonalRow[] {
   if (engine === "tfidf") {
     return tfidfRecommend(state, candidates, { maxResults });
+  }
+  if (engine === "clusters") {
+    return clusterRecommend(state, candidates, { maxResults });
   }
   return hybridAprioriKnnRecommend(state, candidates, { maxResults });
 }
@@ -150,6 +159,14 @@ export function buildAppNativeRecommendations(
       recommendations: [],
       emptyReason:
         "Finish and rate at least one book to get recommendations based on your taste.",
+    };
+  }
+
+  if (engine === "clusters" && !buildLibraryClusters(state)) {
+    return {
+      recommendations: [],
+      emptyReason:
+        "Taste Groups needs more variety in your library — shelve at least six books across different genres and finish rating a few.",
     };
   }
 

@@ -301,6 +301,7 @@ function SystemPanel({
   const options: { value: RecommendationEngine; label: string }[] = [
     { value: "hybrid", label: "For You" },
     { value: "tfidf", label: "Similar Vibes" },
+    { value: "clusters", label: "Taste Groups" },
   ];
 
   return (

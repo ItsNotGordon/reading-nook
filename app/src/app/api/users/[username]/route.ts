@@ -66,8 +66,6 @@ export async function GET(
   const counts = await countAcceptedFriendships(supabase, profile.id);
 
   const isPublic = Boolean(profile.is_public);
-  const canViewCounts =
-    relationship === "friends" || isPublic || viewerFollows || targetFollowsViewer;
   const canViewLibraryFlag = canViewLibrary({
     viewerId: user.id,
     targetId: profile.id,
@@ -87,7 +85,7 @@ export async function GET(
     friendshipId,
     viewerFollows,
     targetFollowsViewer,
-    followingCount: canViewCounts ? counts.following : null,
-    followersCount: canViewCounts ? counts.followers : null,
+    followingCount: counts.following,
+    followersCount: counts.followers,
   });
 }

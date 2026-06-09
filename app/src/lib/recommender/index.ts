@@ -48,6 +48,20 @@ export {
 } from "./tfidfRecommend";
 
 export {
+  CLUSTER_SOURCE,
+  clusterRecommend,
+  type ClusterRecommendOptions,
+} from "./clusterRecommend";
+
+export {
+  buildLibraryClusters,
+  MIN_CLUSTER_COUNT,
+  MIN_SHELVED_FOR_CLUSTERS,
+  type LibraryClusterModel,
+  type TasteCluster,
+} from "./libraryClusters";
+
+export {
   DEFAULT_POPULARITY_SCORE,
   buildPopularityScoreMap,
   popularityBottomThreshold,
